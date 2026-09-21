@@ -1,26 +1,28 @@
-# AST Verwaltung
+# AST Manager
 
-Funktionsfähiges Windows-Desktop-MVP in Python. Sechs Module, zentrale SQLite-Datenbank, native Stundenberechnung und Ausgabe in der bereitgestellten Lohnausweis-PDF. Excel wird weder benötigt noch gestartet.
+Funktionsfähiges Windows-Desktop-MVP in Python. Fünf übersichtliche Arbeitsbereiche, zentrale SQLite-Datenbank, native Stundenberechnung und Ausgabe in der bereitgestellten Lohnausweis-PDF. Excel wird weder benötigt noch gestartet.
 
 ## Sofort ausprobieren
 
-**Fertige Windows-Version:** Das komplette Windows-Paket entpacken. `Demo starten.bat` öffnet eine getrennte Demo mit fiktiven Personen, Rechnungen, Stunden und einem Lohnausweis. `AST-Verwaltung.exe` öffnet die zunächst leere produktive Datenbank. Der Ordner `_internal` muss neben der EXE bleiben. Python und Internet sind für diese Version nicht nötig.
+**Empfohlen:** Im [neuesten Release](https://github.com/manueltuescher/AST-Manager/releases/latest) `AST-Verwaltung-Setup-x64.exe` laden und installieren. Danach AST Manager über das Startmenü öffnen. Updates lassen sich direkt im Programm installieren; für das private Repository einmalig den GitHub-Zugang hinterlegen (siehe [Updates einrichten](docs/UPDATES.md)).
+
+**Portable Windows-Version:** Das komplette Windows-Paket entpacken. `Demo starten.bat` öffnet eine getrennte Demo mit fiktiven Personen, Rechnungen, Stunden und einem Lohnausweis. `AST-Verwaltung.exe` öffnet die zunächst leere produktive Datenbank. Der Ordner `_internal` muss neben der EXE bleiben. Python und Excel sind nicht nötig. Die Datenerfassung funktioniert offline; nur die Update-Suche benötigt Internet.
 
 **Aus dem Quellcode:** Python 3.12, 64 Bit, installieren und `start_demo.bat` doppelklicken. Beim ersten Start werden die Bibliotheken aus `requirements.txt` in eine lokale `.venv` installiert. Dafür ist Internet nötig. Danach startet die App offline. `start.bat` öffnet die produktive Datenbank.
 
-Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfenstergrösse 1180 × 760 logische Pixel; 1440 × 900 oder grösser empfohlen.
+Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfenstergrösse 1120 × 720 logische Pixel; 1380 × 880 oder grösser empfohlen.
 
 ## Bedienung
 
-1. Unter **Stammdaten → Firma** die Ausstellerdaten eintragen und speichern.
-2. Unter **Mitarbeiter** oder **Lernende** eine Person anlegen. Personalnummer, Name, Pensum und Ferienanspruch werden zentral gespeichert.
-3. Für diese Person die erste **Periode** anlegen. Bei Lernenden sind Start und Ende des Lehrjahres frei wählbar. Der Ferienanspruch ist ein Stundenwert; die Vorlage verwendet 216.25 h. Teiljahre oder Teilzeitansprüche werden bewusst als vereinbarter Stundenwert erfasst.
-4. **Stunden erfassen**: Ferien, Überzeit, Krankheit oder Unfall mit Datum und Dezimalstunden buchen. 1.50 h entsprechen 90 Minuten. Guthaben und Überträge aktualisieren sich sofort nach dem Speichern. Im Tab «Alle Perioden & Überträge» erscheinen die verbundenen Jahre.
-5. Unter **Debitoren** eine Rechnung anlegen. Kunden können direkt im Rechnungsdialog angelegt werden. Eine Rechnung auswählen und **Zahlungen** öffnen, um Teilzahlungen mit Valutadatum zu verbuchen. Such-, Status-, Jahres- und Quartalsfilter wirken auf Tabelle und Auswertung. Doppelklick öffnet die Bearbeitung.
-6. Unter **Lohnausweise** einen Ausweis pro Person und Jahr anlegen. Beträge in ganzen CHF eingeben, speichern und **Vorschau** oder **PDF exportieren** wählen. Alle sichtbaren Formularfelder sind abgedeckt, einschliesslich Spesen, Nebenleistungen und Ausstellerzeilen.
-7. Unter **Stammdaten → Daten & Sicherung** sichern oder wiederherstellen. Vor der Wiederherstellung wird eine zusätzliche Sicherung angelegt. Beim ersten Programmstart pro Tag wird der aktuelle Stand ebenfalls gesichert.
+1. **Start:** Direkteinstieg für Rechnung, Zeit und Lohnausweis. Offene Rechnungen mit Fälligkeit stehen darunter. Bei einem leeren Datenbestand helfen Hinweise beim Einrichten.
+2. **Rechnungen:** Die Ansicht startet mit offenen Rechnungen. «Bezahlt» und «Alle» wechseln die Auswahl. Rechnung auswählen, dann **Zahlung erfassen** oder **Details bearbeiten**. Die Zahlung wird gespeichert und der Dialog geschlossen. Bisherige Zahlungen sind im Dialog aufklappbar. Zeitraumfilter und Export liegen bei den weiteren Optionen.
+3. **Team:** Mitarbeiter und Lernende stehen in einer gemeinsamen Liste mit Filtern. **Neue Person** schlägt eine Personalnummer vor; ergänzende Personalangaben sind aufklappbar. Nach dem Anlegen wird das erste Jahr eingerichtet. Person auswählen → **Zeit erfassen** oder **Nachweis öffnen**. Im Nachweis bleiben Guthaben und Buchungen sichtbar; Berechnung und Vorjahre lassen sich bei Bedarf aufklappen. **Person & Jahre** enthält Stammdaten und Folgejahre.
+4. **Lohnausweise:** Vier Schritte führen durch Person/Zeitraum, Lohn/Abzüge, Zusatzangaben und abschliessende Prüfung. Die häufigen Lohnfelder stehen zuerst. Nach dem Speichern **PDF ansehen** oder **PDF speichern** wählen.
+5. **Einstellungen:** Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert und für künftige Lohnausweise übernommen. Personen werden zentral im Team gepflegt.
 
-Eingaben werden mit **Speichern** übernommen. Das Schliessen oder Abbrechen eines Erfassungsdialogs verwirft ungespeicherte Eingaben. Das Firmenformular hat einen eigenen Speicherknopf. `F5` aktualisiert die aktuelle Seite. Personen mit bestehenden Daten können auf inaktiv gesetzt werden.
+Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Eingaben. `F5` aktualisiert die aktuelle Seite. Listen erklären, welche Auswahl für die nächste Aktion nötig ist. Grössere Formulare und ausgeklappte Details können gescrollt werden.
+
+Ferienanspruch wird in Stunden vereinbart (Vorlagenwert 216.25 h); das Pensum reduziert ihn nicht nochmals automatisch. 1.50 h entsprechen 90 Minuten. Für ein erstes Jahr lassen sich bestehende Guthaben übernehmen, Folgejahre berechnen Überträge automatisch. Personen mit bestehenden Daten können auf inaktiv gesetzt werden.
 
 ## Übernommene Vorlagenlogik
 
@@ -39,6 +41,8 @@ Standard: `%LOCALAPPDATA%\AST-Erfassungstool\`.
 - `ast-demo.sqlite3`: getrennte Demodaten.
 - `backups\`: tägliche Start-Sicherungen und Sicherungen vor einer Wiederherstellung.
 - `vorschau\`: erzeugte PDF-Vorschauen.
+- `credentials\`: separat mit Windows verschlüsselter GitHub-Zugang.
+- `updates\`: heruntergeladene und geprüfte Setups.
 - `ast.log`: Fehlermeldungen.
 
 Ein anderer Ordner lässt sich mit `python main.py --data-dir "D:\AST-Daten"` wählen. Eine zweite Instanz derselben Datenbank wird verhindert. Die App ist für einen lokalen Arbeitsplatz gedacht. Die SQLite-Datei ist nicht verschlüsselt; sie übernimmt die Windows-Dateizugriffsrechte. Sicherungen werden nicht automatisch auf ein externes Laufwerk übertragen.
@@ -51,7 +55,10 @@ ast_app/
   database.py              Schema, Transaktionen, Stammdaten, CRUD, Sicherungen
   domain.py                Berechnungen und Validierung ohne Excel
   dialogs.py               Eingabemasken
-  pages.py                 Sechs Module, PDF-Vorschau, Auswertungen
+  experience.py            Fünf geführte Arbeitsbereiche
+  pages.py                 Gemeinsame Datenaktionen, PDF-Vorschau, Auswertungen
+  updates.py / update_ui.py Release-Prüfung, Download und Updatefenster
+  credentials.py           Geschützter GitHub-Zugang mit Windows DPAPI
   widgets.py / theme.py     Wiederverwendbare UI und Gestaltung
   window.py                Hauptfenster und Navigation
   documents.py             Original-PDF befüllen, Berichte, CSV
@@ -64,11 +71,14 @@ scripts/                   Windows-Start-, Test- und Build-Skripte
 assets/                    Anwendungssymbol
 requirements*.txt          Fixierte Abhängigkeiten
 AST-Verwaltung.spec        Windows-Build-Konfiguration
+installer/                 Windows-Setup und Neustart nach Updates
+.github/workflows/         Tests und automatische Releases
+release_config.json        Mitgelieferte Repository-Verbindung
 ```
 
 ## Tests und eigener Build
 
-`test.bat` installiert zusätzlich die Entwicklungsabhängigkeiten und führt die Tests aus. `build.bat` testet zuerst und erstellt anschliessend `dist\AST-Verwaltung\AST-Verwaltung.exe` samt benötigtem `_internal`-Ordner. Für Änderungen den gesamten Build-Ordner weitergeben.
+`test.bat` installiert zusätzlich die Entwicklungsabhängigkeiten und führt die Tests aus. `build.bat` testet zuerst und erstellt anschliessend `dist\AST-Verwaltung\AST-Verwaltung.exe` samt benötigtem `_internal`-Ordner. `build_setup.bat` erstellt anschliessend das Setup (Inno Setup 6 nötig). Programmänderungen auf `main` erzeugen automatisch ein neues Release; Details stehen in [docs/UPDATES.md](docs/UPDATES.md).
 
 Alternativ mit einer aktivierten Python-Umgebung:
 

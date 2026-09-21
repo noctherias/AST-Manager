@@ -1,0 +1,78 @@
+name: Windows Release
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Determine release version
+        id: version
+        run: python tools/prepare_release.py
+      - name: Test calculations, documents, interface and updates
+        run: python -m unittest discover -s tests -v
+      - name: Build Windows application
+        run: |
+          python tools/make_icon.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller --noconfirm AST-Verwaltung.spec
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/collect_licenses.py dist/AST-Verwaltung/_internal/licenses
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/package_release.py
+      - name: Test packaged application
+        run: |
+          $p = Start-Process -FilePath 'dist/AST-Verwaltung/AST-Verwaltung.exe' -ArgumentList @('--smoke-test','--demo','--data-dir',"$env:RUNNER_TEMP/ast-smoke") -WindowStyle Hidden -PassThru -Wait
+          if ($p.ExitCode -ne 0 -or !(Test-Path "$env:RUNNER_TEMP/ast-smoke/smoke-test-ok.txt")) { throw 'Windows start test failed' }
+      - name: Install verified setup compiler
+        run: |
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile "$env:RUNNER_TEMP/inno.exe"
+          if ((Get-FileHash "$env:RUNNER_TEMP/inno.exe" -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Compiler checksum mismatch' }
+          $p = Start-Process "$env:RUNNER_TEMP/inno.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/NOICONS',"/DIR=$env:RUNNER_TEMP/inno") -WindowStyle Hidden -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw 'Compiler setup failed' }
+      - name: Build installer
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          & "$env:RUNNER_TEMP/inno/ISCC.exe" "/DAppVersion=$env:RELEASE_VERSION" installer/AST-Manager.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record exact release source
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ast_app/__init__.py release_config.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) { git commit -m "Build $env:RELEASE_TAG" }
+          git tag $env:RELEASE_TAG
+          git push origin "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create $env:RELEASE_TAG 'installer-output/AST-Verwaltung-Setup-x64.exe' '../AST-Verwaltung-Windows.zip' '../AST-Erfassungstool-Quellcode.zip' --verify-tag --draft --title "AST Manager $env:RELEASE_TAG" --generate-notes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release edit $env:RELEASE_TAG --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

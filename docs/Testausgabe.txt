@@ -1,0 +1,34 @@
+test_backup_restore_validation (test_database.DatabaseTests.test_backup_restore_validation) ... ok
+test_insert_earlier_period_does_not_erase_opening (test_database.DatabaseTests.test_insert_earlier_period_does_not_erase_opening) ... ok
+test_payments_and_uniqueness (test_database.DatabaseTests.test_payments_and_uniqueness) ... ok
+test_period_validation_and_entry_boundaries (test_database.DatabaseTests.test_period_validation_and_entry_boundaries) ... ok
+test_salary_snapshot_and_year_constraint (test_database.DatabaseTests.test_salary_snapshot_and_year_constraint) ... ok
+test_three_year_carry_retroactive_and_persistence (test_database.DatabaseTests.test_three_year_carry_retroactive_and_persistence) ... ok
+test_all_fields_filled_and_sample_values_cleared (test_documents.DocumentTests.test_all_fields_filled_and_sample_values_cleared) ... ok
+test_csv_and_multipage_report (test_documents.DocumentTests.test_csv_and_multipage_report) ... ok
+test_source_widgets_have_unambiguous_canonical_fields (test_documents.DocumentTests.test_source_widgets_have_unambiguous_canonical_fields) ... ok
+test_unknown_field_rejected (test_documents.DocumentTests.test_unknown_field_rejected) ... ok
+test_exact_numbers_and_swiss_format (test_domain.DomainTests.test_exact_numbers_and_swiss_format) ... ok
+test_invoice_status_boundaries (test_domain.DomainTests.test_invoice_status_boundaries) ... ok
+test_negative_balance_and_cumulative_absences (test_domain.DomainTests.test_negative_balance_and_cumulative_absences) ... ok
+test_salary_original_calculation (test_domain.DomainTests.test_salary_original_calculation) ... ok
+test_debtor_sum_entire_column (test_template_parity.TemplateParityTests.test_debtor_sum_entire_column) ... ok
+test_every_hours_formula_with_inputs_and_cached_values (test_template_parity.TemplateParityTests.test_every_hours_formula_with_inputs_and_cached_values) ... ok
+test_navigation_and_all_pages (test_ui.UiTests.test_navigation_and_all_pages) ... ok
+test_real_form_save_click_and_reopen (test_ui.UiTests.test_real_form_save_click_and_reopen) ... ok
+test_simplified_person_form_and_company_survive_window_close (test_ui.UiTests.test_simplified_person_form_and_company_survive_window_close) ... ok
+test_time_and_salary_dialogs (test_ui.UiTests.test_time_and_salary_dialogs) ... ok
+test_update_creates_backup_before_install (test_ui.UiTests.test_update_creates_backup_before_install) ... ok
+test_wizard_advances_and_saves_from_review (test_ui.UiTests.test_wizard_advances_and_saves_from_review) ... ok
+test_installer_rechecks_integrity_and_preserves_start_options (test_updates.UpdateTests.test_installer_rechecks_integrity_and_preserves_start_options) ... ok
+test_offline_and_access_failures_have_actionable_messages (test_updates.UpdateTests.test_offline_and_access_failures_have_actionable_messages) ... ok
+test_private_access_and_redirect_never_leak_token (test_updates.UpdateTests.test_private_access_and_redirect_never_leak_token) ... ok
+test_reject_tampered_assets (test_updates.UpdateTests.test_reject_tampered_assets) ... ok
+test_verified_download_and_failure_cleanup (test_updates.UpdateTests.test_verified_download_and_failure_cleanup) ... ok
+test_versions_and_release_policy (test_updates.UpdateTests.test_versions_and_release_policy) ... ok
+test_windows_token_encryption_and_repository_isolation (test_updates.UpdateTests.test_windows_token_encryption_and_repository_isolation) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 1.524s
+
+OK

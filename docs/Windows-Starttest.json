@@ -1,0 +1,12 @@
+{
+  "tested_at": "2026-09-20T19:20:22+02:00",
+  "platform": "Windows 11 x64",
+  "source_tests": "19 passed",
+  "excel_formulas": 40,
+  "excel_hours_scenarios": 16,
+  "release_exit_code": 0,
+  "pages_opened": 6,
+  "original_pdf_created": true,
+  "report_pdf_created": true,
+  "runtime_log_bytes": 0
+}
