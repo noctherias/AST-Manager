@@ -4,7 +4,7 @@ Funktionsfähiges Windows-Desktop-MVP in Python. Fünf übersichtliche Arbeitsbe
 
 ## Sofort ausprobieren
 
-**Empfohlen:** Im [neuesten Release](https://github.com/manueltuescher/AST-Manager/releases/latest) `AST-Verwaltung-Setup-x64.exe` laden und installieren. Danach AST Manager über das Startmenü öffnen. Updates lassen sich direkt im Programm installieren; für das private Repository einmalig den GitHub-Zugang hinterlegen (siehe [Updates einrichten](docs/UPDATES.md)).
+**Empfohlen:** Im [neuesten Release](https://github.com/noctherias/AST-Manager/releases/latest) `AST-Verwaltung-Setup-x64.exe` laden und installieren. Danach AST Manager über das Startmenü öffnen. Updates lassen sich direkt im Programm installieren; für das private Repository einmalig den GitHub-Zugang hinterlegen (siehe [Updates einrichten](docs/UPDATES.md)).
 
 **Portable Windows-Version:** Das komplette Windows-Paket entpacken. `Demo starten.bat` öffnet eine getrennte Demo mit fiktiven Personen, Rechnungen, Stunden und einem Lohnausweis. `AST-Verwaltung.exe` öffnet die zunächst leere produktive Datenbank. Der Ordner `_internal` muss neben der EXE bleiben. Python und Excel sind nicht nötig. Die Datenerfassung funktioniert offline; nur die Update-Suche benötigt Internet.
 

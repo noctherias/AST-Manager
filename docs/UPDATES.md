@@ -1,6 +1,6 @@
 # GitHub-Releases und Programm-Updates
 
-Repository: [manueltuescher/AST-Manager](https://github.com/manueltuescher/AST-Manager), privat.
+Repository: [noctherias/AST-Manager](https://github.com/noctherias/AST-Manager), privat.
 
 ## Einmal pro Computer
 
