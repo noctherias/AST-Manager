@@ -5,6 +5,12 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 KINDS = {"vacation": "Ferien", "overtime": "Überzeit", "sick": "Krankheit", "accident": "Unfall"}
+TIME_CODES = {
+    "": "Normaler Arbeitstag", "U": "Ferien · ganzer Tag", "UH": "Ferien · halber Tag",
+    "K": "Krank · ganzer Tag", "KR": "Krank · Restzeit", "G": "Gleittag",
+    "H": "Homeoffice", "F": "Feiertag", "KU": "Kurzarbeit · ganzer Tag",
+    "KA": "Kurzarbeit · Restzeit", "B": "Bereitschaft",
+}
 SALARY_AMOUNTS = [
     ("1", "1 · Lohn / Rente"),
     ("2-1", "2.1 · Verpflegung und Unterkunft"),

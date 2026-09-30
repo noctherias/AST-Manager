@@ -25,6 +25,11 @@ def seed_demo(db):
                             "start": f"{year}-01-01", "end": f"{year}-12-31", "allowance": 21625, "opening": 0, "opening_sick": 0, "opening_accident": 0})
         for offset, kind_, hours, note in [(21, "vacation", 4325 + index * 865, "Sommerferien"), (8, "overtime", 650 + index * 125, "Projektabschluss"), (4, "sick", 865, "")]:
             db.save_entry({"period_id": p, "day": max(date(year, 1, 1), today - timedelta(days=offset)).isoformat(), "kind": kind_, "hours": hours, "note": note})
+        for offset, code, note in ((3, "", "Baustelle Musterwil"), (2, "H", "Planung im Homeoffice"), (1, "", "Servicearbeiten")):
+            workday = max(date(year, 1, 1), today - timedelta(days=offset))
+            db.save_time_record({"employee_id": key, "day": workday.isoformat(), "start_1": 450, "end_1": 720,
+                                 "start_2": 780, "end_2": 1035, "break_minutes": 0,
+                                 "code": code, "note": note})
         if index == 0:
             db.save_salary(key, year, f"{year}-01-01", f"{year}-12-31", {
                 "A": "/Ja", "B": "/Off", "HName": first + " " + last,

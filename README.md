@@ -1,6 +1,6 @@
 # AST Manager
 
-Funktionsfähiges Windows-Desktop-MVP in Python. Fünf übersichtliche Arbeitsbereiche, zentrale SQLite-Datenbank, native Stundenberechnung und Ausgabe in der bereitgestellten Lohnausweis-PDF. Excel wird weder benötigt noch gestartet.
+Windows-Desktopanwendung in Python mit fünf klaren Arbeitsbereichen, zentraler SQLite-Datenbank, Excel-Stundennachweis und Ausgabe in der bereitgestellten Lohnausweis-PDF. Excel wird zur Erfassung und zum Export nicht benötigt; die exportierte `.xlsm` kann anschliessend in Excel geöffnet, berechnet und gedruckt werden.
 
 ## Sofort ausprobieren
 
@@ -14,21 +14,21 @@ Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfens
 
 ## Bedienung
 
-1. **Start:** Direkteinstieg für Rechnung, Zeit und Lohnausweis. Offene Rechnungen mit Fälligkeit stehen darunter. Bei einem leeren Datenbestand helfen Hinweise beim Einrichten.
-2. **Rechnungen:** Die Ansicht startet mit offenen Rechnungen. «Bezahlt» und «Alle» wechseln die Auswahl. Rechnung auswählen, dann **Zahlung erfassen** oder **Details bearbeiten**. Die Zahlung wird gespeichert und der Dialog geschlossen. Bisherige Zahlungen sind im Dialog aufklappbar. Zeitraumfilter und Export liegen bei den weiteren Optionen.
-3. **Team:** Mitarbeiter und Lernende stehen in einer gemeinsamen Liste mit Filtern. **Neue Person** schlägt eine Personalnummer vor; ergänzende Personalangaben sind aufklappbar. Nach dem Anlegen wird das erste Jahr eingerichtet. Person auswählen → **Zeit erfassen** oder **Nachweis öffnen**. Im Nachweis bleiben Guthaben und Buchungen sichtbar; Berechnung und Vorjahre lassen sich bei Bedarf aufklappen. **Person & Jahre** enthält Stammdaten und Folgejahre.
+1. **Übersicht:** Direkteinstieg für Debitoren, Arbeitszeit und Lohnausweis. Offene Rechnungen mit Fälligkeit stehen darunter. Bei einem leeren Datenbestand helfen Hinweise beim Einrichten.
+2. **Debitoren:** Die Ansicht startet mit offenen Rechnungen. «Bezahlt» und «Alle» wechseln die Auswahl. Rechnung auswählen, dann **Zahlung erfassen** oder **Details bearbeiten**. Bisherige Zahlungen sind im Dialog aufklappbar. Zeitraumfilter und Export liegen bei den weiteren Optionen.
+3. **Stundennachweis:** Person auswählen und **Arbeitstag erfassen**. Das einfache Fenster enthält Datum, Tagesart, bis zu zwei Arbeitsblöcke, zusätzliche Pause und Bemerkung. **Excel-Liste exportieren** befüllt die zwölf Monatsblätter der Originalvorlage. Formeln, Codes, Jahresübersicht, Makros, Steuerelemente und Druckbereiche bleiben erhalten.
 4. **Lohnausweise:** Vier Schritte führen durch Person/Zeitraum, Lohn/Abzüge, Zusatzangaben und abschliessende Prüfung. Die häufigen Lohnfelder stehen zuerst. Nach dem Speichern **PDF ansehen** oder **PDF speichern** wählen.
-5. **Einstellungen:** Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert und für künftige Lohnausweise übernommen. Personen werden zentral im Team gepflegt.
+5. **Einstellungen:** Das Team wird hier einmalig angelegt und bearbeitet. Daneben liegen Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert.
 
 Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Eingaben. `F5` aktualisiert die aktuelle Seite. Listen erklären, welche Auswahl für die nächste Aktion nötig ist. Grössere Formulare und ausgeklappte Details können gescrollt werden.
 
-Ferienanspruch wird in Stunden vereinbart (Vorlagenwert 216.25 h); das Pensum reduziert ihn nicht nochmals automatisch. 1.50 h entsprechen 90 Minuten. Für ein erstes Jahr lassen sich bestehende Guthaben übernehmen, Folgejahre berechnen Überträge automatisch. Personen mit bestehenden Daten können auf inaktiv gesetzt werden.
+Die Pause zwischen **Geht** und **Kommt 2** berechnet die Excel-Vorlage selbst. Das Feld **Zusätzliche Pause** ist für weitere Pausen innerhalb eines Arbeitsblocks gedacht. Personen mit bestehenden Daten können in den Einstellungen auf inaktiv gesetzt werden.
 
 ## Übernommene Vorlagenlogik
 
 - Debitoren: bezahlte Beträge werden wie `SUM(G:G)` summiert. Teilzahlungen, Restbetrag, Fälligkeit und Status ergänzen die einfache Liste.
-- Stunden: `Guthaben = Vorperioden-Guthaben + Ferienanspruch − Ferienbezug + Überzeit`. Negative Guthaben sind erlaubt und werden hervorgehoben. Krankheit und Unfall summieren sich separat über die Perioden. Frühere Korrekturen aktualisieren alle späteren Salden.
-- Die drei Lehrjahre der allgemeinen Vorlage und die zwei Lehrjahre der Lernenden-Vorlage verwenden denselben Kern. Die App hat keine feste Begrenzung für Jahre oder Buchungszeilen.
+- Zeiterfassung: Die Eingabespalten `Kommt 1`, `Geht 1`, `Kommt 2`, `Geht 2`, `Pause`, `Code` und `Bemerkungen` werden pro Kalendertag befüllt. Die Vorlage berechnet IST-/SOLL-Zeit, Tages- und Monatssaldo, Ferien, Krankheit, Homeoffice, Kurzarbeit und Jahresübersicht selbst.
+- Der Export arbeitet direkt auf dem OOXML-Paket. VBA-Projekt, Formularsteuerelemente, Zeichnungen, Druckereinstellungen, Datenvalidierungen, benannte Bereiche und Formeln werden nicht neu erzeugt. Personendaten, die bereits in der gelieferten Quelldatei standen, werden aus jedem Export entfernt.
 - Lohnausweis: Brutto aus den neun Betragsfeldern der Ziffern 1–7; Abzüge aus 9, 10.1 und 10.2; Netto = Brutto − Abzüge. Quellensteuer und Spesen werden wie im Original separat ausgewiesen.
 
 Die vollständige Analyse steht in [docs/VORLAGENANALYSE.md](docs/VORLAGENANALYSE.md), das maschinenlesbare Inventar inklusive jeder Formel, Abhängigkeit, Datenvalidierung, benannter Bereiche, Druckeinstellungen und PDF-Felddefinitionen in [docs/template_inventory.json](docs/template_inventory.json).
@@ -62,8 +62,9 @@ ast_app/
   widgets.py / theme.py     Wiederverwendbare UI und Gestaltung
   window.py                Hauptfenster und Navigation
   documents.py             Original-PDF befüllen, Berichte, CSV
+  timesheet_excel.py       Makrovorlage verlustfrei befüllen und prüfen
   demo.py                  Fiktive Demo, nur im Demomodus
-templates/                 Vier unveränderte Originaldateien
+templates/                 Originalvorlagen für Lohnausweis und Zeiterfassung
 docs/                      Vorlagenanalyse und Testprotokoll
 tests/                     Fachlogik, Vorlagenvergleich, Datenbank, PDF, UI
 tools/                     Reproduzierbare Analyse und Build-Hilfen
@@ -93,7 +94,7 @@ python tools/collect_licenses.py dist/AST-Verwaltung/_internal/licenses
 
 ## Umfang des MVP
 
-Die App übernimmt die vorhandenen Erfassungs- und Rechenfunktionen. Sie ist keine vollständige Lohnbuchhaltung: Beitragssätze und Quellensteuer werden nicht selbst ermittelt, es gibt keine Bankanbindung oder elektronische Steuerübermittlung. Bestehende ausgefüllte Excel-Dateien werden in diesem MVP nicht importiert; die bereitgestellten Stunden-/Debitorenvorlagen enthalten keine Buchungen. Startsalden lassen sich in der ersten Stundenperiode erfassen.
+Die App übernimmt die vorhandenen Erfassungs- und Rechenfunktionen. Sie ist keine vollständige Lohnbuchhaltung: Beitragssätze und Quellensteuer werden nicht selbst ermittelt, es gibt keine Bankanbindung oder elektronische Steuerübermittlung. Bestehende ausgefüllte Excel-Dateien werden nicht importiert. Neue Arbeitszeiten werden in AST erfasst und als vollständige makrofähige Jahresdatei exportiert. Die Berechnung der Excel-Formeln erfolgt beim Öffnen in Excel.
 
 Der Lohnausweis verwendet ausdrücklich die mitgelieferte Formularfassung «605.040.18N, Form. 11, 12.07». Sie wurde nicht durch ein anderes Formular ersetzt oder auf aktuelle behördliche Anforderungen zertifiziert. Der PDF-Export ist ausfüllbar; die in AST berechneten Summen sind schreibgeschützt. Betragsänderungen deshalb in AST vornehmen und das PDF neu exportieren. Gespeicherte Ausweise enthalten einen nachvollziehbaren Stand der Namen, Adressen und Firmendaten zum Zeitpunkt der Erfassung.
 

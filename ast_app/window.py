@@ -20,24 +20,28 @@ class MainWindow(QMainWindow):
         self.resize(1380, 880)
         self.setMinimumSize(1120, 720)
         root = QWidget()
+        root.setObjectName("appRoot")
         self.setCentralWidget(root)
         layout = QHBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(218)
+        sidebar.setFixedWidth(250)
         nav = QVBoxLayout(sidebar)
-        nav.setContentsMargins(18, 32, 18, 22)
-        nav.setSpacing(9)
+        nav.setContentsMargins(20, 28, 20, 22)
+        nav.setSpacing(8)
         nav.addWidget(label("AST", "brand"))
         nav.addWidget(label("VERWALTUNG", "brandCaption"))
-        nav.addSpacing(35)
+        nav.addSpacing(28)
+        nav.addWidget(label("ARBEITSBEREICHE", "navSection"))
+        nav.addSpacing(4)
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self.buttons = []
-        for i, name in enumerate(["Start", "Rechnungen", "Team", "Lohnausweise", "Einstellungen"]):
+        for i, name in enumerate(["Übersicht", "Debitoren", "Stundennachweis", "Lohnausweise", "Einstellungen"]):
             b = button(name, lambda index=i: self.navigate(index))
+            b.setObjectName("navButton")
             b.setCheckable(True)
             b.setMinimumHeight(46)
             self.nav_group.addButton(b, i)
@@ -53,7 +57,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         layout.addWidget(self.stack, 1)
         self.updates = UpdateController(self, db, demo)
-        self.pages = [Start(db, self), Invoices(db), Team(db), Salaries(db), Settings(db, self.updates)]
+        self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db), Settings(db, self.updates)]
         for page in self.pages:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
@@ -73,6 +77,10 @@ class MainWindow(QMainWindow):
         self.pages[index].refresh()
         self.stack.setCurrentIndex(index)
         self.buttons[index].setChecked(True)
+
+    def navigate_settings_team(self, create=False, employee_id=None):
+        self.navigate(4)
+        self.pages[4].open_team(employee_id=employee_id, create=create)
 
     def prepare_shutdown(self):
         if self._closing: return

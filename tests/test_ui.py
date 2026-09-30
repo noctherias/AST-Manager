@@ -15,8 +15,8 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
 from ast_app.database import Database
 from ast_app.demo import seed_demo
 from ast_app.window import MainWindow
-from ast_app.dialogs import EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog, SalaryDialog, PaymentDialog
-from ast_app.theme import STYLE
+from ast_app.dialogs import EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog, SalaryDialog, PaymentDialog, TimeRecordDialog
+from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
 
@@ -27,7 +27,7 @@ if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
         font_path = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / font_name
         if font_path.exists(): QFontDatabase.addApplicationFont(str(font_path))
 APP.setStyle("Fusion")
-APP.setStyleSheet(STYLE)
+apply_theme(APP)
 QLocale.setDefault(QLocale(QLocale.Language.German, QLocale.Country.Switzerland))
 
 
@@ -69,7 +69,9 @@ class UiTests(unittest.TestCase):
         self.assertTrue(page.open_btn.isEnabled())
         page.open_person()
         self.assertEqual(page.stack.currentIndex(), 1)
-        self.assertIsNotNone(page.workspace.current_balance)
+        self.assertIsNotNone(page.workspace.employee)
+        if os.environ.get("AST_QA_DIR"):
+            page.grab().save(str(Path(os.environ["AST_QA_DIR"]) / "stundennachweis-detail.png"))
         window.navigate(1)
         page = window.pages[1]
         page.search.setText("2026-nothing")
@@ -127,6 +129,20 @@ class UiTests(unittest.TestCase):
         preview.show(); APP.processEvents()
         self.assertEqual(preview.document.pageCount(), 1)
         preview.document.close()
+
+    def test_simple_daily_time_dialog(self):
+        employee = self.db.employees()[0]
+        dialog = TimeRecordDialog(None, self.db, employee)
+        dialog.fields["day"].setDate(dialog.fields["day"].date().addDays(-10))
+        dialog.fields["note"].setText("Baustelle")
+        dialog.show(); APP.processEvents()
+        if os.environ.get("AST_QA_DIR"):
+            dialog.grab().save(str(Path(os.environ["AST_QA_DIR"]) / "arbeitstag-dialog.png"))
+        dialog.submit()
+        self.assertEqual(dialog.result(), QDialog.DialogCode.Accepted)
+        saved = next(row for row in self.db.time_records(employee["id"]) if row["note"] == "Baustelle")
+        self.assertEqual(saved["start_1"], 450)
+        self.assertEqual(saved["start_2"], 780)
 
     def test_wizard_advances_and_saves_from_review(self):
         salary = SalaryDialog(None, self.db)

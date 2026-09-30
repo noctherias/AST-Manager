@@ -5,6 +5,7 @@ import os
 root = Path(SPECPATH)
 a = Analysis([str(root / 'main.py')], pathex=[str(root)],
              binaries=[], datas=[(str(root / 'templates' / 'Vorlage_Lohnausweis.pdf'), 'templates'),
+                                  (str(root / 'templates' / 'Zeiterfassung_Vorlage.xlsm'), 'templates'),
                                   (str(root / 'assets'), 'assets'),
                                   (str(root / 'THIRD_PARTY_NOTICES.md'), '.'),
                                   (str(root / 'release_config.json'), '.')],

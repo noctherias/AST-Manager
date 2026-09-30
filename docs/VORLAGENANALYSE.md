@@ -1,6 +1,6 @@
 # Vollständige Vorlagenanalyse und Umsetzung
 
-Analysiert wurden die vier Originaldateien aus der referenzierten Unterhaltung. Sie liegen unverändert in `templates/`. SHA-256-Prüfsummen sowie der vollständige technische Befund stehen in `template_inventory.json`. Die Analyse ist mit `python tools/analyze_templates.py` reproduzierbar. Die App liest zur Laufzeit keine XLSX-Datei und benötigt weder Excel noch openpyxl.
+Analysiert wurden die vier Originaldateien aus der referenzierten Unterhaltung sowie die später ergänzte `Zeiterfassung_Vorlage.xlsm`. Die vier ursprünglichen Vorlagen liegen unverändert in `templates/`; die makrofähige Zeiterfassung wurde vor dem Einchecken von Mitarbeiterdaten und lokalen Speicherpfaden bereinigt. Die Analyse ist mit `python tools/analyze_templates.py` beziehungsweise `python tools/analyze_zeiterfassung.py` reproduzierbar. Die App benötigt weder eine Excel-Installation noch openpyxl; die makrofähige Vorlage wird als Programmressource gezielt befüllt.
 
 ## Inventar
 
@@ -50,6 +50,14 @@ Die Formeln mit `++` in Jahr 2 enthalten ein unäres Plus und sind rechnerisch n
 Die negativen Werte werden in den Vorlagen mit bedingten Formatierungen hervorgehoben (u. a. G22, I22, G44:G49 und begleitende Beschriftungen). Die App erlaubt negative Salden und negative Überzeit und markiert sie rot. Ferien-, Krankheits- und Unfallbuchungen werden als positive Bezugsstunden validiert; Korrekturen erfolgen über Bearbeiten/Löschen. Das ist eine zusätzliche Eingabeprüfung, da die Originale keine Datenvalidierungen besitzen.
 
 Die ursprünglichen Kapazitäten von 18 Überzeit-/Krankheits-/Unfallbuchungen und 18/62/75 Ferienbuchungen werden durch beliebig viele Datenbankeinträge ersetzt. Es gibt eine chronologische Periodenkette je Person. Die ersten zwei bzw. drei Jahre sind keine fachliche Obergrenze. Perioden dürfen sich nicht überschneiden. Eine zeitliche Lücke erzeugt keinen automatischen Anspruch. Startsalden können ausschliesslich in der ersten Periode erfasst werden und sind in der Berechnung sichtbar.
+
+## Makrofähige Zeiterfassung
+
+`Zeiterfassung_Vorlage.xlsm` enthält 19 Blätter: Voreinstellungen, zwei versteckte Mitarbeiterlisten, Feiertage, Speicherorte, zwölf Monatsblätter, Jahresübersicht und Fahrtkosten. Dazu kommen mehrere tausend Formeln, benannte Bereiche, Datenvalidierungen, geschützte Monatsblätter, 28 Formularsteuerelement-Eigenschaften, VML- und Drawing-Dateien, Druckereinstellungen, eine Berechnungskette und ein VBA-Projekt. Die Monatsblätter verwenden die Eingabespalten D–H, J und O für `Kommt 1`, `Geht 1`, `Kommt 2`, `Geht 2`, zusätzliche Pause, Code und Bemerkung. Die Zeilen 4–34 entsprechen den Kalendertagen 1–31.
+
+Die Anwendung speichert diese Eingaben pro Person und Datum in SQLite. Beim Export wird die Originaldatei als OOXML-ZIP-Paket kopiert und nur in den vorgesehenen Zellen ergänzt. Die übrigen Paketbestandteile bleiben unverändert; der SHA-256-Wert von `xl/vbaProject.bin` wird nach dem Schreiben geprüft. Excel wird beim nächsten Öffnen zur vollständigen Neuberechnung angewiesen. Bereits in der Quelldatei enthaltene Namen, Personalnummern und personenspezifische Speicherpfade werden entfernt, bevor die ausgewählte Person eingesetzt wird.
+
+Codes der Vorlage: `F` Feiertag, `G` Gleittag, `K` krank, `KR` Krank-Restzeit, `KU` Kurzarbeit, `KA` Kurzarbeit-Restzeit, `U` Ferien, `UH` halber Ferientag, `H` Homeoffice und `B` Bereitschaft. Die Vorlagenlogik berechnet daraus IST-/SOLL-Arbeitszeit, Pausenhinweise, Tagessaldo, Monatsübertrag, Ferien- und Abwesenheitswerte sowie die Jahresübersicht.
 
 ## Druck- und Darstellungseinstellungen
 

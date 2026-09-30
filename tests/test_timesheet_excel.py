@@ -1,0 +1,50 @@
+import hashlib
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
+from ast_app.timesheet_excel import export_timesheet
+
+
+NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+
+
+def cell(root, reference):
+    return root.find(f".//x:c[@r='{reference}']", NS)
+
+
+class TimesheetExcelTests(unittest.TestCase):
+    def test_original_package_and_macros_survive_exact_cell_export(self):
+        template = Path("templates/Zeiterfassung_Vorlage.xlsm")
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "export.xlsm"
+            employee = {"first_name": "Max", "last_name": "Muster", "code": "AST-999"}
+            records = [
+                {"day": "2026-01-05", "start_1": 450, "end_1": 720, "start_2": 780,
+                 "end_2": 1035, "break_minutes": 15, "code": "", "note": "Baustelle Zürich"},
+                {"day": "2026-01-06", "start_1": None, "end_1": None, "start_2": None,
+                 "end_2": None, "break_minutes": 0, "code": "U", "note": "Ferien"},
+            ]
+            export_timesheet(target, employee, 2026, records, "AST Elektro AG")
+            with zipfile.ZipFile(template) as source, zipfile.ZipFile(target) as exported:
+                self.assertEqual(set(source.namelist()), set(exported.namelist()))
+                self.assertEqual(hashlib.sha256(source.read("xl/vbaProject.bin")).digest(),
+                                 hashlib.sha256(exported.read("xl/vbaProject.bin")).digest())
+                january = ET.fromstring(exported.read("xl/worksheets/sheet6.xml"))
+                self.assertAlmostEqual(float(cell(january, "D8").find("x:v", NS).text), 450 / 1440)
+                self.assertAlmostEqual(float(cell(january, "H8").find("x:v", NS).text), 15 / 1440)
+                self.assertEqual(cell(january, "J9").find("x:is/x:t", NS).text, "U")
+                self.assertEqual(cell(january, "O8").find("x:is/x:t", NS).text, "Baustelle Zürich")
+                settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
+                self.assertEqual(cell(settings, "C2").find("x:v", NS).text, "2026")
+                self.assertEqual(cell(settings, "C3").find("x:is/x:t", NS).text, "Max Muster")
+                package = b"\n".join(exported.read(name) for name in exported.namelist()
+                                     if name.endswith((".xml", ".rels")))
+                for private_value in (b"Devinsan", b"Tudisco", b"Hubeli", b"Lehmann"):
+                    self.assertNotIn(private_value, package)
+
+
+if __name__ == "__main__":
+    unittest.main()

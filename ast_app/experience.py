@@ -1,11 +1,13 @@
 """Task-focused screens; the shared data and calculation services remain central."""
 from datetime import date
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStackedWidget,
-                              QMenu, QButtonGroup, QDialog, QHeaderView)
-from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded
-from .pages import Receivables, TimePage, SettingsPage, SalaryPage
-from .dialogs import EmployeeDialog, PeriodDialog, EntryDialog, InvoiceDialog
-from .domain import chf, number, display_date
+                              QMenu, QButtonGroup, QDialog, QHeaderView, QMessageBox)
+from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
+from .pages import Receivables, SettingsPage, SalaryPage, save_path
+from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog
+from .domain import TIME_CODES, chf, number, display_date
+from .timesheet_excel import export_timesheet
 from .update_ui import UpdateSettings
 
 
@@ -96,7 +98,7 @@ class Start(Page):
     def setup_next(self):
         if self.setup_step == 0:
             self.window.navigate(4)
-            self.window.pages[4].tabs.setCurrentIndex(0)
+            self.window.pages[4].tabs.setCurrentIndex(2)
         else:
             self.window.navigate(2)
             self.window.pages[2].new_person()
@@ -127,7 +129,7 @@ class Start(Page):
 
 class Invoices(Receivables):
     def __init__(self, db):
-        Page.__init__(self, "Rechnungen", "1. Rechnung auswählen    2. Zahlung erfassen oder Details bearbeiten")
+        Page.__init__(self, "Debitoren", "Rechnungen und Zahlungseingänge zentral bearbeiten.")
         self.db, self.filtered = db, []
         self.header.addWidget(button("+ Neue Rechnung", self.new, True))
         self.cards = self.metrics([("Rechnungsbetrag", "In der Auswahl"), ("Bereits bezahlt", "In der Auswahl"), ("Noch offen", "In der Auswahl", True)])
@@ -188,104 +190,159 @@ class Invoices(Receivables):
         self.pay_btn.setText("Zahlung erfassen" if not r or r["open"] > 0 else "Zahlungen ansehen")
 
 
-class TimeWorkspace(TimePage):
-    def __init__(self, db, back):
-        Page.__init__(self, "Stundennachweis", "")
-        self.db, self.kind = db, "employee"
-        self.layout.insertWidget(0, button("← Zurück zum Team", back))
-        self.person = combo([])
-        self.person.setParent(self)
-        self.person.hide()
-        self.entry_btn = button("+ Zeit erfassen", self.new_entry, True)
+class TimeWorkspace(Page):
+    def __init__(self, db, back, manage_team):
+        super().__init__("Stundennachweis", "Arbeitszeiten und Abwesenheiten einfach erfassen und in die Excel-Vorlage exportieren.")
+        self.db, self.employee, self.current_records = db, None, []
+        self.layout.insertWidget(0, button("← Personenübersicht", back))
+        self.entry_btn = button("+ Arbeitstag erfassen", self.new_entry, True)
         self.header.addWidget(self.entry_btn)
-        more, actions = menu_button("Person & Jahre", [("Person bearbeiten", self.edit_person), ("Nächstes Jahr einrichten", self.new_period), ("Ausgewähltes Jahr bearbeiten", self.edit_period), ("CSV exportieren", self.export_csv)])
-        self.person_btn, self.new_period_btn, self.edit_period_btn, self.csv_btn = actions
-        self.header.addWidget(more)
+        self.header.addWidget(button("Person bearbeiten", manage_team))
         row = self.toolbar()
-        row.addWidget(label("Zeitraum", "muted"))
-        self.period = combo([])
-        row.addWidget(self.period, 1)
-        self.pdf_btn = button("Nachweis als PDF", self.export_pdf)
-        row.addWidget(self.pdf_btn)
-        self.setup_button = button("Erstes Jahr einrichten", self.new_period, True)
-        self.layout.addWidget(self.setup_button)
-        self.cards = self.metrics([("Verfügbares Guthaben", "Ferien inklusive Überzeit", True), ("Ferien bezogen", "Im gewählten Zeitraum"), ("Überzeit", "Im gewählten Zeitraum")])
-        carry = Metric("Übertrag")
-        carry.setParent(self)
-        carry.hide()
-        self.cards.append(carry)
-        self.details = Disclosure("Wie setzt sich das Guthaben zusammen?")
-        self.balance_hint = label("", "muted")
-        self.balance_hint.setWordWrap(True)
-        self.details.form.addRow(self.balance_hint)
-        self.history = Table(["Jahr", "Anspruch h", "Übertrag h", "Ferien h", "Überzeit h", "Guthaben h", "Krank ges. h", "Unfall ges. h"])
-        self.history.setMaximumHeight(210)
-        self.details.form.addRow(self.history)
-        self.layout.addWidget(self.details)
-        self.table = Table(["Datum", "Kategorie", "Stunden", "Bemerkung"])
+        row.addWidget(label("Kalenderjahr", "muted"))
+        current = date.today().year
+        self.year = combo([(str(y), y) for y in range(current + 2, current - 7, -1)], current)
+        row.addWidget(self.year)
+        row.addStretch()
+        self.export_btn = button("Excel-Liste exportieren", self.export_excel, True)
+        row.addWidget(self.export_btn)
+        self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
+                                   ("Arbeitstage", "Tage mit Kommt-/Geht-Zeit"),
+                                   ("Abwesenheiten", "Tage mit einem Code")])
+        self.table = Table(["Datum", "Wochentag", "Arbeitsblock 1", "Arbeitsblock 2", "Pause", "Art", "Total", "Bemerkung"])
         self.layout.addWidget(self.table, 1)
-        row, self.selection_hint = selection_bar(self.layout, "Wähle eine Buchung, um sie zu ändern.")
-        self.edit_btn = button("Buchung bearbeiten", self.edit_entry)
-        self.delete_btn = button("Entfernen", self.remove_entry)
+        row, self.selection_hint = selection_bar(self.layout, "Wähle einen Tag aus oder erfasse einen neuen.")
+        self.edit_btn = button("Tag bearbeiten", self.edit_entry)
+        self.delete_btn = button("Tag löschen", self.remove_entry)
         row.addWidget(self.edit_btn)
         row.addWidget(self.delete_btn)
-        self.hint = label("", "muted")
+        self.hint = label("Die Excel-Datei enthält weiterhin alle Formeln, Monatsblätter, Auswertungen und Makros der Originalvorlage.", "muted")
+        self.hint.setWordWrap(True)
         self.layout.addWidget(self.hint)
-        self.current_balance = None
-        self.person.currentIndexChanged.connect(lambda: self.refresh_periods())
-        self.period.currentIndexChanged.connect(self.refresh_entries)
+        self.year.currentIndexChanged.connect(self.refresh)
         self.table.itemSelectionChanged.connect(self.selection)
         self.table.cellDoubleClicked.connect(self.edit_entry)
         self.selection()
 
+    @staticmethod
+    def _clock(minutes):
+        return "–" if minutes is None else f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+    @staticmethod
+    def _worked(record):
+        total = 0
+        for start, end in ((record["start_1"], record["end_1"]), (record["start_2"], record["end_2"])):
+            if start is not None and end is not None:
+                total += (end - start) % 1440
+        return max(0, total - record["break_minutes"])
+
+    @staticmethod
+    def _duration(minutes):
+        return f"{minutes // 60}:{minutes % 60:02d} h" if minutes else "–"
+
     def show_person(self, key):
-        e = self.db.employee(key)
-        if not e: return
-        self.kind = e["kind"]
-        self.title_label.setText(e["first_name"] + " " + e["last_name"])
-        self.subtitle_label.setText(("Lernende" if self.kind == "apprentice" else "Mitarbeiter") + " · Ferien, Überzeit und Abwesenheiten")
-        self.refresh(key)
+        self.employee = self.db.employee(key)
+        if not self.employee:
+            return
+        self.title_label.setText(self.employee["first_name"] + " " + self.employee["last_name"])
+        self.subtitle_label.setText("Stundennachweis · Personal-Nr. " + self.employee["code"])
+        years = {int(r["day"][:4]) for r in self.db.time_records(key)} | {date.today().year}
+        selected = self.year.currentData()
+        self.year.blockSignals(True)
+        self.year.clear()
+        for year in sorted(years | set(range(date.today().year - 2, date.today().year + 2)), reverse=True):
+            self.year.addItem(str(year), year)
+        self.year.setCurrentIndex(max(0, self.year.findData(selected)))
+        self.year.blockSignals(False)
+        self.refresh()
 
-    def refresh_entries(self):
-        super().refresh_entries()
-        if hasattr(self, "setup_button"):
-            self.setup_button.setVisible(self.period.count() == 0)
-            if not self.current_balance:
-                self.hint.setText("Richte zuerst ein Jahr ein. Danach kannst du Ferien, Stunden und Abwesenheiten erfassen.")
-            elif not self.current_entries:
-                self.hint.setText("Noch keine Einträge. Mit «Zeit erfassen» die erste Buchung hinzufügen.")
+    def refresh(self):
+        if not self.employee:
+            return
+        year = self.year.currentData()
+        self.current_records = self.db.time_records(self.employee["id"], year)
+        rows = []
+        total = 0
+        workdays = 0
+        absences = 0
+        weekdays = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
+        for record in self.current_records:
+            day_value = date.fromisoformat(record["day"])
+            worked = self._worked(record)
+            total += worked
+            workdays += int(record["start_1"] is not None)
+            absences += int(bool(record["code"]))
+            block1 = f"{self._clock(record['start_1'])} – {self._clock(record['end_1'])}" if record["start_1"] is not None else "–"
+            block2 = f"{self._clock(record['start_2'])} – {self._clock(record['end_2'])}" if record["start_2"] is not None else "–"
+            rows.append([display_date(record["day"]), weekdays[day_value.weekday()], block1, block2,
+                         f"{record['break_minutes']} min" if record["break_minutes"] else "–",
+                         TIME_CODES.get(record["code"], record["code"]), self._duration(worked), record["note"]])
+        self.table.populate(rows, [record["id"] for record in self.current_records], [6])
+        self.cards[0].set(self._duration(total))
+        self.cards[1].set(str(workdays))
+        self.cards[2].set(str(absences))
+        self.export_btn.setEnabled(bool(self.employee))
+        self.selection()
 
-    def edit_person(self):
-        key = self.person.currentData()
-        e = self.db.employee(key)
-        if e and EmployeeDialog(self, self.db, e).exec(): self.show_person(key)
+    def selection(self):
+        enabled = self.table.selected_id() is not None
+        self.edit_btn.setEnabled(enabled)
+        self.delete_btn.setEnabled(enabled)
+        self.selection_hint.setText("Ausgewählten Tag bearbeiten oder löschen." if enabled else "Wähle einen Tag aus oder erfasse einen neuen.")
+
+    def new_entry(self):
+        if self.employee and TimeRecordDialog(self, self.db, self.employee).exec():
+            self.refresh()
+
+    def edit_entry(self):
+        record = next((r for r in self.current_records if r["id"] == self.table.selected_id()), None)
+        if record and TimeRecordDialog(self, self.db, self.employee, record).exec():
+            self.refresh()
+
+    @guarded
+    def remove_entry(self):
+        key = self.table.selected_id()
+        if key and confirm(self, "Diesen erfassten Tag löschen?"):
+            self.db.delete("time_records", key)
+            self.refresh()
+
+    @guarded
+    def export_excel(self):
+        if not self.employee:
+            return
+        year = self.year.currentData()
+        path = save_path(self, "Stundennachweis als Excel-Datei", f"Stundennachweis-{self.employee['last_name']}-{year}.xlsm", "xlsm")
+        if path:
+            result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
+            QMessageBox.information(self, "Excel-Liste erstellt", "Die Originalvorlage wurde vollständig befüllt.\n\n" + str(result))
 
 
 class Team(QWidget):
-    def __init__(self, db):
+    def __init__(self, db, window):
         super().__init__()
         self.db = db
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.stack = QStackedWidget()
         layout.addWidget(self.stack)
-        self.overview = Page("Unser Team", "1. Person auswählen    2. Zeit erfassen oder den Stundennachweis öffnen")
-        self.overview.header.addWidget(button("+ Neue Person", self.new_person, True))
+        self.window = window
+        self.overview = Page("Stundennachweis", "Person auswählen, Arbeitstage erfassen und die vollständige Excel-Liste exportieren.")
+        self.overview.header.addWidget(button("Team in Einstellungen verwalten", self.manage_team))
         row = self.overview.toolbar()
         self.kind = None
         self.group = segments(row, [("Alle", None), ("Mitarbeiter", "employee"), ("Lernende", "apprentice")], self.set_kind)
         row.addStretch()
         self.search = line(placeholder="Person suchen …")
         row.addWidget(self.search, 1)
-        self.table = Table(["Name", "Bereich", "Jahr / Lehrjahr", "Guthaben", "Status"])
+        self.table = Table(["Personal-Nr.", "Name", "Bereich", "Einträge dieses Jahr", "Letzter Eintrag", "Status"])
         self.overview.layout.addWidget(self.table, 1)
         row, self.hint = selection_bar(self.overview.layout, "Wähle eine Person aus der Liste.")
-        self.open_btn = button("Nachweis öffnen", self.open_person)
-        self.time_btn = button("Zeit erfassen", self.quick_entry, True)
+        self.open_btn = button("Stundennachweis öffnen", self.open_person)
+        self.time_btn = button("Arbeitstag erfassen", self.quick_entry, True)
         row.addWidget(self.open_btn)
         row.addWidget(self.time_btn)
         self.stack.addWidget(self.overview)
-        self.workspace = TimeWorkspace(db, self.show_overview)
+        self.workspace = TimeWorkspace(db, self.show_overview, self.manage_selected)
         self.stack.addWidget(self.workspace)
         self.table.itemSelectionChanged.connect(self.selection)
         self.table.cellDoubleClicked.connect(self.open_person)
@@ -299,19 +356,20 @@ class Team(QWidget):
     def refresh(self):
         self.refresh_overview()
         if self.stack.currentIndex() == 1:
-            self.workspace.show_person(self.workspace.person.currentData())
+            if self.workspace.employee:
+                self.workspace.show_person(self.workspace.employee["id"])
 
     def refresh_overview(self):
         q = self.search.text().casefold()
         people = [e for e in self.db.employees(self.kind) if q in (e["first_name"] + " " + e["last_name"] + " " + e["code"]).casefold()]
         rows = []
         for e in people:
-            balances = self.db.balances(e["id"])
-            current = next((b for b in balances if b["start"] <= date.today().isoformat() <= b["end"]), balances[-1] if balances else None)
-            rows.append([e["first_name"] + " " + e["last_name"], "Lernende" if e["kind"] == "apprentice" else "Mitarbeiter", current["label"] if current else "Noch nicht eingerichtet", number(current["balance"], " h") if current else "–", "Aktiv" if e["active"] else "Inaktiv"])
+            records = self.db.time_records(e["id"], date.today().year)
+            rows.append([e["code"], e["first_name"] + " " + e["last_name"], "Lernende" if e["kind"] == "apprentice" else "Mitarbeiter",
+                         len(records), display_date(records[0]["day"]) if records else "–", "Aktiv" if e["active"] else "Inaktiv"])
         self.table.populate(rows, [e["id"] for e in people], [3])
         self.selection()
-        if not rows: self.hint.setText("Noch keine Person gefunden. Mit «Neue Person» starten oder die Suche ändern.")
+        if not rows: self.hint.setText("Keine Person gefunden. Das Team wird unter Einstellungen verwaltet.")
 
     def selection(self):
         e = self.db.employee(self.table.selected_id())
@@ -331,26 +389,26 @@ class Team(QWidget):
 
     def quick_entry(self):
         self.open_person()
-        if not self.workspace.current_balance: self.workspace.new_period()
         self.workspace.new_entry()
 
     def new_person(self):
-        d = EmployeeDialog(self, self.db, kind=self.kind or "employee")
-        if d.exec():
-            self.workspace.show_person(d.saved_id)
-            self.stack.setCurrentIndex(1)
-            self.workspace.new_period()
+        self.window.navigate_settings_team(True)
+
+    def manage_team(self):
+        self.window.navigate_settings_team()
+
+    def manage_selected(self):
+        self.window.navigate_settings_team(employee_id=self.workspace.employee["id"] if self.workspace.employee else None)
 
 
 class Settings(SettingsPage):
     def __init__(self, db, controller):
         super().__init__(db)
         self.title_label.setText("Einstellungen")
-        self.subtitle_label.setText("Firma, Kunden, Datensicherung und Programm-Updates.")
-        self.tabs.removeTab(0)  # People live exclusively under Team.
-        company = self.tabs.widget(1)
-        self.tabs.removeTab(1)
-        self.tabs.insertTab(0, company, "Meine Firma")
+        self.subtitle_label.setText("Team, Firma, Kunden, Datensicherung und Programm-Updates zentral verwalten.")
+        self.tabs.setTabText(0, "Team")
+        company = self.tabs.widget(2)
+        self.tabs.setTabText(2, "Meine Firma")
         self.tabs.setCurrentIndex(0)
         self.update_settings = UpdateSettings(db, controller)
         self.tabs.addTab(self.update_settings, "Updates")
@@ -369,6 +427,21 @@ class Settings(SettingsPage):
     def refresh(self):
         super().refresh()
         self.update_settings.refresh()
+
+    def open_team(self, employee_id=None, create=False):
+        self.tabs.setCurrentIndex(0)
+        self.refresh()
+        if create:
+            self.new_person()
+            return
+        if employee_id:
+            for row in range(self.people.rowCount()):
+                if self.people.item(row, 0).data(Qt.ItemDataRole.UserRole) == employee_id:
+                    self.people.selectRow(row)
+                    break
+            person = self.db.employee(employee_id)
+            if person and EmployeeDialog(self, self.db, person).exec():
+                self.refresh()
 
 
 class Salaries(SalaryPage):

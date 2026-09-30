@@ -155,6 +155,7 @@ class Table(QTableWidget):
 class Page(QWidget):
     def __init__(self, title, subtitle):
         super().__init__()
+        self.setObjectName("pageRoot")
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(32, 26, 32, 24)
         self.layout.setSpacing(18)
@@ -203,9 +204,11 @@ class FormDialog(QDialog):
             sub.setWordWrap(True)
             self.layout.addWidget(sub)
         scroll = QScrollArea()
+        scroll.setObjectName("formScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
+        content.setObjectName("formContent")
         self.form = QFormLayout(content)
         self.form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.form.setSpacing(12)

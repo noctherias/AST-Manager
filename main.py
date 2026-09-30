@@ -19,7 +19,7 @@ def main():
     from PySide6.QtWidgets import QApplication, QMessageBox
     from ast_app.database import Database
     from ast_app.demo import seed_demo
-    from ast_app.theme import STYLE
+    from ast_app.theme import apply_theme
     from ast_app.window import MainWindow
 
     root = args.data_dir or Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "AST-Erfassungstool"
@@ -31,7 +31,7 @@ def main():
     app = QApplication(sys.argv[:1])
     app.setApplicationName("AST Verwaltung")
     app.setStyle("Fusion")
-    app.setStyleSheet(STYLE)
+    apply_theme(app)
     lock = QLockFile(str(root / (filename + ".lock")))
     lock.setStaleLockTime(0)
     if not lock.tryLock(100):
@@ -58,8 +58,12 @@ def main():
                 window.navigate(index)
                 app.processEvents()
             from ast_app.documents import salary_pdf, report_pdf
+            from ast_app.timesheet_excel import export_timesheet
             salary_pdf({"A": "/Ja", "B": "/Off", "HName": "AST Starttest", "1": "1000"}, root / "smoke-lohnausweis.pdf")
             report_pdf(root / "smoke-report.pdf", "AST Starttest", "Test", ["Test", "Wert"], [["PDF", "OK"]], "Test erfolgreich")
+            employee = db.employees()[0]
+            export_timesheet(root / "smoke-stundennachweis.xlsm", employee, date.today().year,
+                             db.time_records(employee["id"], date.today().year), db.settings().get("company", ""))
             (root / "smoke-test-ok.txt").write_text("Alle fünf Bereiche erfolgreich geladen.\n", encoding="utf-8")
             window.close()
             return 0

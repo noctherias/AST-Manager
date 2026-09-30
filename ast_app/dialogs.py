@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, QTime
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QWidget, QTabWidget, QScrollArea,
-    QFormLayout, QDialogButtonBox, QCheckBox, QFrame, QComboBox)
+    QFormLayout, QDialogButtonBox, QCheckBox, QFrame, QComboBox, QTimeEdit, QSpinBox)
 
-from .domain import units, number, chf, KINDS, SALARY_AMOUNTS, SALARY_TEXT, SALARY_FLAGS, salary_totals
+from .domain import units, number, chf, KINDS, TIME_CODES, SALARY_AMOUNTS, SALARY_TEXT, SALARY_FLAGS, salary_totals
 from .widgets import FormDialog, line, numeric, combo, day, day_value, label, button, guarded, Table, confirm, Disclosure
 
 
@@ -198,6 +198,90 @@ class EntryDialog(FormDialog):
         d["hours"] = units(d["hours"])
         d["period_id"] = self.period["id"]
         self.saved_id = self.db.save_entry(d, self.row.get("id"))
+        self.accept()
+
+
+class TimeRecordDialog(FormDialog):
+    """Simple front end for the seven editable columns in each Excel day row."""
+    def __init__(self, parent, db, employee, row=None):
+        super().__init__(parent, "Tag bearbeiten" if row else "Arbeitstag erfassen",
+                         employee["first_name"] + " " + employee["last_name"], 680)
+        self.db, self.employee, self.row = db, employee, row or {}
+        r = self.row
+        self.add("day", "Datum", day(r.get("day")))
+        self.add("code", "Art des Tages", combo([(title, code) for code, title in TIME_CODES.items()], r.get("code", "")))
+
+        self.has_times = QCheckBox("Arbeitszeiten erfassen")
+        self.has_times.setChecked(r.get("start_1") is not None if row else not bool(r.get("code")))
+        self.form.addRow("", self.has_times)
+        self.start_1 = self._time(r.get("start_1"), 7, 30)
+        self.end_1 = self._time(r.get("end_1"), 12, 0)
+        self.form.addRow("Kommt", self.start_1)
+        self.form.addRow("Geht", self.end_1)
+
+        self.has_second = QCheckBox("Zweiten Arbeitsblock verwenden")
+        self.has_second.setChecked(r.get("start_2") is not None if row else True)
+        self.form.addRow("", self.has_second)
+        self.start_2 = self._time(r.get("start_2"), 13, 0)
+        self.end_2 = self._time(r.get("end_2"), 17, 15)
+        self.form.addRow("Kommt 2", self.start_2)
+        self.form.addRow("Geht 2", self.end_2)
+
+        pause = QSpinBox()
+        pause.setRange(0, 1440)
+        pause.setSuffix(" min")
+        pause.setValue(r.get("break_minutes", 0))
+        pause.setMinimumHeight(38)
+        self.add("break_minutes", "Zusätzliche Pause", pause)
+        self.add("note", "Bemerkung", line(r.get("note", ""), "z. B. Baustelle Zürich"))
+        hint = label("Die Pause zwischen Geht und Kommt 2 berechnet Excel automatisch. Hier nur weitere Pausen eintragen.", "muted")
+        hint.setWordWrap(True)
+        self.form.addRow("", hint)
+        self.has_times.toggled.connect(self._state)
+        self.has_second.toggled.connect(self._state)
+        self.fields["code"].currentIndexChanged.connect(self._code_changed)
+        self._state()
+
+    @staticmethod
+    def _time(minutes, hour, minute):
+        widget = QTimeEdit()
+        widget.setDisplayFormat("HH:mm")
+        value = int(minutes) if minutes is not None else hour * 60 + minute
+        widget.setTime(QTime(value // 60, value % 60))
+        widget.setMinimumHeight(38)
+        return widget
+
+    def _code_changed(self):
+        if self.fields["code"].currentData() and not self.row:
+            self.has_times.setChecked(False)
+
+    def _state(self):
+        enabled = self.has_times.isChecked()
+        self.has_second.setEnabled(enabled)
+        for widget in (self.start_1, self.end_1):
+            widget.setEnabled(enabled)
+        for widget in (self.start_2, self.end_2):
+            widget.setEnabled(enabled and self.has_second.isChecked())
+        self.fields["break_minutes"].setEnabled(enabled)
+
+    @staticmethod
+    def _minutes(widget):
+        value = widget.time()
+        return value.hour() * 60 + value.minute()
+
+    @guarded
+    def submit(self):
+        values = self.values()
+        values["employee_id"] = self.employee["id"]
+        if self.has_times.isChecked():
+            values.update(start_1=self._minutes(self.start_1), end_1=self._minutes(self.end_1))
+            if self.has_second.isChecked():
+                values.update(start_2=self._minutes(self.start_2), end_2=self._minutes(self.end_2))
+            else:
+                values.update(start_2=None, end_2=None)
+        else:
+            values.update(start_1=None, end_1=None, start_2=None, end_2=None, break_minutes=0)
+        self.saved_id = self.db.save_time_record(values, self.row.get("id"))
         self.accept()
 
 

@@ -94,5 +94,18 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(self.db.salaries()[0]["fields"]["HName"], "Test Person")
         self.assertEqual(self.db.salaries()[0]["fields"]["11"], "46000")
 
+    def test_daily_time_records_are_unique_and_persisted(self):
+        data = {"employee_id": self.person, "day": "2026-01-05", "start_1": 450, "end_1": 720,
+                "start_2": 780, "end_2": 1035, "break_minutes": 15, "code": "H", "note": "Test"}
+        key = self.db.save_time_record(data)
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["id"], key)
+        with self.assertRaises(ValueError):
+            self.db.save_time_record(data)
+        with self.assertRaises(ValueError):
+            self.db.save_time_record({**data, "day": "2026-01-06", "start_1": None})
+        self.db.close()
+        self.db = Database(self.path)
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["note"], "Test")
+
 
 if __name__ == "__main__": unittest.main()

@@ -6,5 +6,6 @@
 *.ps1 text eol=crlf
 *.pdf binary
 *.xlsx binary
+*.xlsm binary
 *.png binary
 *.ico binary

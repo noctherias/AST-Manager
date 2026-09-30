@@ -32,6 +32,12 @@ CREATE TABLE IF NOT EXISTS entries(
  id INTEGER PRIMARY KEY, period_id INTEGER NOT NULL REFERENCES periods(id) ON DELETE RESTRICT,
  day TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('vacation','overtime','sick','accident')),
  hours INTEGER NOT NULL CHECK(hours!=0 AND (kind='overtime' OR hours>0)), note TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS time_records(
+ id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+ day TEXT NOT NULL, start_1 INTEGER, end_1 INTEGER, start_2 INTEGER, end_2 INTEGER,
+ break_minutes INTEGER NOT NULL DEFAULT 0 CHECK(break_minutes>=0 AND break_minutes<=1440),
+ code TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+ UNIQUE(employee_id,day));
 CREATE TABLE IF NOT EXISTS invoices(
  id INTEGER PRIMARY KEY, number TEXT NOT NULL COLLATE NOCASE UNIQUE,
  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
@@ -48,8 +54,10 @@ CREATE TABLE IF NOT EXISTS audit_log(
 CREATE INDEX IF NOT EXISTS entries_period ON entries(period_id,day);
 CREATE INDEX IF NOT EXISTS payments_invoice ON payments(invoice_id);
 CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
-PRAGMA user_version=1;
+CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
 """
+
+SCHEMA_VERSION = 2
 
 
 class Database:
@@ -62,10 +70,11 @@ class Database:
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA busy_timeout=15000")
         version = self.conn.execute("PRAGMA user_version").fetchone()[0]
-        if version > 1:
+        if version > SCHEMA_VERSION:
             self.conn.close()
             raise ValueError("Diese Datenbank stammt aus einer neueren Programmversion.")
         self.conn.executescript(SCHEMA)
+        self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
 
     def close(self):
         self.conn.close()
@@ -173,7 +182,7 @@ class Database:
             return self._save("payments", {"invoice_id": invoice_id, "day": day, "amount": amount, "note": note})
 
     def delete(self, table, key):
-        if table not in ("entries", "payments", "invoices", "salaries"):
+        if table not in ("entries", "time_records", "payments", "invoices", "salaries"):
             raise ValueError("Dieser Datensatz kann nicht gelöscht werden.")
         try:
             with self.conn:
@@ -214,6 +223,46 @@ class Database:
         if d["kind"] not in KINDS or not d["hours"] or (d["hours"] < 0 and d["kind"] != "overtime"):
             raise ValueError("Nur Überzeit darf negativ sein; Nullbuchungen sind nicht zulässig.")
         return self._save("entries", d, key)
+
+    def time_records(self, employee_id, year=None):
+        sql = "SELECT * FROM time_records WHERE employee_id=?"
+        args = [employee_id]
+        if year is not None:
+            sql += " AND day>=? AND day<=?"
+            args.extend((f"{int(year):04d}-01-01", f"{int(year):04d}-12-31"))
+        return self.rows(sql + " ORDER BY day DESC,id DESC", args)
+
+    def save_time_record(self, data, key=None):
+        fields = ("employee_id", "day", "start_1", "end_1", "start_2", "end_2", "break_minutes", "code", "note")
+        d = {name: data.get(name) for name in fields}
+        d["day"] = iso(d["day"])
+        d["code"] = str(d.get("code") or "").strip().upper()
+        d["note"] = str(d.get("note") or "").strip()
+        valid_codes = {"", "F", "G", "K", "KR", "KU", "KA", "U", "UH", "H", "B", "E1", "E2", "E3", "E4", "E5"}
+        if d["code"] not in valid_codes:
+            raise ValueError("Bitte einen gültigen Abwesenheits- oder Arbeitscode auswählen.")
+        if not self.employee(d["employee_id"]):
+            raise ValueError("Die ausgewählte Person existiert nicht mehr.")
+        values = [d[name] for name in ("start_1", "end_1", "start_2", "end_2")]
+        if any(v is not None and not 0 <= int(v) < 1440 for v in values):
+            raise ValueError("Bitte gültige Uhrzeiten eingeben.")
+        first = d["start_1"] is not None or d["end_1"] is not None
+        second = d["start_2"] is not None or d["end_2"] is not None
+        if first != (d["start_1"] is not None and d["end_1"] is not None):
+            raise ValueError("Für den ersten Arbeitsblock braucht es Kommt- und Geht-Zeit.")
+        if second != (d["start_2"] is not None and d["end_2"] is not None):
+            raise ValueError("Für den zweiten Arbeitsblock braucht es Kommt- und Geht-Zeit.")
+        if second and not first:
+            raise ValueError("Der zweite Arbeitsblock kann nur zusammen mit dem ersten erfasst werden.")
+        if first:
+            duration = (d["end_1"] - d["start_1"]) % 1440
+            if second:
+                duration += (d["end_2"] - d["start_2"]) % 1440
+            if duration <= d["break_minutes"]:
+                raise ValueError("Die zusätzliche Pause muss kürzer als die Arbeitszeit sein.")
+        elif not d["code"]:
+            raise ValueError("Bitte Arbeitszeiten oder einen Code erfassen.")
+        return self._save("time_records", d, key)
 
     def balances(self, employee_id):
         results = []
@@ -262,20 +311,18 @@ class Database:
         if source == self.path.resolve():
             raise ValueError("Diese Datenbank ist bereits geöffnet.")
         with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)) as incoming:
-            if incoming.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or incoming.execute("PRAGMA user_version").fetchone()[0] != 1:
+            saved_version = incoming.execute("PRAGMA user_version").fetchone()[0]
+            if incoming.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or not 1 <= saved_version <= SCHEMA_VERSION:
                 raise ValueError("Die Sicherung ist beschädigt oder hat eine andere Version.")
-            expected = {r[0] for r in self.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            expected = {"settings", "customers", "employees", "periods", "entries", "invoices", "payments", "salaries", "audit_log"}
             actual = {r[0] for r in incoming.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not expected <= actual:
                 raise ValueError("Das ist keine vollständige AST-Sicherung.")
-            for table in expected:
-                current = [tuple(r)[1:6] for r in self.conn.execute(f'PRAGMA table_info("{table}")')]
-                saved = [tuple(r)[1:6] for r in incoming.execute(f'PRAGMA table_info("{table}")')]
-                if current != saved:
-                    raise ValueError("Die Tabellenstruktur der Sicherung passt nicht zu dieser Version.")
             if incoming.execute("PRAGMA foreign_key_check").fetchall():
                 raise ValueError("Die Sicherung enthält ungültige Verknüpfungen.")
             safety = self.path.parent / "backups" / ("vor-wiederherstellung-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f") + ".sqlite3")
             self.backup(safety)
             incoming.backup(self.conn)
+            self.conn.executescript(SCHEMA)
+            self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         return safety
