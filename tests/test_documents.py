@@ -61,17 +61,22 @@ class DocumentTests(unittest.TestCase):
     def test_reminder_letter_with_custom_text_and_logo(self):
         logo = Path(self.temp.name) / "logo.png"
         Image.new("RGB", (320, 100), "#087e67").save(logo)
-        invoice = {"number": "R-204", "customer": "Musterkunde AG", "customer_address": "Dorfstrasse 4",
+        invoice = {"number": "R-204", "customer": "Musterkunde AG", "customer_number": "2043",
+                   "customer_address": "Dorfstrasse 4",
                    "customer_postcode": "5000", "customer_city": "Aarau", "issued": "2026-08-01",
                    "due": "2026-08-31", "open": 125050}
         settings = {"company": "AST Muster AG", "address": "Werkstrasse 1", "postcode": "5000",
-                    "city": "Aarau", "phone": "+41 62 000 00 00", "contact": "Administration",
+                    "city": "Aarau", "phone": "+41 62 000 00 00", "email": "info@ast-muster.ch",
+                    "website": "www.ast-muster.ch", "contact": "Administration",
                     "logo_path": str(logo)}
         path = Path(self.temp.name) / "mahnung.pdf"
         reminder_pdf(path, invoice, settings, 3,
                      "Bitte begleichen Sie {betrag} für Rechnung {rechnungsnummer} bis {frist}.")
         text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
-        for value in ("Mahnung 2", "R-204", "Musterkunde AG", "CHF 1’250.50", "AST Muster AG"):
+        for value in ("Mahnung 2", "R-204", "Musterkunde AG", "Kunden-Nr. 2043",
+                      "Zahlungen berücksichtigt bis", "Betrag brutto", "Betrag offen", "Faktura",
+                      "Total", "Sollte sich Ihre Zahlung", "CHF 1’250.50", "AST Muster AG",
+                      "Es gelten unsere AGB", "www.ast-muster.ch", "Seite 1"):
             self.assertIn(value, text)
         self.assertGreater(path.stat().st_size, 2000)
         self.assertEqual(validate_template("Hallo {kunde}"), "Hallo {kunde}")
@@ -79,15 +84,16 @@ class DocumentTests(unittest.TestCase):
             validate_template("Hallo {unbekannt}")
 
         expanded = format_reminder_text(
-            "{rechnungsnummer}|{kundenadresse}|{kunden_plz}|{kunden_ort}|{kunden_email}|"
+            "{rechnungsnummer}|{kundennummer}|{kundenadresse}|{kunden_plz}|{kunden_ort}|{kunden_email}|"
             "{rechnungsdatum}|{faelligkeit}|{betrag}|{mahndatum}|{frist}|{frist_tage}|"
             "{tage_ueberfaellig}|{mahnstufe}|{firma}|{firmenadresse}|{firmen_plz}|"
-            "{firmen_ort}|{telefon}|{kontakt}",
+            "{firmen_ort}|{telefon}|{kontakt}|{firmen_email}|{website}",
             {**invoice, "customer_email": "rechnung@kunde.ch"}, settings, 3, date(2026, 9, 30))
-        for value in ("R-204", "Dorfstrasse 4", "5000", "Aarau", "rechnung@kunde.ch",
+        for value in ("R-204", "2043", "Dorfstrasse 4", "5000", "Aarau", "rechnung@kunde.ch",
                       "01.08.2026", "31.08.2026", "CHF 1’250.50", "30.09.2026",
                       "07.10.2026", "7", "30", "Mahnung 2", "AST Muster AG",
-                      "Werkstrasse 1", "+41 62 000 00 00", "Administration"):
+                      "Werkstrasse 1", "+41 62 000 00 00", "Administration", "info@ast-muster.ch",
+                      "www.ast-muster.ch"):
             self.assertIn(value, expanded)
         self.assertNotIn("{", expanded)
 

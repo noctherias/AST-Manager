@@ -38,6 +38,7 @@ DEFAULT_REMINDER_TEXTS = {
 
 PLACEHOLDER_INFO = {
     "{kunde}": "Name oder Firma des Empfängers",
+    "{kundennummer}": "Kundennummer des Empfängers",
     "{kundenadresse}": "Strasse des Empfängers",
     "{kunden_plz}": "Postleitzahl des Empfängers",
     "{kunden_ort}": "Ort des Empfängers",
@@ -57,6 +58,8 @@ PLACEHOLDER_INFO = {
     "{firmen_ort}": "Eigener Firmenort",
     "{telefon}": "Eigene Telefonnummer",
     "{kontakt}": "Eigene Kontaktperson",
+    "{firmen_email}": "Eigene E-Mail-Adresse",
+    "{website}": "Eigene Website",
 }
 PLACEHOLDERS = tuple(PLACEHOLDER_INFO)
 PLACEHOLDER_NAMES = {value[1:-1] for value in PLACEHOLDERS}
@@ -85,6 +88,7 @@ def _values(invoice, settings, level, created):
     deadline_days = deadlines[int(level)]
     return {
         "kunde": invoice["customer"],
+        "kundennummer": invoice.get("customer_number", ""),
         "kundenadresse": invoice.get("customer_address", ""),
         "kunden_plz": invoice.get("customer_postcode", ""),
         "kunden_ort": invoice.get("customer_city", ""),
@@ -103,6 +107,8 @@ def _values(invoice, settings, level, created):
         "firmen_ort": settings.get("city", ""),
         "telefon": settings.get("phone", ""),
         "kontakt": settings.get("contact", ""),
+        "firmen_email": settings.get("email", ""),
+        "website": settings.get("website", ""),
         "mahnstufe": REMINDER_LEVELS[int(level)],
     }
 
@@ -132,57 +138,114 @@ def reminder_pdf(path, invoice, settings, level, template=None, created=None):
         raise ValueError("Für eine bezahlte Rechnung kann kein Mahnbrief erstellt werden.")
     created = created or date.today()
     styles = getSampleStyleSheet()
-    body = ParagraphStyle("ASTLetter", parent=styles["Normal"], fontName="Helvetica", fontSize=10.5,
-                          leading=15, textColor=colors.HexColor("#172f3d"))
-    small = ParagraphStyle("ASTSmall", parent=body, fontSize=8.5, leading=12, textColor=colors.HexColor("#536b79"))
-    right = ParagraphStyle("ASTRight", parent=small, alignment=TA_RIGHT)
-    subject = ParagraphStyle("ASTSubject", parent=body, fontName="Helvetica-Bold", fontSize=13, leading=17)
+    body = ParagraphStyle("ASTLetter", parent=styles["Normal"], fontName="Helvetica", fontSize=10,
+                          leading=12.5, textColor=colors.black)
+    small = ParagraphStyle("ASTSmall", parent=body, fontSize=8, leading=10)
+    right = ParagraphStyle("ASTRight", parent=body, alignment=TA_RIGHT)
+    footer_right = ParagraphStyle("ASTFooterRight", parent=small, alignment=TA_RIGHT)
+    subject = ParagraphStyle("ASTSubject", parent=body, fontName="Helvetica-Bold", fontSize=13, leading=16)
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     story = []
     logo_path = settings.get("logo_path", "").strip()
-    logo = Spacer(45 * mm, 20 * mm)
+    logo = None
     if logo_path and Path(logo_path).is_file():
         try:
             width, height = ImageReader(logo_path).getSize()
-            scale = min((45 * mm) / width, (22 * mm) / height)
+            scale = min((58 * mm) / width, (25 * mm) / height)
             logo = Image(logo_path, width=width * scale, height=height * scale)
         except Exception as exc:
             raise ValueError("Das gespeicherte Firmenlogo kann nicht gelesen werden.") from exc
-    company_lines = [settings.get(key, "") for key in ("company", "address")]
-    company_lines.append(" ".join(filter(None, (settings.get("postcode", ""), settings.get("city", "")))))
-    company_lines.extend(settings.get(key, "") for key in ("phone", "contact"))
-    company = Paragraph("<br/>".join(escape(v) for v in company_lines if v), right)
-    header = Table([[logo, company]], colWidths=[92 * mm, 78 * mm], hAlign="LEFT")
-    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                                ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
-    story.extend((header, Spacer(1, 18 * mm)))
+    company_name = escape(settings.get("company", ""))
+    if logo is None:
+        logo = Paragraph(f"<b>{company_name}</b>", ParagraphStyle(
+            "ASTCompany", parent=body, fontName="Helvetica-Bold", fontSize=18, leading=21))
+    company_lines = [settings.get("address", ""),
+                     " ".join(filter(None, (settings.get("postcode", ""), settings.get("city", "")))),
+                     settings.get("phone", ""), settings.get("email", ""), settings.get("website", "")]
+    identity = [logo, Spacer(1, 3 * mm), Paragraph("<br/>".join(escape(v) for v in company_lines if v), small)]
+    header = Table([[identity, ""]], colWidths=[82 * mm, 78 * mm], hAlign="LEFT")
+    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    story.extend((header, Spacer(1, 11 * mm)))
     recipient = [invoice["customer"], invoice.get("customer_address", ""),
                  " ".join(filter(None, (invoice.get("customer_postcode", ""), invoice.get("customer_city", ""))))]
-    story.append(Paragraph("<br/>".join(escape(v) for v in recipient if v), body))
-    story.extend((Spacer(1, 15 * mm), Paragraph(f"{escape(settings.get('city', ''))}, {created.strftime('%d.%m.%Y')}", right),
-                  Spacer(1, 9 * mm), Paragraph(f"{REMINDER_LEVELS[level]} · Rechnung {escape(invoice['number'])}", subject),
-                  Spacer(1, 6 * mm), Paragraph("Sehr geehrte Damen und Herren", body), Spacer(1, 5 * mm)))
+    recipient_block = Table([["", Paragraph("<br/>".join(escape(v) for v in recipient if v), body)]],
+                            colWidths=[92 * mm, 68 * mm], hAlign="LEFT")
+    recipient_block.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                         ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                         ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    customer_number = invoice.get("customer_number", "").strip()
+    account_lines = []
+    if customer_number:
+        account_lines.append(f"Kunden-Nr. {escape(customer_number)}")
+    account_lines.append(f"Zahlungen berücksichtigt bis {created.strftime('%d.%m.%Y')}")
+    account = Paragraph("<br/><br/>".join(account_lines), body)
+    place_date = Paragraph(f"{escape(settings.get('city', ''))}, {created.strftime('%d.%m.%Y')}", right)
+    info = Table([[account, place_date]], colWidths=[92 * mm, 68 * mm], hAlign="LEFT")
+    info.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                              ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                              ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    story.extend((recipient_block, Spacer(1, 17 * mm), info, Spacer(1, 14 * mm),
+                  Paragraph(f"{REMINDER_LEVELS[level]} zur Rechnung {escape(invoice['number'])}", subject),
+                  Spacer(1, 5 * mm)))
     text = format_reminder_text(template or reminder_text(settings, level), invoice, settings, level, created)
     story.extend(_paragraphs(text, body))
-    details = [["Rechnung", invoice["number"]], ["Rechnungsdatum", display_date(invoice["issued"])],
-               ["Fällig am", display_date(invoice["due"])], ["Offener Betrag", chf(invoice["open"])]]
-    table = Table(details, colWidths=[48 * mm, 112 * mm], hAlign="LEFT")
-    table.setStyle(TableStyle([("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#edf3f5")),
-                               ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                               ("FONTNAME", (1, -1), (1, -1), "Helvetica-Bold"),
-                               ("GRID", (0, 0), (-1, -1), .4, colors.HexColor("#cedbe1")),
-                               ("PADDING", (0, 0), (-1, -1), 8)]))
-    story.extend((table, Spacer(1, 10 * mm), Paragraph("Freundliche Grüsse", body), Spacer(1, 8 * mm),
-                  Paragraph(escape(settings.get("company", "")), body)))
+    gross = invoice.get("amount", invoice["open"])
+    details = [
+        ["Rechnung-Nr.", "Belegdatum", "Verfalldatum", "Art", "Betrag brutto", "Betrag offen", "Stufe"],
+        [invoice["number"], display_date(invoice["issued"]), display_date(invoice["due"]), "Faktura",
+         chf(gross), chf(invoice["open"]), str(level)],
+        ["", "", "", "", "Total  " + chf(gross), chf(invoice["open"]), ""],
+    ]
+    table = Table(details, colWidths=[24 * mm, 23 * mm, 23 * mm, 17 * mm, 30 * mm, 29 * mm, 14 * mm], hAlign="LEFT")
+    table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 2), (-1, 2), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.2),
+        ("LEADING", (0, 0), (-1, -1), 10),
+        ("LINEBELOW", (0, 0), (-1, 0), .55, colors.black),
+        ("LINEBELOW", (0, 1), (-1, 1), .55, colors.black),
+        ("ALIGN", (4, 1), (5, -1), "RIGHT"),
+        ("ALIGN", (6, 0), (6, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.extend((Spacer(1, 7 * mm), table, Spacer(1, 11 * mm),
+                  Paragraph("Sollte sich Ihre Zahlung mit diesem Schreiben gekreuzt haben, bitten wir Sie, dieses als gegenstandslos zu betrachten.", body),
+                  Spacer(1, 13 * mm), Paragraph("Freundliche Grüsse", body), Spacer(1, 5 * mm),
+                  Paragraph(company_name, body)))
 
     def footer(canvas, document):
-        canvas.setFont("Helvetica", 8)
-        canvas.setFillColor(colors.HexColor("#718492"))
-        canvas.drawString(22 * mm, 13 * mm, settings.get("company", ""))
-        canvas.drawRightString(188 * mm, 13 * mm, f"Seite {document.page}")
+        canvas.setStrokeColor(colors.HexColor("#555555"))
+        canvas.setLineWidth(.6)
+        canvas.line(20 * mm, 27 * mm, 190 * mm, 27 * mm)
+        footer_left = [f"<b>{company_name}</b>", escape(settings.get("address", "")),
+                       escape(" ".join(filter(None, (settings.get("postcode", ""), settings.get("city", ""))))),
+                       escape(settings.get("phone", "")), escape(settings.get("email", ""))]
+        footer_middle = ["Es gelten unsere AGB"]
+        if settings.get("website", ""):
+            footer_middle.append("Mehr Infos auf <b>" + escape(settings["website"]) + "</b>")
+        left_paragraph = Paragraph("<br/>".join(value for value in footer_left if value), small)
+        middle_paragraph = Paragraph("<br/>".join(footer_middle), small)
+        page_paragraph = Paragraph(f"Seite {document.page}", footer_right)
+        footer_table = Table([[left_paragraph, middle_paragraph, page_paragraph]],
+                             colWidths=[72 * mm, 58 * mm, 40 * mm])
+        footer_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                                          ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                          ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                          ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                          ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        footer_table.wrapOn(canvas, 170 * mm, 22 * mm)
+        footer_table.drawOn(canvas, 20 * mm, 5 * mm)
 
-    SimpleDocTemplate(str(destination), pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm,
-                      topMargin=20 * mm, bottomMargin=22 * mm, title=f"{REMINDER_LEVELS[level]} {invoice['number']}",
+    SimpleDocTemplate(str(destination), pagesize=A4, leftMargin=20 * mm, rightMargin=30 * mm,
+                      topMargin=15 * mm, bottomMargin=39 * mm, title=f"{REMINDER_LEVELS[level]} {invoice['number']}",
                       author=settings.get("company", "AST Verwaltung")).build(story, onFirstPage=footer, onLaterPages=footer)
     return destination

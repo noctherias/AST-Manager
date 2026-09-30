@@ -13,7 +13,8 @@ class CustomerDialog(FormDialog):
     def __init__(self, parent, db, row=None):
         super().__init__(parent, "Kunde bearbeiten" if row else "Neuer Kunde", "Kundendaten werden zentral für alle Rechnungen verwendet.")
         self.db, self.row = db, row or {}
-        for key, title in [("name", "Name / Firma *"), ("address", "Strasse"), ("postcode", "PLZ"), ("city", "Ort"), ("email", "E-Mail")]:
+        for key, title in [("name", "Name / Firma *"), ("customer_number", "Kunden-Nr."),
+                           ("address", "Strasse"), ("postcode", "PLZ"), ("city", "Ort"), ("email", "E-Mail")]:
             self.add(key, title, line(self.row.get(key, "")))
 
     @guarded
@@ -170,6 +171,7 @@ class ManualReminderDialog(FormDialog):
         ]
         self.customer_picker = self.add("customer_id", "Aus Stammdaten übernehmen", combo(customers, None))
         self.add("customer", "Name / Firma *", line())
+        self.add("customer_number", "Kunden-Nr.", line())
         self.add("customer_address", "Strasse", line())
         self.add("customer_postcode", "PLZ", line())
         self.add("customer_city", "Ort", line())
@@ -195,7 +197,8 @@ class ManualReminderDialog(FormDialog):
         customer = next((row for row in self.db.customers() if row["id"] == key), None)
         if not customer:
             return
-        for field, source in (("customer", "name"), ("customer_address", "address"),
+        for field, source in (("customer", "name"), ("customer_number", "customer_number"),
+                              ("customer_address", "address"),
                               ("customer_postcode", "postcode"), ("customer_city", "city"),
                               ("customer_email", "email")):
             self.fields[field].setText(customer.get(source, ""))
@@ -212,6 +215,7 @@ class ManualReminderDialog(FormDialog):
             raise ValueError("Bitte einen positiven geforderten Betrag eingeben.")
         self.invoice = {
             "customer": values["customer"],
+            "customer_number": values["customer_number"],
             "customer_address": values["customer_address"],
             "customer_postcode": values["customer_postcode"],
             "customer_city": values["customer_city"],

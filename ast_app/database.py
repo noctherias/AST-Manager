@@ -13,6 +13,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS customers(
  id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+ customer_number TEXT NOT NULL DEFAULT '',
  address TEXT NOT NULL DEFAULT '', postcode TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '',
  email TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS employees(
@@ -59,7 +60,7 @@ CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
 CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
 """
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class Database:
@@ -76,6 +77,9 @@ class Database:
             self.conn.close()
             raise ValueError("Diese Datenbank stammt aus einer neueren Programmversion.")
         self.conn.executescript(SCHEMA)
+        customer_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(customers)")}
+        if "customer_number" not in customer_columns:
+            self.conn.execute("ALTER TABLE customers ADD COLUMN customer_number TEXT NOT NULL DEFAULT ''")
         employee_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(employees)")}
         if "birth_date" not in employee_columns:
             self.conn.execute("ALTER TABLE employees ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''")
@@ -151,7 +155,7 @@ class Database:
         return self.rows("SELECT * FROM customers ORDER BY name")
 
     def save_customer(self, data, key=None):
-        data = {k: str(data.get(k, "")).strip() for k in ("name", "address", "postcode", "city", "email")}
+        data = {k: str(data.get(k, "")).strip() for k in ("name", "customer_number", "address", "postcode", "city", "email")}
         if not data["name"]:
             raise ValueError("Bitte einen Kundennamen eingeben.")
         return self._save("customers", data, key)
@@ -176,7 +180,7 @@ class Database:
         return self._save("employees", d, key)
 
     def invoices(self):
-        rows = self.rows("""SELECT i.*,c.name AS customer,c.address AS customer_address,
+        rows = self.rows("""SELECT i.*,c.name AS customer,c.customer_number AS customer_number,c.address AS customer_address,
                             c.postcode AS customer_postcode,c.city AS customer_city,c.email AS customer_email,
                             COALESCE(SUM(p.amount),0) AS paid,MAX(p.day) AS valuta
                             FROM invoices i JOIN customers c ON c.id=i.customer_id

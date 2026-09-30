@@ -551,7 +551,7 @@ class SettingsPage(Page):
         self.layout.addWidget(self.tabs, 1)
         self.people = Table(["Personal-Nr.", "Name", "Bereich", "Funktion", "Pensum", "Status"])
         self.people.cellDoubleClicked.connect(self.edit_person)
-        self.customers = Table(["Name / Firma", "Strasse", "PLZ", "Ort", "E-Mail"])
+        self.customers = Table(["Kunden-Nr.", "Name / Firma", "Strasse", "PLZ", "Ort", "E-Mail"])
         self.customers.cellDoubleClicked.connect(self.edit_customer)
         for title, table, new, edit in [("Personen", self.people, self.new_person, self.edit_person), ("Kunden", self.customers, self.new_customer, self.edit_customer)]:
             pane = QWidget()
@@ -570,7 +570,9 @@ class SettingsPage(Page):
         form.setContentsMargins(18, 20, 18, 15)
         form.setSpacing(16)
         self.company_fields = {}
-        for key, title in [("company", "Firma"), ("address", "Strasse"), ("postcode", "PLZ"), ("city", "Ort"), ("phone", "Telefon"), ("contact", "Verantwortliche Person")]:
+        for key, title in [("company", "Firma"), ("address", "Strasse"), ("postcode", "PLZ"),
+                           ("city", "Ort"), ("phone", "Telefon"), ("email", "E-Mail"),
+                           ("website", "Website"), ("contact", "Verantwortliche Person")]:
             self.company_fields[key] = line()
             form.addRow(title, self.company_fields[key])
         self.logo_preview = label("Kein Firmenlogo gewählt", "muted")
@@ -626,7 +628,7 @@ class SettingsPage(Page):
         people = self.db.employees()
         self.people.populate([[p["code"], p["first_name"] + " " + p["last_name"], "Lernende" if p["kind"] == "apprentice" else "Mitarbeiter", p["job"], number(p["workload"], " %"), "Aktiv" if p["active"] else "Inaktiv"] for p in people], [p["id"] for p in people])
         customers = self.db.customers()
-        self.customers.populate([[c[k] for k in ("name", "address", "postcode", "city", "email")] for c in customers], [c["id"] for c in customers])
+        self.customers.populate([[c[k] for k in ("customer_number", "name", "address", "postcode", "city", "email")] for c in customers], [c["id"] for c in customers])
         settings = self.db.settings()
         for key, widget in self.company_fields.items(): widget.setText(settings.get(key, ""))
         self._show_logo(settings.get("logo_path", ""))

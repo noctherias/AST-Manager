@@ -8,11 +8,13 @@ def seed_demo(db):
     today = date.today()
     year = today.year
     db.save_settings({"company": "AST Muster AG", "address": "Werkstrasse 12", "postcode": "4663",
-                      "city": "Aarburg", "phone": "+41 62 000 00 00", "contact": "Administration", "demo_seeded": "1"})
-    customers = [db.save_customer({"name": n, "address": a, "postcode": z, "city": c, "email": ""})
-                 for n, a, z, c in [("Alpenblick Immobilien AG", "Bergstrasse 8", "5000", "Aarau"),
-                                   ("Werkraum Architektur", "Bahnhofstrasse 21", "4600", "Olten"),
-                                   ("Gemeinde Musterwil", "Dorfplatz 1", "4800", "Musterwil")]]
+                      "city": "Aarburg", "phone": "+41 62 000 00 00", "email": "info@ast-muster.ch",
+                      "website": "www.ast-muster.ch", "contact": "Administration", "demo_seeded": "1"})
+    customers = [db.save_customer({"name": n, "customer_number": code, "address": a,
+                                   "postcode": z, "city": c, "email": ""})
+                 for code, n, a, z, c in [("1001", "Alpenblick Immobilien AG", "Bergstrasse 8", "5000", "Aarau"),
+                                          ("1002", "Werkraum Architektur", "Bahnhofstrasse 21", "4600", "Olten"),
+                                          ("1003", "Gemeinde Musterwil", "Dorfplatz 1", "4800", "Musterwil")]]
     for index, (first, last, kind) in enumerate([("Lena", "Keller", "employee"), ("Marco", "Steiner", "employee"), ("Nora", "Frei", "apprentice")]):
         key = db.save_employee({"code": f"AST-{index+1:03}", "first_name": first, "last_name": last,
                                "kind": kind, "salutation": "", "ahv": "", "ahv_old": "", "address": "Musterstrasse 1",

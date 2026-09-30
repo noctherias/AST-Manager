@@ -59,12 +59,13 @@ class DatabaseTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.period(2024)
 
     def test_payments_and_uniqueness(self):
-        customer = self.db.save_customer({"name": "Test AG"})
+        customer = self.db.save_customer({"name": "Test AG", "customer_number": "K-2043"})
         data = {"number": "001", "customer_id": customer, "issued": "2026-01-01", "due": "2026-02-01", "amount": 10000, "note": ""}
         invoice = self.db.save_invoice(data)
         with self.assertRaises(ValueError): self.db.save_invoice(data)
         self.db.add_payment(invoice, "2026-01-15", 3333)
         self.assertEqual(self.db.invoices()[0]["open"], 6667)
+        self.assertEqual(self.db.invoices()[0]["customer_number"], "K-2043")
         with self.assertRaises(ValueError): self.db.add_payment(invoice, "2026-01-15", 6668)
         with self.assertRaises(ValueError): self.db.save_invoice({**data, "amount": 3000}, invoice)
         with self.assertRaises(ValueError): self.db.delete("invoices", invoice)
