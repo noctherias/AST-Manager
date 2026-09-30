@@ -83,8 +83,10 @@ class DatabaseTests(unittest.TestCase):
         self.db.set_reminder(invoice, 0)
         row = next(r for r in self.db.invoices() if r["id"] == invoice)
         self.assertEqual((row["reminder_level"], row["reminder_date"]), (0, ""))
+        self.db.set_reminder(invoice, 4, "2026-03-01")
+        self.assertEqual(next(r for r in self.db.invoices() if r["id"] == invoice)["reminder_level"], 4)
         with self.assertRaises(ValueError):
-            self.db.set_reminder(invoice, 4, "2026-02-15")
+            self.db.set_reminder(invoice, 5, "2026-03-02")
 
     def test_backup_restore_validation(self):
         self.period(2024)

@@ -144,7 +144,7 @@ class ReminderDialog(FormDialog):
         self.db, self.invoice = db, invoice
         self.add("level", "Mahnstufe", combo([
             ("Keine Mahnung", 0), ("1. Zahlungserinnerung", 1),
-            ("2. Mahnung", 2), ("3. Letzte Mahnung", 3),
+            ("2. Mahnung 1", 2), ("3. Mahnung 2", 3), ("4. Betreibung", 4),
         ], invoice.get("reminder_level", 0)))
         self.add("reminder_date", "Mahndatum", day(invoice.get("reminder_date") or date.today().isoformat()))
         hint = label("Stufe 0 entfernt die aktuelle Mahnkennzeichnung. Bereits erfasste Zahlungen bleiben unverändert.", "muted")

@@ -54,7 +54,7 @@ class UiTests(unittest.TestCase):
     def test_navigation_and_all_pages(self):
         window = MainWindow(self.db, True)
         window.show()
-        for index in range(5):
+        for index in range(6):
             QTest.mouseClick(window.buttons[index], Qt.MouseButton.LeftButton)
             for _ in range(4): APP.processEvents()
             self.assertEqual(window.stack.currentIndex(), index)
@@ -62,6 +62,8 @@ class UiTests(unittest.TestCase):
                 folder = Path(os.environ["AST_QA_DIR"])
                 folder.mkdir(parents=True, exist_ok=True)
                 window.grab().save(str(folder / f"page-{index}.png"))
+        self.assertEqual(window.buttons[5].objectName(), "navSubButton")
+        self.assertGreater(window.pages[5].table.rowCount(), 0)
         window.navigate(2)
         page = window.pages[2]
         self.assertGreater(page.table.rowCount(), 0)

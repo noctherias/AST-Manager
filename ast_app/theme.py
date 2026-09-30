@@ -38,6 +38,9 @@ QWidget#sidebar QLabel#navSection { color: #7fa2ad; font-size: 8pt; font-weight:
 QWidget#sidebar QPushButton#navButton { text-align: left; color: #d9e6e9; background: transparent; border: none; border-radius: 9px; padding: 13px 16px; font-weight: 600; }
 QWidget#sidebar QPushButton#navButton:hover { background: #174653; color: white; }
 QWidget#sidebar QPushButton#navButton:checked { background: #e4f3ee; color: #075f50; border-left: 4px solid #30b99c; padding-left: 12px; }
+QWidget#sidebar QPushButton#navSubButton { text-align: left; color: #b9ced5; background: transparent; border: none; border-radius: 8px; padding: 8px 16px 8px 34px; font-size: 9pt; }
+QWidget#sidebar QPushButton#navSubButton:hover { background: #174653; color: white; }
+QWidget#sidebar QPushButton#navSubButton:checked { background: #d8eee6; color: #075f50; border-left: 4px solid #30b99c; padding-left: 30px; font-weight: 600; }
 QLabel#pageTitle { font-size: 25pt; font-weight: 650; color: #162f3e; }
 QLabel#dialogTitle { font-size: 19pt; font-weight: 650; }
 QLabel#sectionTitle { font-size: 13pt; font-weight: 650; }

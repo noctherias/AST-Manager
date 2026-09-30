@@ -68,7 +68,7 @@ def main():
             export_timesheet(root / "smoke-stundennachweis.xlsm", employee, date.today().year,
                              db.time_records(employee["id"], date.today().year), db.settings().get("company", ""))
             import_timesheet(db, root / "smoke-stundennachweis.xlsm", employee["id"], overwrite=True)
-            (root / "smoke-test-ok.txt").write_text("Alle fünf Bereiche erfolgreich geladen.\n", encoding="utf-8")
+            (root / "smoke-test-ok.txt").write_text("Alle sechs Bereiche erfolgreich geladen.\n", encoding="utf-8")
             window.close()
             return 0
         window.show()

@@ -2,13 +2,16 @@
 from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStackedWidget,
-                              QMenu, QButtonGroup, QDialog, QHeaderView, QMessageBox, QFileDialog)
+                              QMenu, QButtonGroup, QDialog, QHeaderView, QMessageBox, QFileDialog,
+                              QTabWidget, QPlainTextEdit)
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
-from .pages import Receivables, SettingsPage, SalaryPage, save_path
+from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog
 from .domain import TIME_CODES, chf, number, display_date
 from .timesheet_excel import export_timesheet
 from .excel_import import import_timesheet
+from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS,
+                        reminder_text, reminder_pdf, validate_template)
 from .update_ui import UpdateSettings
 
 
@@ -192,6 +195,142 @@ class Invoices(Receivables):
         r = self.selected()
         self.selection_hint.setText(f"{r['number']} · {r['customer']}" if r else "Bitte eine Rechnung auswählen.")
         self.pay_btn.setText("Zahlung erfassen" if not r or r["open"] > 0 else "Zahlungen ansehen")
+
+
+class Reminders(Page):
+    def __init__(self, db, window):
+        super().__init__("Mahnungen", "Offene Forderungen mahnen, Brieftexte pflegen und druckfertige PDFs erstellen.")
+        self.db, self.window, self.filtered = db, window, []
+        self.header.addWidget(button("Logo & Firmendaten", self.open_company_settings))
+        self.cards = self.metrics([(REMINDER_LEVELS[level], "Offene Rechnungen") for level in range(1, 5)])
+        self.tabs = QTabWidget()
+        self.layout.addWidget(self.tabs, 1)
+
+        letters = QWidget()
+        letter_layout = QVBoxLayout(letters)
+        letter_layout.setContentsMargins(16, 16, 16, 16)
+        search_row = QHBoxLayout()
+        self.search = line(placeholder="Rechnung oder Kunde suchen …")
+        search_row.addWidget(self.search, 1)
+        search_row.addWidget(label("Nur offene Rechnungen werden angezeigt.", "muted"))
+        letter_layout.addLayout(search_row)
+        self.table = Table(["Rechnung", "Kunde", "Fällig am", "Offen", "Aktuelle Mahnstufe"])
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        letter_layout.addWidget(self.table, 1)
+        action_bar = QFrame()
+        action_bar.setObjectName("selectionBar")
+        actions = QHBoxLayout(action_bar)
+        actions.setContentsMargins(14, 10, 14, 10)
+        self.selection_hint = label("Bitte eine offene Rechnung auswählen.", "muted")
+        actions.addWidget(self.selection_hint, 1)
+        self.level = combo([(f"Stufe {key} · {title}", key) for key, title in REMINDER_LEVELS.items()], 1)
+        actions.addWidget(self.level)
+        self.level_button = button("Mahnstufe speichern", self.save_level)
+        self.pdf_button = button("Mahnbrief erstellen", self.create_letter, True)
+        actions.addWidget(self.level_button)
+        actions.addWidget(self.pdf_button)
+        letter_layout.addWidget(action_bar)
+        self.tabs.addTab(letters, "Mahnungen erstellen")
+
+        templates = QWidget()
+        template_layout = QVBoxLayout(templates)
+        template_layout.setContentsMargins(18, 18, 18, 18)
+        help_text = label("Texte für jede Mahnstufe. Verfügbare Platzhalter: " + ", ".join(PLACEHOLDERS), "muted")
+        help_text.setWordWrap(True)
+        template_layout.addWidget(help_text)
+        self.template_tabs = QTabWidget()
+        self.template_editors = {}
+        for level, title in REMINDER_LEVELS.items():
+            editor = QPlainTextEdit()
+            editor.setMinimumHeight(260)
+            editor.setPlaceholderText(DEFAULT_REMINDER_TEXTS[level])
+            self.template_tabs.addTab(editor, f"Stufe {level} · {title}")
+            self.template_editors[level] = editor
+        template_layout.addWidget(self.template_tabs, 1)
+        row = QHBoxLayout()
+        row.addWidget(label("Absätze mit einer Leerzeile trennen. Platzhalter werden beim Erstellen des Briefs ersetzt.", "muted"), 1)
+        row.addWidget(button("Mahntexte speichern", self.save_templates, True))
+        template_layout.addLayout(row)
+        self.tabs.addTab(templates, "Mahntexte")
+
+        self.search.textChanged.connect(self.filter_rows)
+        self.table.itemSelectionChanged.connect(self.selection)
+        self.table.cellDoubleClicked.connect(self.create_letter)
+        self.selection()
+
+    @staticmethod
+    def level_text(invoice):
+        level = int(invoice.get("reminder_level", 0))
+        return "Noch nicht gemahnt" if not level else f"Stufe {level} · {REMINDER_LEVELS.get(level, '')} · {display_date(invoice.get('reminder_date'))}"
+
+    def refresh(self):
+        settings = self.db.settings()
+        for level, editor in self.template_editors.items():
+            editor.setPlainText(reminder_text(settings, level))
+        all_open = [invoice for invoice in self.db.invoices() if invoice["open"] > 0]
+        for level, card in enumerate(self.cards, 1):
+            card.set(str(sum(invoice.get("reminder_level", 0) == level for invoice in all_open)))
+        self.filter_rows()
+
+    def filter_rows(self):
+        query = self.search.text().strip().casefold()
+        self.filtered = [invoice for invoice in self.db.invoices() if invoice["open"] > 0 and
+                         (not query or query in (invoice["number"] + " " + invoice["customer"]).casefold())]
+        self.table.populate([[invoice["number"], invoice["customer"], display_date(invoice["due"]),
+                              chf(invoice["open"]), self.level_text(invoice)] for invoice in self.filtered],
+                            [invoice["id"] for invoice in self.filtered], [3])
+        self.selection()
+
+    def selected(self):
+        return next((invoice for invoice in self.filtered if invoice["id"] == self.table.selected_id()), None)
+
+    def selection(self):
+        invoice = self.selected()
+        enabled = bool(invoice)
+        self.level_button.setEnabled(enabled)
+        self.pdf_button.setEnabled(enabled)
+        if invoice:
+            current = int(invoice.get("reminder_level", 0))
+            suggested = min(4, current + 1) if current else 1
+            self.level.setCurrentIndex(self.level.findData(suggested))
+            self.selection_hint.setText(f"{invoice['number']} · {invoice['customer']} · offen {chf(invoice['open'])}")
+        else:
+            self.selection_hint.setText("Bitte eine offene Rechnung auswählen.")
+
+    @guarded
+    def save_level(self):
+        invoice = self.selected()
+        if invoice:
+            self.db.set_reminder(invoice["id"], self.level.currentData(), date.today().isoformat())
+            self.refresh()
+
+    @guarded
+    def create_letter(self):
+        invoice = self.selected()
+        if not invoice:
+            return
+        level = self.level.currentData()
+        settings = self.db.settings()
+        if not settings.get("company", "").strip():
+            raise ValueError("Bitte zuerst unter Einstellungen die Firmendaten erfassen.")
+        path = save_path(self, "Mahnbrief speichern",
+                         f"{REMINDER_LEVELS[level].replace(' ', '-')}-{invoice['number']}.pdf")
+        if path:
+            reminder_pdf(path, invoice, settings, level, reminder_text(settings, level))
+            self.db.set_reminder(invoice["id"], level, date.today().isoformat())
+            self.refresh()
+            PdfPreview(self, path).exec()
+
+    @guarded
+    def save_templates(self):
+        values = {f"reminder_text_{level}": validate_template(editor.toPlainText())
+                  for level, editor in self.template_editors.items()}
+        self.db.save_settings(values)
+        QMessageBox.information(self, "Gespeichert", "Die vier Mahntexte wurden gespeichert.")
+
+    def open_company_settings(self):
+        self.window.navigate(4)
+        self.window.pages[4].tabs.setCurrentIndex(2)
 
 
 class TimeWorkspace(Page):

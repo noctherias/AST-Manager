@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
+import shutil
 import tempfile
 
 from PySide6.QtCore import Qt, QRectF, QBuffer, QIODevice
-from PySide6.QtGui import QColor, QPainter, QFont, QDesktopServices
+from PySide6.QtGui import QColor, QPainter, QFont, QDesktopServices, QPixmap
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTabWidget, QFormLayout,
     QDialog, QFileDialog, QMessageBox, QHeaderView, QScrollArea)
@@ -572,6 +573,17 @@ class SettingsPage(Page):
         for key, title in [("company", "Firma"), ("address", "Strasse"), ("postcode", "PLZ"), ("city", "Ort"), ("phone", "Telefon"), ("contact", "Verantwortliche Person")]:
             self.company_fields[key] = line()
             form.addRow(title, self.company_fields[key])
+        self.logo_preview = label("Kein Firmenlogo gewählt", "muted")
+        self.logo_preview.setMinimumSize(220, 80)
+        self.logo_preview.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        logo_actions = QWidget()
+        logo_row = QHBoxLayout(logo_actions)
+        logo_row.setContentsMargins(0, 0, 0, 0)
+        logo_row.addWidget(button("Logo auswählen …", self.upload_logo))
+        logo_row.addWidget(button("Logo entfernen", self.remove_logo))
+        logo_row.addStretch()
+        form.addRow("Logo für Mahnungen", self.logo_preview)
+        form.addRow("", logo_actions)
         form.addRow("", button("Firmendaten speichern", self.save_company, True))
         company_layout.addLayout(form)
         company_layout.addStretch()
@@ -617,6 +629,7 @@ class SettingsPage(Page):
         self.customers.populate([[c[k] for k in ("name", "address", "postcode", "city", "email")] for c in customers], [c["id"] for c in customers])
         settings = self.db.settings()
         for key, widget in self.company_fields.items(): widget.setText(settings.get(key, ""))
+        self._show_logo(settings.get("logo_path", ""))
         self.backup_directory.setText(settings.get("backup_directory", ""))
         self.backup_retention.setText(settings.get("backup_retention_days", "30"))
 
@@ -638,6 +651,41 @@ class SettingsPage(Page):
     def save_company(self):
         self.db.save_settings({k: w.text() for k, w in self.company_fields.items()})
         QMessageBox.information(self, "Gespeichert", "Firmendaten wurden gespeichert.")
+
+    def _show_logo(self, path):
+        pixmap = QPixmap(path) if path else QPixmap()
+        if pixmap.isNull():
+            self.logo_preview.setPixmap(QPixmap())
+            self.logo_preview.setText("Kein Firmenlogo gewählt")
+        else:
+            self.logo_preview.setText("")
+            self.logo_preview.setPixmap(pixmap.scaled(210, 72, Qt.AspectRatioMode.KeepAspectRatio,
+                                                       Qt.TransformationMode.SmoothTransformation))
+            self.logo_preview.setToolTip(str(path))
+
+    @guarded
+    def upload_logo(self):
+        source, _ = QFileDialog.getOpenFileName(self, "Firmenlogo auswählen", "",
+                                                "Bilder (*.png *.jpg *.jpeg)")
+        if not source:
+            return
+        if QPixmap(source).isNull():
+            raise ValueError("Die ausgewählte Datei ist kein lesbares PNG- oder JPG-Bild.")
+        folder = self.db.path.parent / "branding"
+        folder.mkdir(parents=True, exist_ok=True)
+        destination = folder / ("firmenlogo" + Path(source).suffix.lower())
+        shutil.copy2(source, destination)
+        self.db.save_settings({"logo_path": str(destination)})
+        self._show_logo(str(destination))
+
+    @guarded
+    def remove_logo(self):
+        path = Path(self.db.settings().get("logo_path", ""))
+        folder = (self.db.path.parent / "branding").resolve()
+        if path.is_file() and path.resolve().parent == folder:
+            path.unlink()
+        self.db.save_settings({"logo_path": ""})
+        self._show_logo("")
 
     @guarded
     def backup(self):

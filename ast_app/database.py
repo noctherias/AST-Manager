@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS invoices(
  id INTEGER PRIMARY KEY, number TEXT NOT NULL COLLATE NOCASE UNIQUE,
  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
  issued TEXT NOT NULL, due TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), note TEXT NOT NULL DEFAULT '',
- reminder_level INTEGER NOT NULL DEFAULT 0 CHECK(reminder_level BETWEEN 0 AND 3), reminder_date TEXT NOT NULL DEFAULT '',
+ reminder_level INTEGER NOT NULL DEFAULT 0 CHECK(reminder_level BETWEEN 0 AND 4), reminder_date TEXT NOT NULL DEFAULT '',
  CHECK(due>=issued));
 CREATE TABLE IF NOT EXISTS payments(
  id INTEGER PRIMARY KEY, invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE RESTRICT,
@@ -59,7 +59,7 @@ CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
 CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
 """
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class Database:
@@ -84,6 +84,22 @@ class Database:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
         if "reminder_date" not in invoice_columns:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_date TEXT NOT NULL DEFAULT ''")
+        invoice_sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='invoices'").fetchone()[0]
+        if "BETWEEN 0 AND 3" in invoice_sql:
+            self.conn.commit()
+            self.conn.execute("PRAGMA foreign_keys=OFF")
+            with self.conn:
+                self.conn.execute("""CREATE TABLE invoices_new(
+                    id INTEGER PRIMARY KEY, number TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+                    issued TEXT NOT NULL, due TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0),
+                    note TEXT NOT NULL DEFAULT '', reminder_level INTEGER NOT NULL DEFAULT 0
+                    CHECK(reminder_level BETWEEN 0 AND 4), reminder_date TEXT NOT NULL DEFAULT '', CHECK(due>=issued))""")
+                self.conn.execute("""INSERT INTO invoices_new(id,number,customer_id,issued,due,amount,note,reminder_level,reminder_date)
+                    SELECT id,number,customer_id,issued,due,amount,note,reminder_level,reminder_date FROM invoices""")
+                self.conn.execute("DROP TABLE invoices")
+                self.conn.execute("ALTER TABLE invoices_new RENAME TO invoices")
+            self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         self.conn.commit()
 
@@ -160,7 +176,9 @@ class Database:
         return self._save("employees", d, key)
 
     def invoices(self):
-        rows = self.rows("""SELECT i.*,c.name AS customer,COALESCE(SUM(p.amount),0) AS paid,MAX(p.day) AS valuta
+        rows = self.rows("""SELECT i.*,c.name AS customer,c.address AS customer_address,
+                            c.postcode AS customer_postcode,c.city AS customer_city,c.email AS customer_email,
+                            COALESCE(SUM(p.amount),0) AS paid,MAX(p.day) AS valuta
                             FROM invoices i JOIN customers c ON c.id=i.customer_id
                             LEFT JOIN payments p ON p.invoice_id=i.id GROUP BY i.id ORDER BY i.issued DESC,i.id DESC""")
         for r in rows:
@@ -196,8 +214,8 @@ class Database:
 
     def set_reminder(self, invoice_id, level, reminder_date=""):
         level = int(level)
-        if level not in range(4):
-            raise ValueError("Die Mahnstufe muss zwischen 0 und 3 liegen.")
+        if level not in range(5):
+            raise ValueError("Die Mahnstufe muss zwischen 0 und 4 liegen.")
         invoice = next((row for row in self.invoices() if row["id"] == invoice_id), None)
         if not invoice:
             raise ValueError("Die Rechnung existiert nicht mehr.")

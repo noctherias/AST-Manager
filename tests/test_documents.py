@@ -5,6 +5,8 @@ import unittest
 from pypdf import PdfReader
 from ast_app.documents import salary_pdf, field_name, resource_path, csv_export, report_pdf
 from ast_app.domain import SALARY_AMOUNTS, SALARY_TEXT, SALARY_FLAGS
+from ast_app.reminders import reminder_pdf, validate_template
+from PIL import Image
 
 
 class DocumentTests(unittest.TestCase):
@@ -54,6 +56,26 @@ class DocumentTests(unittest.TestCase):
 
     def test_unknown_field_rejected(self):
         with self.assertRaises(ValueError): salary_pdf({"not-a-field": "x"}, Path(self.temp.name) / "bad.pdf")
+
+    def test_reminder_letter_with_custom_text_and_logo(self):
+        logo = Path(self.temp.name) / "logo.png"
+        Image.new("RGB", (320, 100), "#087e67").save(logo)
+        invoice = {"number": "R-204", "customer": "Musterkunde AG", "customer_address": "Dorfstrasse 4",
+                   "customer_postcode": "5000", "customer_city": "Aarau", "issued": "2026-08-01",
+                   "due": "2026-08-31", "open": 125050}
+        settings = {"company": "AST Muster AG", "address": "Werkstrasse 1", "postcode": "5000",
+                    "city": "Aarau", "phone": "+41 62 000 00 00", "contact": "Administration",
+                    "logo_path": str(logo)}
+        path = Path(self.temp.name) / "mahnung.pdf"
+        reminder_pdf(path, invoice, settings, 3,
+                     "Bitte begleichen Sie {betrag} für Rechnung {rechnungsnummer} bis {frist}.")
+        text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+        for value in ("Mahnung 2", "R-204", "Musterkunde AG", "CHF 1’250.50", "AST Muster AG"):
+            self.assertIn(value, text)
+        self.assertGreater(path.stat().st_size, 2000)
+        self.assertEqual(validate_template("Hallo {kunde}"), "Hallo {kunde}")
+        with self.assertRaises(ValueError):
+            validate_template("Hallo {unbekannt}")
 
     def test_csv_and_multipage_report(self):
         path = Path(self.temp.name) / "data.csv"

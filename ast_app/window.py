@@ -4,7 +4,7 @@ from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, QButtonGroup, QFrame, QScrollArea, QApplication
 
 from .widgets import label, button
-from .experience import Start, Invoices, Team, Salaries, Settings
+from .experience import Start, Invoices, Reminders, Team, Salaries, Settings
 from .update_ui import UpdateController
 from . import __version__
 from .documents import resource_path
@@ -38,15 +38,18 @@ class MainWindow(QMainWindow):
         nav.addSpacing(4)
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
-        self.buttons = []
-        for i, name in enumerate(["Übersicht", "Debitoren", "Stundennachweis", "Lohnausweise", "Einstellungen"]):
-            b = button(name, lambda index=i: self.navigate(index))
-            b.setObjectName("navButton")
+        self.buttons = [None] * 6
+        for page_index, name, child in [
+            (0, "Übersicht", False), (1, "Debitoren", False), (5, "Mahnungen", True),
+            (2, "Stundennachweis", False), (3, "Lohnausweise", False), (4, "Einstellungen", False),
+        ]:
+            b = button(name, lambda index=page_index: self.navigate(index))
+            b.setObjectName("navSubButton" if child else "navButton")
             b.setCheckable(True)
-            b.setMinimumHeight(46)
-            self.nav_group.addButton(b, i)
+            b.setMinimumHeight(38 if child else 46)
+            self.nav_group.addButton(b, page_index)
             nav.addWidget(b)
-            self.buttons.append(b)
+            self.buttons[page_index] = b
         nav.addStretch()
         nav.addWidget(label("DEMODATEN" if demo else "LOKAL GESPEICHERT", "brandCaption"))
         bottom = label("Separate Testumgebung\nFrei ausprobieren" if demo else "Deine Verwaltung.\nAlles an einem Ort.")
@@ -57,7 +60,8 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         layout.addWidget(self.stack, 1)
         self.updates = UpdateController(self, db, demo)
-        self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db), Settings(db, self.updates)]
+        self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db),
+                      Settings(db, self.updates), Reminders(db, self)]
         for page in self.pages:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
