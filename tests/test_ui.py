@@ -64,6 +64,14 @@ class UiTests(unittest.TestCase):
                 window.grab().save(str(folder / f"page-{index}.png"))
         self.assertEqual(window.buttons[5].objectName(), "navSubButton")
         self.assertGreater(window.pages[5].table.rowCount(), 0)
+        reminders = window.pages[5]
+        reminders.tabs.setCurrentIndex(1)
+        reminders.template_editors[1].clear()
+        reminders.placeholder_picker.setCurrentIndex(reminders.placeholder_picker.findData("{rechnungsnummer}"))
+        reminders.insert_placeholder()
+        self.assertEqual(reminders.template_editors[1].toPlainText(), "{rechnungsnummer}")
+        if os.environ.get("AST_QA_DIR"):
+            reminders.grab().save(str(Path(os.environ["AST_QA_DIR"]) / "mahntexte-variablen.png"))
         window.navigate(2)
         page = window.pages[2]
         self.assertGreater(page.table.rowCount(), 0)

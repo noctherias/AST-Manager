@@ -173,6 +173,7 @@ class ManualReminderDialog(FormDialog):
         self.add("customer_address", "Strasse", line())
         self.add("customer_postcode", "PLZ", line())
         self.add("customer_city", "Ort", line())
+        self.add("customer_email", "E-Mail", line())
         self.add("number", "Rechnungsnummer *", line(placeholder="z. B. 2026-1042"))
         self.add("issued", "Rechnungsdatum", day())
         self.add("due", "Fällig am", day((date.today() + timedelta(days=30)).isoformat()))
@@ -195,7 +196,8 @@ class ManualReminderDialog(FormDialog):
         if not customer:
             return
         for field, source in (("customer", "name"), ("customer_address", "address"),
-                              ("customer_postcode", "postcode"), ("customer_city", "city")):
+                              ("customer_postcode", "postcode"), ("customer_city", "city"),
+                              ("customer_email", "email")):
             self.fields[field].setText(customer.get(source, ""))
 
     @guarded
@@ -213,6 +215,7 @@ class ManualReminderDialog(FormDialog):
             "customer_address": values["customer_address"],
             "customer_postcode": values["customer_postcode"],
             "customer_city": values["customer_city"],
+            "customer_email": values["customer_email"],
             "number": values["number"],
             "issued": values["issued"],
             "due": values["due"],

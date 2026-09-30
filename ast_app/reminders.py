@@ -36,8 +36,29 @@ DEFAULT_REMINDER_TEXTS = {
         "Wir setzen Ihnen eine letzte Zahlungsfrist bis {frist}. Nach unbenutztem Ablauf werden wir die Betreibung einleiten."),
 }
 
-PLACEHOLDERS = ("{kunde}", "{rechnungsnummer}", "{rechnungsdatum}", "{faelligkeit}",
-                "{betrag}", "{frist}", "{firma}", "{mahnstufe}")
+PLACEHOLDER_INFO = {
+    "{kunde}": "Name oder Firma des Empfängers",
+    "{kundenadresse}": "Strasse des Empfängers",
+    "{kunden_plz}": "Postleitzahl des Empfängers",
+    "{kunden_ort}": "Ort des Empfängers",
+    "{kunden_email}": "E-Mail-Adresse des Empfängers",
+    "{rechnungsnummer}": "Rechnungsnummer aus der Eingabemaske",
+    "{rechnungsdatum}": "Datum der Rechnung",
+    "{faelligkeit}": "Fälligkeitsdatum der Rechnung",
+    "{betrag}": "Offener Betrag inklusive CHF",
+    "{mahndatum}": "Erstellungsdatum des Mahnbriefs",
+    "{frist}": "Automatisch berechnete neue Zahlungsfrist",
+    "{frist_tage}": "Anzahl Tage der neuen Zahlungsfrist",
+    "{tage_ueberfaellig}": "Tage seit dem Fälligkeitsdatum",
+    "{mahnstufe}": "Bezeichnung der ausgewählten Mahnstufe",
+    "{firma}": "Eigener Firmenname",
+    "{firmenadresse}": "Eigene Firmenstrasse",
+    "{firmen_plz}": "Eigene Firmen-PLZ",
+    "{firmen_ort}": "Eigener Firmenort",
+    "{telefon}": "Eigene Telefonnummer",
+    "{kontakt}": "Eigene Kontaktperson",
+}
+PLACEHOLDERS = tuple(PLACEHOLDER_INFO)
 PLACEHOLDER_NAMES = {value[1:-1] for value in PLACEHOLDERS}
 
 
@@ -60,14 +81,28 @@ def validate_template(template):
 
 def _values(invoice, settings, level, created):
     deadlines = {1: 10, 2: 7, 3: 7, 4: 5}
+    due = date.fromisoformat(invoice["due"])
+    deadline_days = deadlines[int(level)]
     return {
         "kunde": invoice["customer"],
+        "kundenadresse": invoice.get("customer_address", ""),
+        "kunden_plz": invoice.get("customer_postcode", ""),
+        "kunden_ort": invoice.get("customer_city", ""),
+        "kunden_email": invoice.get("customer_email", ""),
         "rechnungsnummer": invoice["number"],
         "rechnungsdatum": display_date(invoice["issued"]),
         "faelligkeit": display_date(invoice["due"]),
         "betrag": chf(invoice["open"]),
-        "frist": (created + timedelta(days=deadlines[int(level)])).strftime("%d.%m.%Y"),
+        "mahndatum": created.strftime("%d.%m.%Y"),
+        "frist": (created + timedelta(days=deadline_days)).strftime("%d.%m.%Y"),
+        "frist_tage": str(deadline_days),
+        "tage_ueberfaellig": str(max(0, (created - due).days)),
         "firma": settings.get("company", ""),
+        "firmenadresse": settings.get("address", ""),
+        "firmen_plz": settings.get("postcode", ""),
+        "firmen_ort": settings.get("city", ""),
+        "telefon": settings.get("phone", ""),
+        "kontakt": settings.get("contact", ""),
         "mahnstufe": REMINDER_LEVELS[int(level)],
     }
 

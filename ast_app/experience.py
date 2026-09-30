@@ -10,7 +10,7 @@ from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDi
 from .domain import TIME_CODES, chf, number, display_date
 from .timesheet_excel import export_timesheet
 from .excel_import import import_timesheet
-from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS,
+from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS, PLACEHOLDER_INFO,
                         reminder_text, reminder_pdf, validate_template)
 from .update_ui import UpdateSettings
 
@@ -237,9 +237,16 @@ class Reminders(Page):
         templates = QWidget()
         template_layout = QVBoxLayout(templates)
         template_layout.setContentsMargins(18, 18, 18, 18)
-        help_text = label("Texte für jede Mahnstufe. Verfügbare Platzhalter: " + ", ".join(PLACEHOLDERS), "muted")
+        help_text = label("Variablen werden beim Erstellen automatisch mit den Angaben aus der Rechnung oder der manuellen Eingabemaske ersetzt.", "muted")
         help_text.setWordWrap(True)
         template_layout.addWidget(help_text)
+        variable_row = QHBoxLayout()
+        variable_row.addWidget(label("Variable auswählen", "muted"))
+        self.placeholder_picker = combo([(f"{token}  –  {description}", token)
+                                         for token, description in PLACEHOLDER_INFO.items()], PLACEHOLDERS[0])
+        variable_row.addWidget(self.placeholder_picker, 1)
+        variable_row.addWidget(button("In Text einfügen", self.insert_placeholder))
+        template_layout.addLayout(variable_row)
         self.template_tabs = QTabWidget()
         self.template_editors = {}
         for level, title in REMINDER_LEVELS.items():
@@ -344,6 +351,12 @@ class Reminders(Page):
                   for level, editor in self.template_editors.items()}
         self.db.save_settings(values)
         QMessageBox.information(self, "Gespeichert", "Die vier Mahntexte wurden gespeichert.")
+
+    def insert_placeholder(self):
+        editor = self.template_tabs.currentWidget()
+        if editor:
+            editor.insertPlainText(self.placeholder_picker.currentData())
+            editor.setFocus()
 
     def open_company_settings(self):
         self.window.navigate(4)

@@ -1,11 +1,12 @@
 from pathlib import Path
+from datetime import date
 import tempfile
 import unittest
 
 from pypdf import PdfReader
 from ast_app.documents import salary_pdf, field_name, resource_path, csv_export, report_pdf
 from ast_app.domain import SALARY_AMOUNTS, SALARY_TEXT, SALARY_FLAGS
-from ast_app.reminders import reminder_pdf, validate_template
+from ast_app.reminders import reminder_pdf, validate_template, format_reminder_text
 from PIL import Image
 
 
@@ -76,6 +77,19 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(validate_template("Hallo {kunde}"), "Hallo {kunde}")
         with self.assertRaises(ValueError):
             validate_template("Hallo {unbekannt}")
+
+        expanded = format_reminder_text(
+            "{rechnungsnummer}|{kundenadresse}|{kunden_plz}|{kunden_ort}|{kunden_email}|"
+            "{rechnungsdatum}|{faelligkeit}|{betrag}|{mahndatum}|{frist}|{frist_tage}|"
+            "{tage_ueberfaellig}|{mahnstufe}|{firma}|{firmenadresse}|{firmen_plz}|"
+            "{firmen_ort}|{telefon}|{kontakt}",
+            {**invoice, "customer_email": "rechnung@kunde.ch"}, settings, 3, date(2026, 9, 30))
+        for value in ("R-204", "Dorfstrasse 4", "5000", "Aarau", "rechnung@kunde.ch",
+                      "01.08.2026", "31.08.2026", "CHF 1’250.50", "30.09.2026",
+                      "07.10.2026", "7", "30", "Mahnung 2", "AST Muster AG",
+                      "Werkstrasse 1", "+41 62 000 00 00", "Administration"):
+            self.assertIn(value, expanded)
+        self.assertNotIn("{", expanded)
 
     def test_csv_and_multipage_report(self):
         path = Path(self.temp.name) / "data.csv"
