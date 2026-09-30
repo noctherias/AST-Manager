@@ -1,7 +1,8 @@
 from datetime import date
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
-from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, QButtonGroup, QFrame, QScrollArea, QApplication
+from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget,
+                               QButtonGroup, QFrame, QScrollArea, QApplication, QStyle)
 
 from .widgets import label, button
 from .experience import Start, Invoices, Reminders, Team, Salaries, Settings
@@ -25,38 +26,57 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        sidebar = QWidget()
-        sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(250)
-        nav = QVBoxLayout(sidebar)
-        nav.setContentsMargins(20, 28, 20, 22)
-        nav.setSpacing(8)
-        nav.addWidget(label("AST", "brand"))
-        nav.addWidget(label("VERWALTUNG", "brandCaption"))
-        nav.addSpacing(28)
-        nav.addWidget(label("ARBEITSBEREICHE", "navSection"))
-        nav.addSpacing(4)
+        self.sidebar = QWidget()
+        self.sidebar.setObjectName("sidebar")
+        self.nav = QVBoxLayout(self.sidebar)
+        self.nav.setContentsMargins(20, 20, 20, 22)
+        self.nav.setSpacing(8)
+        brand_row = QHBoxLayout()
+        self.brand_label = label("AST", "brand")
+        brand_row.addWidget(self.brand_label, 1)
+        self.sidebar_toggle = button("‹", self.toggle_sidebar)
+        self.sidebar_toggle.setObjectName("sidebarToggle")
+        self.sidebar_toggle.setFixedSize(36, 36)
+        brand_row.addWidget(self.sidebar_toggle)
+        self.nav.addLayout(brand_row)
+        self.brand_caption = label("VERWALTUNG", "brandCaption")
+        self.nav.addWidget(self.brand_caption)
+        self.nav.addSpacing(22)
+        self.nav_section = label("ARBEITSBEREICHE", "navSection")
+        self.nav.addWidget(self.nav_section)
+        self.nav.addSpacing(4)
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self.buttons = [None] * 6
-        for page_index, name, child in [
-            (0, "Übersicht", False), (1, "Debitoren", False), (5, "Mahnungen", True),
-            (2, "Stundennachweis", False), (3, "Lohnausweise", False), (4, "Einstellungen", False),
+        self.nav_items = {}
+        for page_index, name, child, icon in [
+            (0, "Übersicht", False, QStyle.StandardPixmap.SP_DesktopIcon),
+            (1, "Debitoren", False, QStyle.StandardPixmap.SP_FileDialogDetailedView),
+            (5, "Mahnungen", True, QStyle.StandardPixmap.SP_MessageBoxWarning),
+            (2, "Stundennachweis", False, QStyle.StandardPixmap.SP_FileDialogListView),
+            (3, "Lohnausweise", False, QStyle.StandardPixmap.SP_FileIcon),
+            (4, "Einstellungen", False, QStyle.StandardPixmap.SP_ComputerIcon),
         ]:
             b = button(name, lambda index=page_index: self.navigate(index))
             b.setObjectName("navSubButton" if child else "navButton")
             b.setCheckable(True)
             b.setMinimumHeight(38 if child else 46)
+            b.setIcon(self.style().standardIcon(icon))
+            b.setIconSize(QSize(20, 20))
+            b.setToolTip(name)
             self.nav_group.addButton(b, page_index)
-            nav.addWidget(b)
+            self.nav.addWidget(b)
             self.buttons[page_index] = b
-        nav.addStretch()
-        nav.addWidget(label("DEMODATEN" if demo else "LOKAL GESPEICHERT", "brandCaption"))
-        bottom = label("Separate Testumgebung\nFrei ausprobieren" if demo else "Deine Verwaltung.\nAlles an einem Ort.")
-        nav.addWidget(bottom)
-        nav.addSpacing(10)
-        nav.addWidget(label("Version " + __version__))
-        layout.addWidget(sidebar)
+            self.nav_items[page_index] = (name, child)
+        self.nav.addStretch()
+        self.storage_label = label("DEMODATEN" if demo else "LOKAL GESPEICHERT", "brandCaption")
+        self.nav.addWidget(self.storage_label)
+        self.bottom_label = label("Separate Testumgebung\nFrei ausprobieren" if demo else "Deine Verwaltung.\nAlles an einem Ort.")
+        self.nav.addWidget(self.bottom_label)
+        self.nav.addSpacing(10)
+        self.version_label = label("Version " + __version__)
+        self.nav.addWidget(self.version_label)
+        layout.addWidget(self.sidebar)
         self.stack = QStackedWidget()
         layout.addWidget(self.stack, 1)
         self.updates = UpdateController(self, db, demo)
@@ -72,6 +92,29 @@ class MainWindow(QMainWindow):
         QApplication.instance().aboutToQuit.connect(self.prepare_shutdown)
         self.refresh_shortcut = QShortcut(QKeySequence("F5"), self)
         self.refresh_shortcut.activated.connect(lambda: self.pages[self.stack.currentIndex()].refresh())
+        self.set_sidebar_collapsed(self.db.settings().get("sidebar_collapsed", "0") == "1", save=False)
+
+    def toggle_sidebar(self):
+        self.set_sidebar_collapsed(not self.sidebar_collapsed)
+
+    def set_sidebar_collapsed(self, collapsed, save=True):
+        self.sidebar_collapsed = bool(collapsed)
+        self.sidebar.setFixedWidth(78 if collapsed else 250)
+        self.nav.setContentsMargins(10 if collapsed else 20, 20, 10 if collapsed else 20, 22)
+        self.brand_label.setText("A" if collapsed else "AST")
+        self.brand_label.setAlignment(Qt.AlignmentFlag.AlignCenter if collapsed else Qt.AlignmentFlag.AlignLeft)
+        self.sidebar_toggle.setText("›" if collapsed else "‹")
+        self.sidebar_toggle.setToolTip("Menü ausklappen" if collapsed else "Menü einklappen")
+        for widget in (self.brand_caption, self.nav_section, self.storage_label, self.bottom_label, self.version_label):
+            widget.setVisible(not collapsed)
+        for page_index, (name, child) in self.nav_items.items():
+            nav_button = self.buttons[page_index]
+            nav_button.setText("" if collapsed else name)
+            nav_button.setProperty("collapsed", collapsed)
+            nav_button.style().unpolish(nav_button)
+            nav_button.style().polish(nav_button)
+        if save:
+            self.db.save_settings({"sidebar_collapsed": "1" if collapsed else "0"})
 
     def navigate(self, index):
         if not hasattr(self, "pages"):

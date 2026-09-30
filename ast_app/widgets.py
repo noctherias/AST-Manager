@@ -124,6 +124,7 @@ class Table(QTableWidget):
         self.setAlternatingRowColors(False)
         self.setWordWrap(False)
         self.verticalHeader().setDefaultSectionSize(48)
+        self.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.horizontalHeader().setMinimumSectionSize(80)
         self.setMinimumHeight(190)
@@ -136,10 +137,7 @@ class Table(QTableWidget):
                 item = QTableWidgetItem(str(value))
                 if c == 0 and ids is not None:
                     item.setData(Qt.ItemDataRole.UserRole, ids[r])
-                if c in numeric_columns:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                else:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item.setToolTip(str(value))
                 if value in ("Überfällig", "Negativ"):
                     item.setForeground(QColor("#bd3c40"))

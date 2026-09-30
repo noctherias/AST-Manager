@@ -20,6 +20,7 @@ from ast_app.dialogs import EmployeeDialog, CustomerDialog, InvoiceDialog, Entry
 from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
+from ast_app.widgets import Table
 
 APP = QApplication.instance() or QApplication([])
 if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
@@ -140,6 +141,35 @@ class UiTests(unittest.TestCase):
         reopened = MainWindow(self.db, True).pages[1]
         self.assertTrue(reopened.table.isColumnHidden(headers.index("Status")))
         self.assertEqual(reopened.table.horizontalHeader().visualIndex(note_column), 0)
+
+    def test_tables_centered_and_sidebar_collapse_persists(self):
+        window = MainWindow(self.db, True)
+        window.show(); window.navigate(1); APP.processEvents()
+        tables = window.findChildren(Table)
+        self.assertGreater(len(tables), 5)
+        for table in tables:
+            self.assertTrue(table.horizontalHeader().defaultAlignment() & Qt.AlignmentFlag.AlignHCenter)
+        first_item = window.pages[1].table.item(0, 0)
+        self.assertTrue(first_item.textAlignment() & Qt.AlignmentFlag.AlignHCenter)
+
+        self.assertEqual(window.sidebar.width(), 250)
+        QTest.mouseClick(window.sidebar_toggle, Qt.MouseButton.LeftButton)
+        APP.processEvents()
+        self.assertEqual(window.sidebar.width(), 78)
+        self.assertEqual(window.buttons[1].text(), "")
+        self.assertEqual(window.buttons[1].toolTip(), "Debitoren")
+        self.assertEqual(self.db.settings()["sidebar_collapsed"], "1")
+        if os.environ.get("AST_QA_DIR"):
+            folder = Path(os.environ["AST_QA_DIR"])
+            folder.mkdir(parents=True, exist_ok=True)
+            window.grab().save(str(folder / "navigation-eingeklappt.png"))
+
+        reopened = MainWindow(self.db, True)
+        self.assertEqual(reopened.sidebar.width(), 78)
+        QTest.mouseClick(reopened.sidebar_toggle, Qt.MouseButton.LeftButton)
+        self.assertEqual(reopened.sidebar.width(), 250)
+        self.assertEqual(reopened.buttons[1].text(), "Debitoren")
+        self.assertEqual(self.db.settings()["sidebar_collapsed"], "0")
 
     def test_time_and_salary_dialogs(self):
         e = self.db.employees()[0]

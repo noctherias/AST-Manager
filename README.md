@@ -20,7 +20,7 @@ Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfens
 4. **Lohnausweise:** Vier Schritte führen durch Person/Zeitraum, Lohn/Abzüge, Zusatzangaben und abschliessende Prüfung. Die häufigen Lohnfelder stehen zuerst. Nach dem Speichern **PDF ansehen** oder **PDF speichern** wählen.
 5. **Einstellungen:** Das Team wird hier einmalig angelegt und bearbeitet. Daneben liegen Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert.
 
-Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Eingaben. `F5` aktualisiert die aktuelle Seite. Listen erklären, welche Auswahl für die nächste Aktion nötig ist. Grössere Formulare und ausgeklappte Details können gescrollt werden.
+Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Eingaben. `F5` aktualisiert die aktuelle Seite. Listen erklären, welche Auswahl für die nächste Aktion nötig ist. Tabellenüberschriften und Zellinhalte sind einheitlich mittig ausgerichtet. Die linke Navigation lässt sich über den Pfeil beim AST-Schriftzug einklappen; die gewählte Ansicht bleibt nach einem Neustart erhalten. Grössere Formulare und ausgeklappte Details können gescrollt werden.
 
 Die Pause zwischen **Geht** und **Kommt 2** berechnet die Excel-Vorlage selbst. Das Feld **Zusätzliche Pause** ist für weitere Pausen innerhalb eines Arbeitsblocks gedacht. Personen mit bestehenden Daten können in den Einstellungen auf inaktiv gesetzt werden.
 
