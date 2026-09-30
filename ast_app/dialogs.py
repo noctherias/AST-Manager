@@ -363,7 +363,7 @@ class SalaryDialog(QDialog):
             k = f"Unterschrift1.{idx}"
             self.pdf[k] = line(max_length=80)
             issuer.addRow(title, self.pdf[k])
-        issuer.addRow(label("Gespeicherte Ausweise behalten ihre damaligen Adress- und Firmendaten.\nDie PDF bleibt ausfüllbar; Änderungen an Beträgen bitte in AST speichern\nund anschliessend neu exportieren, damit die Summen aktuell bleiben.", "muted"))
+        issuer.addRow(label("Gespeicherte Ausweise behalten ihre damaligen Adress- und Firmendaten.\nDie PDF bettet alle Werte sichtbar und druckfest ein. Änderungen bitte in AST speichern\nund anschliessend neu exportieren, damit die Summen aktuell bleiben.", "muted"))
         self.totals_label = label("", "sectionTitle")
         layout.addWidget(self.totals_label)
         buttons = QDialogButtonBox()

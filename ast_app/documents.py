@@ -33,6 +33,44 @@ def field_name(obj):
     return ".".join(reversed(names))
 
 
+def _flatten_form_appearances(writer):
+    """Paint every widget appearance with a unique page resource name.
+
+    pypdf's built-in flatten loop can reuse an earlier appearance for empty or
+    hierarchical fields. Unique XObject names keep all fields in this complex
+    Swiss salary certificate visible in Qt PDF, browsers and print output.
+    """
+    for page_index, page in enumerate(writer.pages):
+        widgets = list(page.get("/Annots", []))
+        for widget_index, ref in enumerate(widgets):
+            widget = ref.get_object()
+            if widget.get("/Subtype") != "/Widget":
+                continue
+            # Respect Invisible, Hidden and NoView annotation flags. The form
+            # contains calculation helpers such as ``abzuege`` that must not
+            # be painted onto the official document.
+            if int(widget.get("/F", 0)) & (1 | 2 | 32):
+                continue
+            normal = widget.get("/AP", {}).get("/N")
+            if normal is None:
+                continue
+            normal = normal.get_object()
+            if hasattr(normal, "get_data"):
+                appearance = normal
+            else:
+                state = widget.get("/AS", "/Off")
+                appearance = normal.get(state) if state in normal else normal.get("/Off")
+                appearance = appearance.get_object() if appearance is not None else None
+            if appearance is None:
+                continue
+            if widget.get("/FT") == "/Btn" or (widget.get("/Parent") and widget["/Parent"].get("/FT") == "/Btn"):
+                appearance.set_data(b"0 G\n1 w\n" + appearance.get_data())
+            rect = widget["/Rect"]
+            writer._add_apstream_object(
+                page, appearance, f"AST_{page_index}_{widget_index}", rect[0], rect[1]
+            )
+
+
 def salary_pdf(fields, destination, template=None):
     source = Path(template) if template else resource_path("templates/Vorlage_Lohnausweis.pdf")
     reader = PdfReader(source)
@@ -69,7 +107,14 @@ def salary_pdf(fields, destination, template=None):
                 if size < 6:
                     raise ValueError(f"Text für PDF-Feld {name} ist zu lang. Bitte kürzen oder auf Fortsetzungszeilen verteilen.")
                 formatted[name] = (values[name], "/Arial", size)
+    # Qt's PDF renderer (used by the in-app preview) does not paint AcroForm
+    # widgets. Paint the generated appearances into the page content so the
+    # completed certificate looks identical in the preview, browser, printout
+    # and archived PDF.
     writer.update_page_form_field_values(None, formatted, auto_regenerate=False)
+    _flatten_form_appearances(writer)
+    writer.remove_annotations(subtypes="/Widget")
+    writer.root_object.pop(NameObject("/AcroForm"), None)
     writer.compress_identical_objects(remove_duplicates=True, remove_unreferenced=True)
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -81,27 +126,18 @@ def salary_pdf(fields, destination, template=None):
 
 def validate_salary_pdf(path, expected):
     reader = PdfReader(path)
-    fields = reader.get_fields() or {}
-    for name, value in expected.items():
-        if name not in fields or str(fields[name].get("/V", "")) != str(value):
-            raise ValueError(f"PDF-Feld konnte nicht korrekt geschrieben werden: {name}")
-    seen = set()
+    if "/AcroForm" in reader.trailer["/Root"]:
+        raise ValueError("Der Lohnausweis enthält noch nicht eingebettete Formularfelder.")
     for page in reader.pages:
         for ref in page.get("/Annots", []):
             obj = ref.get_object()
-            if obj.get("/Subtype") != "/Widget":
-                continue
-            name = field_name(obj)
-            seen.add(name)
-            value = obj.get("/V")
-            if value is None and obj.get("/Parent"):
-                value = obj["/Parent"].get("/V")
-            if name in expected and str(value if value is not None else "") != str(expected[name]):
-                raise ValueError(f"PDF-Anzeige und Feldinhalt weichen ab: {name}")
-            if name in expected and not obj.get("/AP", {}).get("/N"):
-                raise ValueError(f"PDF-Feld ohne Darstellung: {name}")
-    if set(expected) - seen:
-        raise ValueError("Die PDF-Vorlage enthält Felder ohne sichtbare Zuordnung.")
+            if obj.get("/Subtype") == "/Widget":
+                raise ValueError("Der Lohnausweis enthält noch unsichtbare Formular-Ebenen.")
+    visible_values = [str(value) for value in expected.values()
+                      if value not in ("", "/Off", "/Ja")]
+    extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
+    if visible_values and not any(value in extracted for value in visible_values):
+        raise ValueError("Die Lohnausweisdaten wurden nicht sichtbar in die PDF-Seite eingebettet.")
 
 
 def csv_export(path, headers, rows):

@@ -1,6 +1,6 @@
 # Testprotokoll
 
-Stand: 30.09.2026, Version 0.3.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
+Stand: 30.09.2026, Version 0.3.2. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
 
 ## Automatisierte Tests
 
@@ -15,9 +15,9 @@ Stand: 30.09.2026, Version 0.3.0. Geprüft unter Windows 11 x64 (10.0.26200), Py
 | Zeiterfassung | Eindeutiger Datensatz pro Person/Tag, zwei Arbeitsblöcke, Zusatzpause, Codes und Bemerkung; Jahresfilter und Persistenz. Verlustfreier XLSM-Export mit identischer Paketstruktur und identischem VBA-Hash, korrekte Zielzellen sowie Entfernung vorbestehender Personendaten. |
 | Sicherungen | SQLite-Sicherung und Wiederherstellung, automatische Sicherheitssicherung, Integritätsprüfung und gültige Fremdschlüssel nach Wiederherstellung. |
 | Lohnausweis | Richtige Brutto-/Abzugs-/Nettosumme, separate Quellensteuer und Spesen, Ganzfrankenbeträge, ein Ausweis pro Person/Jahr, Jahresgrenzen, Erhalt gespeicherter Personalangaben bei späteren Stammdatenänderungen. |
-| PDF-Struktur | Vollständige Widget-/Feldbaum-Zuordnung, alle Eingabefelder, alle Checkboxen, fünf Aussteller-Unterfelder, kanonische Werte und Appearance-Streams, entfernte Vorlagenwerte, Ablehnung unbekannter Felder. |
+| PDF-Struktur | Vollständige Widget-/Feldbaum-Zuordnung der Quelle, alle Eingabefelder, Checkboxen und fünf Aussteller-Unterfelder; sichtbare Einbettung in die fertige Seite, keine verbleibenden Widgets, entfernte Vorlagenwerte, Ablehnung unbekannter Felder. |
 | Berichte/CSV | Mehrseitiger PDF-Bericht, Unicode-CSV, Schutz vor Formelinterpretation beim späteren Öffnen in Tabellenprogrammen. |
-| Updates | Versionsvergleich, stabile Releases, privater API-Zugriff, kein Token bei fremden Weiterleitungszielen, Windows-DPAPI-Rundlauf, Hash-/Grössenprüfung, Abbruchbereinigung, Offline-/Zugriffsfehler, Datenbanksicherung vor Installation, Startparameter und erneute Integritätsprüfung. |
+| Updates | Fest eingebauter öffentlicher Update-Kanal, Versionsvergleich, stabile Releases, sichere Weiterleitungsziele, Hash-/Grössenprüfung, Abbruchbereinigung, Offline-/Zugriffsfehler, Datenbanksicherung vor Installation, Startparameter und erneute Integritätsprüfung. |
 | Oberfläche | Fünf Arbeitsbereiche navigiert, Filter, Auswahlaktionen, reale Qt-Klicks zum Speichern von Kunden, Rechnung, Teilzahlung und Arbeitstag; Lohnausweis speichern/wiederöffnen, integrierte PDF-Vorschau; Teamverwaltung unter Einstellungen und Erhalt der Firmendaten beim Schliessen. Die explizite helle Palette wurde mit Bildausgaben der Seiten und Dialoge geprüft. |
 
 Die Qt-Tests laufen mit dem Offscreen-Plugin. Für die Bildkontrolle wurden die Windows-Schriften explizit geladen. Es wurden zusätzlich die Hauptseiten und der Lohnausweisdialog als Bilder geprüft. Die drei PDF-Arten wurden mit Poppler gerendert und visuell auf Text, Feldpositionen, Summen und Seitenränder kontrolliert.

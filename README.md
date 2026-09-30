@@ -4,7 +4,7 @@ Windows-Desktopanwendung in Python mit fünf klaren Arbeitsbereichen, zentraler 
 
 ## Sofort ausprobieren
 
-**Empfohlen:** Im [neuesten Release](https://github.com/noctherias/AST-Manager/releases/latest) `AST-Verwaltung-Setup-x64.exe` laden und installieren. Danach AST Manager über das Startmenü öffnen. Updates lassen sich direkt im Programm installieren; für das private Repository einmalig den GitHub-Zugang hinterlegen (siehe [Updates einrichten](docs/UPDATES.md)).
+**Empfohlen:** Im [neuesten Release](https://github.com/noctherias/AST-Manager/releases/latest) `AST-Verwaltung-Setup-x64.exe` laden und installieren. Danach AST Manager über das Startmenü öffnen. Updates werden automatisch über den fest eingebauten Update-Kanal gefunden und lassen sich direkt im Programm installieren; eine GitHub-Verbindung ist nicht nötig (siehe [Updates einrichten](docs/UPDATES.md)).
 
 **Portable Windows-Version:** Das komplette Windows-Paket entpacken. `Demo starten.bat` öffnet eine getrennte Demo mit fiktiven Personen, Rechnungen, Stunden und einem Lohnausweis. `AST-Verwaltung.exe` öffnet die zunächst leere produktive Datenbank. Der Ordner `_internal` muss neben der EXE bleiben. Python und Excel sind nicht nötig. Die Datenerfassung funktioniert offline; nur die Update-Suche benötigt Internet.
 
@@ -41,7 +41,6 @@ Standard: `%LOCALAPPDATA%\AST-Erfassungstool\`.
 - `ast-demo.sqlite3`: getrennte Demodaten.
 - `backups\`: tägliche Start-Sicherungen und Sicherungen vor einer Wiederherstellung.
 - `vorschau\`: erzeugte PDF-Vorschauen.
-- `credentials\`: separat mit Windows verschlüsselter GitHub-Zugang.
 - `updates\`: heruntergeladene und geprüfte Setups.
 - `ast.log`: Fehlermeldungen.
 
@@ -58,7 +57,6 @@ ast_app/
   experience.py            Fünf geführte Arbeitsbereiche
   pages.py                 Gemeinsame Datenaktionen, PDF-Vorschau, Auswertungen
   updates.py / update_ui.py Release-Prüfung, Download und Updatefenster
-  credentials.py           Geschützter GitHub-Zugang mit Windows DPAPI
   widgets.py / theme.py     Wiederverwendbare UI und Gestaltung
   window.py                Hauptfenster und Navigation
   documents.py             Original-PDF befüllen, Berichte, CSV
@@ -96,6 +94,6 @@ python tools/collect_licenses.py dist/AST-Verwaltung/_internal/licenses
 
 Die App übernimmt die vorhandenen Erfassungs- und Rechenfunktionen. Sie ist keine vollständige Lohnbuchhaltung: Beitragssätze und Quellensteuer werden nicht selbst ermittelt, es gibt keine Bankanbindung oder elektronische Steuerübermittlung. Bestehende ausgefüllte Excel-Dateien werden nicht importiert. Neue Arbeitszeiten werden in AST erfasst und als vollständige makrofähige Jahresdatei exportiert. Die Berechnung der Excel-Formeln erfolgt beim Öffnen in Excel.
 
-Der Lohnausweis verwendet ausdrücklich die mitgelieferte Formularfassung «605.040.18N, Form. 11, 12.07». Sie wurde nicht durch ein anderes Formular ersetzt oder auf aktuelle behördliche Anforderungen zertifiziert. Der PDF-Export ist ausfüllbar; die in AST berechneten Summen sind schreibgeschützt. Betragsänderungen deshalb in AST vornehmen und das PDF neu exportieren. Gespeicherte Ausweise enthalten einen nachvollziehbaren Stand der Namen, Adressen und Firmendaten zum Zeitpunkt der Erfassung.
+Der Lohnausweis verwendet ausdrücklich die mitgelieferte Formularfassung «605.040.18N, Form. 11, 12.07». Sie wurde nicht durch ein anderes Formular ersetzt oder auf aktuelle behördliche Anforderungen zertifiziert. Der PDF-Export bettet alle Werte sichtbar in die Seite ein, damit Vorschau, Browser, Druck und Archiv dieselben Daten zeigen. Änderungen werden in AST vorgenommen und anschliessend neu exportiert. Gespeicherte Ausweise enthalten einen nachvollziehbaren Stand der Namen, Adressen und Firmendaten zum Zeitpunkt der Erfassung.
 
 Technische Referenzen: [Qt-PDF-Vorschau](https://doc.qt.io/qtforpython-6/PySide6/QtPdfWidgets/QPdfView.html), [pypdf-Formularbearbeitung](https://pypdf.readthedocs.io/en/stable/user/forms.html). Lizenzhinweise: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

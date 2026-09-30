@@ -11,8 +11,7 @@ from urllib.request import Request
 
 from ast_app.updates import (ASSET_NAME, Release, UpdateError, version_tuple, repository_name,
                              parse_release, check_release, download_release, open_url,
-                             GithubRedirect, start_installer)
-from ast_app.credentials import save_token, load_token, credential_path, delete_token
+                             GithubRedirect, start_installer, configured_repository)
 
 
 REPO = "manueltuescher/AST-Manager"
@@ -42,6 +41,10 @@ class UpdateTests(unittest.TestCase):
         release = check_release(REPO, "0.2.0", lambda url: io.BytesIO(json.dumps(metadata()).encode()))
         self.assertEqual(release.version, "0.3.0")
         self.assertIn("api.github.com/repos/", release.download_url)
+
+    def test_bundled_update_channel_overrides_stale_user_setting(self):
+        self.assertEqual(configured_repository({"update_repository": "old-owner/old-repo"}),
+                         "noctherias/AST-Manager")
 
     def test_reject_tampered_assets(self):
         for field, value in [("digest", None), ("size", -1), ("id", "1234"),
@@ -83,20 +86,10 @@ class UpdateTests(unittest.TestCase):
 
     def test_offline_and_access_failures_have_actionable_messages(self):
         for error, message in [(URLError("offline"), "Internetverbindung"),
-                                (HTTPError("url", 404, "not found", {}, None), "privaten"),
-                                (HTTPError("url", 401, "denied", {}, None), "erneuern")]:
+                                (HTTPError("url", 404, "not found", {}, None), "nicht öffentlich"),
+                                (HTTPError("url", 401, "denied", {}, None), "abgelehnt")]:
             with self.assertRaisesRegex(UpdateError, message):
                 check_release(REPO, opener=lambda url: (_ for _ in ()).throw(error))
-
-    @unittest.skipUnless(os.name == "nt", "Windows DPAPI")
-    def test_windows_token_encryption_and_repository_isolation(self):
-        with tempfile.TemporaryDirectory() as temp:
-            save_token(temp, REPO, "fake-github-test-token")
-            self.assertNotIn(b"fake-github-test-token", credential_path(temp, REPO).read_bytes())
-            self.assertEqual(load_token(temp, REPO), "fake-github-test-token")
-            self.assertEqual(load_token(temp, "different/repo"), "")
-            delete_token(temp, REPO)
-            self.assertEqual(load_token(temp, REPO), "")
 
     @unittest.skipUnless(os.name == "nt", "Windows installer")
     def test_installer_rechecks_integrity_and_preserves_start_options(self):

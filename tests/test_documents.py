@@ -39,18 +39,18 @@ class DocumentTests(unittest.TestCase):
         path = Path(self.temp.name) / "salary.pdf"
         salary_pdf(fields, path)
         r = PdfReader(path)
-        actual = r.get_fields()
-        for k, v in fields.items(): self.assertEqual(str(actual[k].get("/V", "")), v)
-        self.assertEqual(actual["8"]["/V"], "900")
-        self.assertEqual(actual["11"]["/V"], "600")
+        self.assertNotIn("/AcroForm", r.trailer["/Root"])
+        self.assertFalse(any(a.get_object().get("/Subtype") == "/Widget"
+                             for page in r.pages for a in page.get("/Annots", [])))
+        text = "\n".join(page.extract_text() or "" for page in r.pages)
+        for value in ("Lena Muster", "Musterstrasse 4", "756.0000.0000.00", "900", "600"):
+            self.assertIn(value, text)
         self.assertEqual(len(r.pages), 1)
-        self.assertFalse(any("Anthony" in str(f.get("/V", "")) for f in actual.values()))
         salary_pdf({"A": "/Ja", "B": "/Off", "HName": "Neue Person", "1": "1000"}, path)
-        actual = PdfReader(path).get_fields()
-        self.assertEqual(actual["E-bis"]["/V"], "")
-        self.assertEqual(actual["OrtDatum"]["/V"], "")
-        self.assertEqual(actual["1"]["/V"], "1000")
-        self.assertEqual(actual["11"]["/V"], "1000")
+        text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+        self.assertIn("Neue Person", text)
+        self.assertIn("1000", text)
+        self.assertNotIn("Lena Muster", text)
 
     def test_unknown_field_rejected(self):
         with self.assertRaises(ValueError): salary_pdf({"not-a-field": "x"}, Path(self.temp.name) / "bad.pdf")

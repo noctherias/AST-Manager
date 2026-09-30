@@ -18,3 +18,4 @@ credentials/
 docs/qa/
 docs/zeiterfassung_inventory.json
 build-smoke/
+tmp/

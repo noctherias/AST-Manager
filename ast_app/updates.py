@@ -1,4 +1,4 @@
-"""GitHub release checks and verified downloads, including private repositories."""
+"""Automatic checks and verified downloads from the bundled GitHub channel."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -43,14 +43,14 @@ def repository_name(value):
 
 
 def configured_repository(settings):
-    if settings.get("update_repository"):
-        return repository_name(settings["update_repository"])
+    # The application owns its update channel. A stale user setting must never
+    # redirect checks to an old repository after a move or owner change.
     config = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1])) / "release_config.json"
     if config.exists():
         value = json.loads(config.read_text(encoding="utf-8")).get("repository", "")
         if value:
             return repository_name(value)
-    return ""
+    return repository_name(settings["update_repository"]) if settings.get("update_repository") else ""
 
 
 def allowed_url(url):
@@ -135,9 +135,9 @@ def check_release(repository, current=__version__, opener=open_url):
         return parse_release(data, repo, current)
     except HTTPError as e:
         if e.code == 404:
-            raise UpdateError("Noch kein Release gefunden oder kein Zugriff. Bei einem privaten Repository den Zugang unter Einstellungen > Updates hinterlegen.") from None
+            raise UpdateError("Der automatische Update-Kanal ist momentan nicht öffentlich erreichbar.") from None
         if e.code == 401:
-            raise UpdateError("Der GitHub-Zugang ist abgelaufen oder ungültig. Bitte unter Einstellungen > Updates erneuern.") from None
+            raise UpdateError("GitHub hat die automatische Versionsprüfung abgelehnt.") from None
         if e.code in (403, 429):
             raise UpdateError("GitHub erlaubt momentan keine weitere Prüfung. Bitte später versuchen.") from None
         raise UpdateError(f"GitHub ist momentan nicht erreichbar (HTTP {e.code}).") from None

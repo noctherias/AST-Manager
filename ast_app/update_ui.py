@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
-from functools import partial
 from pathlib import Path
 import sys
 import threading
@@ -10,13 +9,12 @@ import time
 
 from PySide6.QtCore import QObject, Signal, QTimer
 from PySide6.QtWidgets import (QApplication, QDialog, QVBoxLayout, QHBoxLayout, QPlainTextEdit,
-                              QProgressBar, QMessageBox, QCheckBox, QWidget, QFormLayout, QLineEdit)
+                              QProgressBar, QMessageBox, QCheckBox, QWidget)
 
 from . import __version__
-from .credentials import load_token, save_token, delete_token, credential_path
 from .updates import open_url
-from .updates import check_release, download_release, start_installer, configured_repository, repository_name
-from .widgets import label, button, line, guarded
+from .updates import check_release, download_release, start_installer, configured_repository
+from .widgets import label, button, guarded
 
 
 class Job(QObject):
@@ -40,8 +38,7 @@ class Job(QObject):
 
 
 class UpdateDialog(QDialog):
-    def __init__(self, parent, release, db, demo=False, token=""):
-        self.token = token
+    def __init__(self, parent, release, db, demo=False):
         super().__init__(parent)
         self.release, self.db, self.demo = release, db, demo
         self.job = None
@@ -85,7 +82,7 @@ class UpdateDialog(QDialog):
         self.job.success.connect(self.install_ready)
         job = self.job
         job.run(lambda: download_release(self.release, self.db.path.parent / "updates",
-                                         job.progress.emit, job.cancel.is_set, partial(open_url, token=self.token)))
+                                         job.progress.emit, job.cancel.is_set, open_url))
 
     def failed(self, message):
         self.status.setText(message)
@@ -138,7 +135,6 @@ class UpdateController(QObject):
         if self.busy or self.stopped: return
         try:
             repo = configured_repository(self.db.settings())
-            self.token = load_token(self.db.path.parent, repo) if repo else ""
         except ValueError as exc:
             self.state_changed.emit(str(exc))
             return
@@ -151,7 +147,7 @@ class UpdateController(QObject):
         self.job = Job(self)
         self.job.success.connect(lambda release: self.finished(release, manual))
         self.job.failure.connect(lambda message: self.failed(message, manual))
-        self.job.run(lambda: check_release(repo, opener=partial(open_url, token=self.token)))
+        self.job.run(lambda: check_release(repo, opener=open_url))
 
     def failed(self, message, manual):
         self.busy = False
@@ -176,7 +172,7 @@ class UpdateController(QObject):
             if QApplication.activeModalWidget():
                 QTimer.singleShot(1500, show_when_ready)
                 return
-            result = UpdateDialog(self.window, release, self.db, self.demo, self.token).exec()
+            result = UpdateDialog(self.window, release, self.db, self.demo).exec()
             if result != QDialog.DialogCode.Accepted:
                 self.db.save_settings({"update_snoozed_version": release.version, "update_snoozed_until": str(time.time() + 86400)})
         show_when_ready()
@@ -199,47 +195,19 @@ class UpdateSettings(QWidget):
         self.auto = QCheckBox("Beim Start automatisch nach neuen Versionen suchen")
         self.auto.toggled.connect(self.save_auto)
         layout.addWidget(self.auto)
-        from .widgets import Disclosure
-        connection = Disclosure("GitHub-Verbindung einrichten", expanded=not credential_path(db.path.parent, configured_repository(db.settings())).exists())
-        self.repo = line(placeholder="benutzer/projekt")
-        connection.form.addRow("Repository", self.repo)
-        self.token = line(placeholder="Neuen Zugangstoken eingeben (optional)", max_length=512)
-        self.token.setEchoMode(QLineEdit.EchoMode.Password)
-        connection.form.addRow("GitHub-Zugang", self.token)
-        connection.form.addRow(button("Verbindung speichern", self.save_repository))
-        connection.form.addRow(button("Gespeicherten Zugang entfernen", self.remove_token))
-        help_text = label("Für dieses private Repository einmalig einen GitHub-Token mit Lesezugriff auf AST-Manager hinterlegen. Auf GitHub: Settings > Developer settings > Fine-grained tokens, Repository AST-Manager, Contents: Read-only. Der Zugang wird mit deinem Windows-Konto verschlüsselt und nicht in der Datenbanksicherung gespeichert.", "muted")
+        help_text = label("Neue Versionen werden automatisch über den fest eingebauten AST-Update-Kanal gefunden. Es sind keine GitHub-Verbindung und keine Zugangsdaten erforderlich.", "muted")
         help_text.setWordWrap(True)
-        connection.form.addRow(help_text)
-        layout.addWidget(connection)
+        layout.addWidget(help_text)
         layout.addStretch()
         self.refresh()
 
     def refresh(self):
         settings = self.db.settings()
         repo = configured_repository(settings)
-        self.repo.setText(repo)
-        connected = repo and credential_path(self.db.path.parent, repo).exists()
-        self.state.setText(("GitHub-Zugang hinterlegt · " if connected else "Privates Repository: Bitte unten einmalig den GitHub-Zugang hinterlegen · ") + repo if repo else "Die Update-Funktion ist bereit. Hinterlege zuerst das GitHub-Repository.")
+        self.state.setText("Automatische Updates sind eingerichtet." if repo else "Der Update-Kanal fehlt in dieser Installation.")
         self.auto.blockSignals(True)
         self.auto.setChecked(settings.get("update_auto", "1") == "1")
         self.auto.blockSignals(False)
 
     def save_auto(self, checked):
         self.db.save_settings({"update_auto": "1" if checked else "0"})
-
-    @guarded
-    def save_repository(self):
-        repo = repository_name(self.repo.text())
-        self.db.save_settings({"update_repository": repo, "update_snoozed_version": "", "update_last_attempt": "0"})
-        if self.token.text().strip():
-            save_token(self.db.path.parent, repo, self.token.text())
-            self.token.clear()
-        self.state.setText("Verbindung gespeichert: " + repo + " · Jetzt nach Updates suchen.")
-
-    @guarded
-    def remove_token(self):
-        repo = repository_name(self.repo.text())
-        delete_token(self.db.path.parent, repo)
-        self.token.clear()
-        self.state.setText("Gespeicherter GitHub-Zugang entfernt.")

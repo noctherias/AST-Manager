@@ -1,21 +1,14 @@
 # GitHub-Releases und Programm-Updates
 
-Repository: [noctherias/AST-Manager](https://github.com/noctherias/AST-Manager), privat.
+Update-Kanal: [noctherias/AST-Manager](https://github.com/noctherias/AST-Manager).
 
-## Einmal pro Computer
-
-1. Im GitHub-Konto unter **Settings → Developer settings → Personal access tokens → Fine-grained tokens** einen Token erstellen.
-2. Als Repository nur **AST-Manager** auswählen. Berechtigung **Contents: Read-only** vergeben. Ein Ablaufdatum wählen; nach dessen Ablauf muss der Zugang erneuert werden. Das Konto muss auf das private Repository zugreifen dürfen.
-3. In AST unter **Einstellungen → Updates → GitHub-Verbindung einrichten** den Token eingeben und **Verbindung speichern** wählen.
-4. **Jetzt nach Updates suchen** prüft die Verbindung.
-
-Der Token bleibt auf diesem PC, mit Windows DPAPI für das aktuelle Windows-Konto verschlüsselt. Er liegt separat von SQLite und wird weder ins Repository noch in Datenbanksicherungen geschrieben. Niemals Zugangstokens in Quellcode oder Release-Dateien eintragen. Die normale Datenerfassung funktioniert auch ohne GitHub-Zugang und ohne Internet.
+Das Repository und seine Release-Dateien müssen öffentlich lesbar sein. Dadurch funktioniert die Update-Suche ohne Konto, Token oder manuell eingetragene Repository-Adresse. Die normale Datenerfassung funktioniert weiterhin ohne Internet.
 
 ## Im täglichen Betrieb
 
 Die App prüft beim Start und danach alle sechs Stunden auf neuere stabile Releases. Bei einer neuen Version erscheint ein Fenster mit Änderungen und **Herunterladen & aktualisieren**. **Später** verschiebt den Hinweis für diese Version um einen Tag; eine manuelle Suche ist jederzeit möglich. Offline-Fehler unterbrechen die Arbeit nicht.
 
-Der Installer wird über die authentifizierte GitHub-API geladen. Weiterleitungen erhalten keinen Zugangstoken ausserhalb von api.github.com. Die App prüft Dateigrösse und den von GitHub gelieferten SHA-256-Digest und erstellt vor der Installation eine SQLite-Sicherung. Nach erfolgreichem Start des Setups wird AST geschlossen. Das Setup aktualisiert die Programmdateien und startet AST wieder mit demselben Datenordner und Demo-/Produktivmodus.
+Der Installer wird über die öffentliche GitHub-API geladen. Die App prüft Dateigrösse und den von GitHub gelieferten SHA-256-Digest und erstellt vor der Installation eine SQLite-Sicherung. Nach erfolgreichem Start des Setups wird AST geschlossen. Das Setup aktualisiert die Programmdateien und startet AST wieder mit demselben Datenordner und Demo-/Produktivmodus.
 
 Die Installation erfolgt ohne Administratorrechte unter `%LOCALAPPDATA%\Programs\AST-Manager`. Daten bleiben unter `%LOCALAPPDATA%\AST-Erfassungstool` beziehungsweise dem ausdrücklich gewählten Datenordner. Auch eine Deinstallation entfernt diese Daten nicht. Beim Wechsel vom portablen ZIP zur installierten App anschliessend den Startmenü-Eintrag **AST Manager** benutzen. Die Quellcode-Version zeigt verfügbare Updates an, installiert jedoch keinen Ersatz über die Entwicklungsumgebung.
 
@@ -33,7 +26,7 @@ Dateien pro Release:
 - `AST-Verwaltung-Windows.zip`: portable Version.
 - `AST-Erfassungstool-Quellcode.zip`: vollständiger Quellcode einschliesslich Vorlagen und Build-Skripten.
 
-GitHub Actions benötigt für diesen Workflow `contents: write` (im Workflow gesetzt), aktivierte Actions und verfügbare Windows-Runner-Minuten. Das Repository bleibt privat. Ein späteres Ändern der Sichtbarkeit sollte auch die mitgelieferten Originalvorlagen berücksichtigen.
+GitHub Actions benötigt für diesen Workflow `contents: write` (im Workflow gesetzt), aktivierte Actions und verfügbare Windows-Runner-Minuten. Der Update-Kanal und die Release-Dateien müssen öffentlich lesbar bleiben.
 
 ## Eigener Setup-Build
 
