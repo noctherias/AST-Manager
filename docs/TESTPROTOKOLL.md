@@ -1,10 +1,10 @@
 # Testprotokoll
 
-Stand: 30.09.2026, Version 0.3.2. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
+Stand: 30.09.2026, Version 0.4.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
 
 ## Automatisierte Tests
 
-`python -m unittest discover -s tests -v`: **32 Tests**. Die fachlichen, Dokument-, Export-, Datenbank- und UI-Tests liefen lokal erfolgreich. Der bestehende DPAPI-Test benötigt wie in Version 0.2.0 das normale interaktive Windows-Benutzerprofil und läuft zusätzlich in GitHub Actions.
+`python -m unittest discover -s tests -v`: **37 Tests**. Die fachlichen, Dokument-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
 
 | Bereich | Geprüfte Fälle |
 |---|---|
@@ -24,7 +24,7 @@ Die Qt-Tests laufen mit dem Offscreen-Plugin. Für die Bildkontrolle wurden die 
 
 ## Windows-Paket
 
-Der Build enthält Python, die nötigen Qt-Module, PDF-Bibliotheken, die Original-PDF und `Zeiterfassung_Vorlage.xlsm`. openpyxl wird im Programm nicht benötigt. Der Starttest der gebauten EXE umfasst alle fünf Arbeitsbereiche, SQLite-Datenhaltung, Original-PDF, ReportLab-Bericht und einen echten XLSM-Export. Die erzeugte Datei wurde zusätzlich mit Microsoft Excel geöffnet: 19 Blätter, Jahr 2026 und die exportierte Person wurden korrekt gelesen.
+Der Build enthält Python, die nötigen Qt-Module, PDF- und Excel-Bibliotheken, die offizielle Lohnausweis-PDF und `Zeiterfassung_Vorlage.xlsm`. Der Starttest der gebauten EXE umfasst alle fünf Arbeitsbereiche, SQLite-Datenhaltung, PDF-Berichte und einen echten XLSM-Export. Der Excel-Import wird mit einer erzeugten Debitorendatei sowie einem exportierten und wieder eingelesenen Stundennachweis geprüft.
 
 Beim Pakettest wurde ein Konflikt mit einer vom Build-PATH eingesammelten Poppler-ICU-DLL gefunden. Der Build schliesst diese fremde Bibliothek aus und verwendet die von Qt erwartete Windows-ICU-Schnittstelle. Die Korrektur ist in der mitgelieferten `.spec` verankert.
 
@@ -32,4 +32,4 @@ Beim Pakettest wurde ein Konflikt mit einer vom Build-PATH eingesammelten Popple
 
 Zusätzlich mit Version 0.2.0 geprüft: gebautes Inno-Setup unter eigener Test-Kennung im Arbeitsordner installiert, installierte EXE mit Demo-Datenbank und PDF-Starttest ausgeführt, Setup erneut über dieselbe Installation ausgeführt. Der SHA-256-Hash der Datenbank blieb unverändert. Danach die Testinstallation deinstalliert; die Datenbank blieb bestehen. Der Windows-DPAPI-Test wurde unter dem normalen Windows-Benutzer ausgeführt (das eingeschränkte Sandbox-Konto hat kein verwendbares DPAPI-Profil). Diese Update- und Installer-Tests bleiben unverändert Teil der Release-Pipeline für 0.3.0.
 
-Getestet auf diesem Windows-11-Rechner, nicht auf einem separaten frisch installierten Windows-Rechner. Keine Steuer-/Lohnbuchhaltungs-Zertifizierung, kein Bank- oder Mehrbenutzerbetrieb, keine automatische Übernahme anderer ausgefüllter Arbeitsmappen. Die geprüften fachlichen Regeln stammen aus den fünf gelieferten Vorlagen.
+Getestet auf diesem Windows-11-Rechner, nicht auf einem separaten frisch installierten Windows-Rechner. Keine Steuer-/Lohnbuchhaltungs-Zertifizierung, kein Bank- oder Mehrbenutzerbetrieb. Frei aufgebaute Arbeitsmappen ausserhalb der unterstützten Debitoren- und Zeiterfassungsstruktur werden nicht automatisch zugeordnet.

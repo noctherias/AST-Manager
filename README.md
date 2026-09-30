@@ -15,8 +15,8 @@ Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfens
 ## Bedienung
 
 1. **Übersicht:** Direkteinstieg für Debitoren, Arbeitszeit und Lohnausweis. Offene Rechnungen mit Fälligkeit stehen darunter. Bei einem leeren Datenbestand helfen Hinweise beim Einrichten.
-2. **Debitoren:** Die Ansicht startet mit offenen Rechnungen. «Bezahlt» und «Alle» wechseln die Auswahl. Rechnung auswählen, dann **Zahlung erfassen** oder **Details bearbeiten**. Bisherige Zahlungen sind im Dialog aufklappbar. Zeitraumfilter und Export liegen bei den weiteren Optionen.
-3. **Stundennachweis:** Person auswählen und **Arbeitstag erfassen**. Das einfache Fenster enthält Datum, Tagesart, bis zu zwei Arbeitsblöcke, zusätzliche Pause und Bemerkung. **Excel-Liste exportieren** befüllt die zwölf Monatsblätter der Originalvorlage. Formeln, Codes, Jahresübersicht, Makros, Steuerelemente und Druckbereiche bleiben erhalten.
+2. **Debitoren:** Die Ansicht startet mit offenen Rechnungen. «Bezahlt» und «Alle» wechseln die Auswahl. Rechnung auswählen, dann **Zahlung erfassen**, **Mahnstufe** oder **Details bearbeiten**. Eine bestehende Debitoren-Datei lässt sich über **Excel importieren** übernehmen. Zeitraumfilter und Export liegen bei den weiteren Optionen.
+3. **Stundennachweis:** Person auswählen und **Arbeitstag erfassen**. **Zeitraum erfassen** übernimmt dieselben Arbeitszeiten oder Abwesenheiten für ausgewählte Wochentage. **Excel importieren** liest eine vorhandene AST-Jahresdatei; **Excel-Liste exportieren** befüllt die zwölf Monatsblätter der Originalvorlage.
 4. **Lohnausweise:** Vier Schritte führen durch Person/Zeitraum, Lohn/Abzüge, Zusatzangaben und abschliessende Prüfung. Die häufigen Lohnfelder stehen zuerst. Nach dem Speichern **PDF ansehen** oder **PDF speichern** wählen.
 5. **Einstellungen:** Das Team wird hier einmalig angelegt und bearbeitet. Daneben liegen Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert.
 
@@ -39,12 +39,12 @@ Standard: `%LOCALAPPDATA%\AST-Erfassungstool\`.
 
 - `ast.sqlite3`: produktive Daten.
 - `ast-demo.sqlite3`: getrennte Demodaten.
-- `backups\`: tägliche Start-Sicherungen und Sicherungen vor einer Wiederherstellung.
+- `backups\`: tägliche Start-Sicherungen und Sicherungen vor einer Wiederherstellung. Unter Einstellungen kann zusätzlich ein externer Ordner mit Aufbewahrungsfrist gewählt werden.
 - `vorschau\`: erzeugte PDF-Vorschauen.
 - `updates\`: heruntergeladene und geprüfte Setups.
 - `ast.log`: Fehlermeldungen.
 
-Ein anderer Ordner lässt sich mit `python main.py --data-dir "D:\AST-Daten"` wählen. Eine zweite Instanz derselben Datenbank wird verhindert. Die App ist für einen lokalen Arbeitsplatz gedacht. Die SQLite-Datei ist nicht verschlüsselt; sie übernimmt die Windows-Dateizugriffsrechte. Sicherungen werden nicht automatisch auf ein externes Laufwerk übertragen.
+Ein anderer Ordner lässt sich mit `python main.py --data-dir "D:\AST-Daten"` wählen. Eine zweite Instanz derselben Datenbank wird verhindert. Die App ist für einen lokalen Arbeitsplatz gedacht. Die SQLite-Datei ist nicht verschlüsselt; sie übernimmt die Windows-Dateizugriffsrechte.
 
 ## Projektstruktur
 
@@ -79,6 +79,8 @@ release_config.json        Mitgelieferte Repository-Verbindung
 
 `test.bat` installiert zusätzlich die Entwicklungsabhängigkeiten und führt die Tests aus. `build.bat` testet zuerst und erstellt anschliessend `dist\AST-Verwaltung\AST-Verwaltung.exe` samt benötigtem `_internal`-Ordner. `build_setup.bat` erstellt anschliessend das Setup (Inno Setup 6 nötig). Programmänderungen auf `main` erzeugen automatisch ein neues Release; Details stehen in [docs/UPDATES.md](docs/UPDATES.md).
 
+Der Release-Workflow signiert Anwendung und Installer automatisch, sobald ein Code-Signing-Zertifikat als GitHub-Secrets hinterlegt wurde. Die einmalige Einrichtung ist in [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) beschrieben.
+
 Alternativ mit einer aktivierten Python-Umgebung:
 
 ```powershell
@@ -92,8 +94,8 @@ python tools/collect_licenses.py dist/AST-Verwaltung/_internal/licenses
 
 ## Umfang des MVP
 
-Die App übernimmt die vorhandenen Erfassungs- und Rechenfunktionen. Sie ist keine vollständige Lohnbuchhaltung: Beitragssätze und Quellensteuer werden nicht selbst ermittelt, es gibt keine Bankanbindung oder elektronische Steuerübermittlung. Bestehende ausgefüllte Excel-Dateien werden nicht importiert. Neue Arbeitszeiten werden in AST erfasst und als vollständige makrofähige Jahresdatei exportiert. Die Berechnung der Excel-Formeln erfolgt beim Öffnen in Excel.
+Die App übernimmt die vorhandenen Erfassungs- und Rechenfunktionen. Sie ist keine vollständige Lohnbuchhaltung: Beitragssätze und Quellensteuer werden nicht selbst ermittelt, es gibt keine Bankanbindung oder elektronische Steuerübermittlung. Unterstützt werden der Import der mitgelieferten Debitoren-Struktur und der AST-Zeiterfassung mit zwölf Monatsblättern. Andere frei aufgebaute Arbeitsmappen werden nicht automatisch zugeordnet. Die Berechnung der exportierten Excel-Formeln erfolgt beim Öffnen in Excel.
 
-Der Lohnausweis verwendet ausdrücklich die mitgelieferte Formularfassung «605.040.18N, Form. 11, 12.07». Sie wurde nicht durch ein anderes Formular ersetzt oder auf aktuelle behördliche Anforderungen zertifiziert. Der PDF-Export bettet alle Werte sichtbar in die Seite ein, damit Vorschau, Browser, Druck und Archiv dieselben Daten zeigen. Änderungen werden in AST vorgenommen und anschliessend neu exportiert. Gespeicherte Ausweise enthalten einen nachvollziehbaren Stand der Namen, Adressen und Firmendaten zum Zeitpunkt der Erfassung.
+Der Lohnausweis verwendet die aktuelle offizielle ESTV-Formularfassung «Form. 11 dfi 605.040.18N 01.21» von 2023. Der PDF-Export bettet alle Werte sichtbar in die Seite ein, damit Vorschau, Browser, Druck und Archiv dieselben Daten zeigen. Änderungen werden in AST vorgenommen und anschliessend neu exportiert. Gespeicherte Ausweise enthalten einen nachvollziehbaren Stand der Namen, Adressen und Firmendaten zum Zeitpunkt der Erfassung.
 
 Technische Referenzen: [Qt-PDF-Vorschau](https://doc.qt.io/qtforpython-6/PySide6/QtPdfWidgets/QPdfView.html), [pypdf-Formularbearbeitung](https://pypdf.readthedocs.io/en/stable/user/forms.html). Lizenzhinweise: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

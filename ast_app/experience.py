@@ -2,12 +2,13 @@
 from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStackedWidget,
-                              QMenu, QButtonGroup, QDialog, QHeaderView, QMessageBox)
+                              QMenu, QButtonGroup, QDialog, QHeaderView, QMessageBox, QFileDialog)
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
 from .pages import Receivables, SettingsPage, SalaryPage, save_path
-from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog
+from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog
 from .domain import TIME_CODES, chf, number, display_date
 from .timesheet_excel import export_timesheet
+from .excel_import import import_timesheet
 from .update_ui import UpdateSettings
 
 
@@ -132,6 +133,7 @@ class Invoices(Receivables):
         Page.__init__(self, "Debitoren", "Rechnungen und Zahlungseingänge zentral bearbeiten.")
         self.db, self.filtered = db, []
         self.header.addWidget(button("+ Neue Rechnung", self.new, True))
+        self.header.addWidget(button("Excel importieren", self.import_excel))
         self.cards = self.metrics([("Rechnungsbetrag", "In der Auswahl"), ("Bereits bezahlt", "In der Auswahl"), ("Noch offen", "In der Auswahl", True)])
         row = self.toolbar()
         self.status = combo([(v, v) for v in ("Alle offenen", "Bezahlt", "Alle Status")])
@@ -147,14 +149,16 @@ class Invoices(Receivables):
         filters.form.addRow("Rechnungsjahr", self.year)
         filters.form.addRow("Quartal", self.quarter)
         self.layout.addWidget(filters)
-        self.table = Table(["Rechnung", "Kunde", "Fällig am", "Betrag CHF", "Offen CHF", "Status"])
+        self.table = Table(["Rechnung", "Kunde", "Fällig am", "Betrag CHF", "Offen CHF", "Mahnstufe", "Status"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(self.layout, "Bitte eine Rechnung auswählen.")
         self.edit_btn = button("Details bearbeiten", self.edit)
         self.pay_btn = button("Zahlung erfassen", self.pay, True)
+        self.reminder_btn = button("Mahnstufe", self.reminder)
         row.addWidget(self.edit_btn)
         row.addWidget(self.pay_btn)
+        row.addWidget(self.reminder_btn)
         more, actions = menu_button("Weitere Aktionen", [("Auswahl als PDF / Drucken", self.export_pdf), ("Auswahl als CSV exportieren", self.export_csv), ("Rechnung löschen …", self.remove)])
         self.delete_btn = actions[-1]
         self.header.addWidget(more)
@@ -178,7 +182,7 @@ class Invoices(Receivables):
             and (not year or int(r["issued"][:4]) == year)
             and (not quarter or (int(r["issued"][5:7]) - 1) // 3 + 1 == quarter)
             and (status == "Alle Status" or status == "Alle offenen" and r["open"] > 0 or r["status"] == status)]
-        self.table.populate([[r["number"], r["customer"], display_date(r["due"]), number(r["amount"]), number(r["open"]), r["status"]] for r in self.filtered], [r["id"] for r in self.filtered], [3, 4])
+        self.table.populate([[r["number"], r["customer"], display_date(r["due"]), number(r["amount"]), number(r["open"]), self.reminder_text(r), r["status"]] for r in self.filtered], [r["id"] for r in self.filtered], [3, 4])
         for c, key in zip(self.cards, ("amount", "paid", "open")): c.set(chf(sum(r[key] for r in self.filtered)))
         self.summary.setText(f"{len(self.filtered)} Rechnungen · {self.year.currentText()} · {self.quarter.currentText()}" if self.filtered else "Keine Rechnungen in dieser Auswahl. Erstelle eine Rechnung oder ändere den Filter.")
         self.selection()
@@ -197,6 +201,7 @@ class TimeWorkspace(Page):
         self.layout.insertWidget(0, button("← Personenübersicht", back))
         self.entry_btn = button("+ Arbeitstag erfassen", self.new_entry, True)
         self.header.addWidget(self.entry_btn)
+        self.header.addWidget(button("Zeitraum erfassen", self.bulk_entry))
         self.header.addWidget(button("Person bearbeiten", manage_team))
         row = self.toolbar()
         row.addWidget(label("Kalenderjahr", "muted"))
@@ -205,6 +210,7 @@ class TimeWorkspace(Page):
         row.addWidget(self.year)
         row.addStretch()
         self.export_btn = button("Excel-Liste exportieren", self.export_excel, True)
+        row.addWidget(button("Excel importieren", self.import_excel))
         row.addWidget(self.export_btn)
         self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
                                    ("Arbeitstage", "Tage mit Kommt-/Geht-Zeit"),
@@ -294,6 +300,17 @@ class TimeWorkspace(Page):
         if self.employee and TimeRecordDialog(self, self.db, self.employee).exec():
             self.refresh()
 
+    def bulk_entry(self):
+        if not self.employee:
+            return
+        dialog = BulkTimeDialog(self, self.db, self.employee, self.year.currentData())
+        if dialog.exec():
+            self.refresh()
+            result = dialog.result_counts
+            QMessageBox.information(self, "Zeitraum erfasst",
+                                    f"{result['created']} Tage neu erfasst, {result['updated']} überschrieben, "
+                                    f"{result['skipped']} bestehende Tage ausgelassen.")
+
     def edit_entry(self):
         record = next((r for r in self.current_records if r["id"] == self.table.selected_id()), None)
         if record and TimeRecordDialog(self, self.db, self.employee, record).exec():
@@ -315,6 +332,32 @@ class TimeWorkspace(Page):
         if path:
             result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
             QMessageBox.information(self, "Excel-Liste erstellt", "Die Originalvorlage wurde vollständig befüllt.\n\n" + str(result))
+
+    @guarded
+    def import_excel(self):
+        if not self.employee:
+            return
+        path, _ = QFileDialog.getOpenFileName(self, "Zeiterfassung aus Excel importieren", "",
+                                              "Excel-Zeiterfassung (*.xlsm *.xlsx)")
+        if not path:
+            return
+        answer = QMessageBox.question(
+            self, "Bestehende Tage",
+            "Sollen bereits erfasste Tage mit den Werten aus Excel überschrieben werden?\n\n"
+            "Ja = überschreiben · Nein = bestehende Tage behalten",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Cancel:
+            return
+        result = import_timesheet(self.db, path, self.employee["id"], answer == QMessageBox.StandardButton.Yes)
+        self.show_person(self.employee["id"])
+        index = self.year.findData(result["year"])
+        if index >= 0:
+            self.year.setCurrentIndex(index)
+        QMessageBox.information(self, "Excel-Import abgeschlossen",
+                                f"{result['created']} Tage neu importiert, {result['updated']} überschrieben, "
+                                f"{result['skipped']} bestehende Tage ausgelassen.")
 
 
 class Team(QWidget):

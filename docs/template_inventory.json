@@ -2622,1423 +2622,1250 @@
   ],
   "pdf": {
     "file": "Vorlage_Lohnausweis.pdf",
-    "sha256": "98e9ef2a2e914189970167016f38adda210ea7be868ba98980caa8a5dd892cac",
+    "sha256": "683cd4f6331aedddff6fd7dc8f713d8a2703a8eb4cf21a18d98bc3102604cbf0",
     "pages": 1,
     "metadata": {
-      "/CreationDate": "D:20081211074619+01'00'",
-      "/Creator": "Adobe InDesign CS3 (5.0)",
-      "/ModDate": "D:20220303161259+01'00'",
-      "/Producer": "Adobe PDF Library 8.0",
+      "/Author": "Eidgenössische Steuerverwaltung ESTV",
+      "/CreationDate": "D:20210119105701+01'00'",
+      "/Creator": "Adobe InDesign CC 13.1 (Windows)",
+      "/ModDate": "D:20210119105808+01'00'",
+      "/Producer": "Adobe PDF Library 15.0",
+      "/Title": "Form. 11: Lohnausweis – Certificat de salaire – Certificato di salario",
       "/Trapped": "/False"
     },
     "fields": {
-      "C": {
-        "/T": "C",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'AFSpecial_KeystrokeEx(\"999.99.999.999\");', '/S': '/JavaScript'}"
-        }
+      "OptionKreuzOhneRahmen_A": {
+        "/T": "OptionKreuzOhneRahmen_A",
+        "/FT": "/Btn",
+        "/TU": "A Lohnausweis – Certificat de salaire – Certificato di salario",
+        "/Ff": 0,
+        "/_States_": [
+          "/Ja / Oui / Sì",
+          "/Off"
+        ]
       },
-      "C2": {
-        "/T": "C2",
+      "OptionKreuzOhneRahmen_F": {
+        "/T": "OptionKreuzOhneRahmen_F",
+        "/FT": "/Btn",
+        "/TU": "F Unentgeltliche Beförderung zwischen Wohn- und Arbeitsort / Transport gratuit entre le domicile et le lieu de travail / Trasporto gratuito dal domicilio al luogo di lavoro",
+        "/Ff": 0,
+        "/_States_": [
+          "/Ja / Oui / Sì",
+          "/Off"
+        ]
+      },
+      "AHVLinks_C": {
+        "/T": "AHVLinks_C",
         "/FT": "/Tx",
+        "/TU": "C AHV-Nr. – No AVS – N. AVS",
+        "/Ff": 8388608,
         "/AA": {
           "/K": "{'/JS': 'AFSpecial_KeystrokeEx(\"999.9999.9999.99\");', '/S': '/JavaScript'}"
         }
       },
-      "D": {
-        "/T": "D",
+      "TextLinks_D": {
+        "/T": "TextLinks_D",
         "/FT": "/Tx",
-        "/V": "2026"
+        "/TU": "D Jahr – Année – Anno",
+        "/Ff": 8388608
       },
-      "E-von": {
-        "/T": "E-von",
+      "TextMehrzeiligLinks_Empfaenger": {
+        "/T": "TextMehrzeiligLinks_Empfaenger",
         "/FT": "/Tx",
-        "/V": "01.01."
+        "/TU": "Empfängeradresse / adresse du destinataire / indirizzo del destinatario",
+        "/Ff": 8392704
       },
-      "E-bis": {
-        "/T": "E-bis",
+      "TextLinks_C-GebDatum": {
+        "/T": "TextLinks_C-GebDatum",
         "/FT": "/Tx",
-        "/V": "31.08."
+        "/TU": "C Geburtsdatum – Date de naissance – Data di nascita",
+        "/Ff": 8388608
       },
-      "HAnrede": {
-        "/T": "HAnrede",
+      "DezZahlNull_1": {
+        "/T": "DezZahlNull_1",
         "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "HName": {
-        "/T": "HName",
-        "/FT": "/Tx",
-        "/Ff": 4194304,
-        "/V": "Anthony Ragu Devinsan"
-      },
-      "HAdresse": {
-        "/T": "HAdresse",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "HPostfach": {
-        "/T": "HPostfach",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "HWohnort": {
-        "/T": "HWohnort",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "1": {
-        "/T": "1",
-        "/FT": "/Tx",
-        "/Ff": 12582912,
-        "/V": "6550",
+        "/TU": "1. Lohn/Rente – Salaire/Rente – Salario/Rendita",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "2-1": {
-        "/T": "2-1",
+      "DezZahlNull_2_1": {
+        "/T": "DezZahlNull_2_1",
         "/FT": "/Tx",
+        "/TU": "2.1 Verpflegung, Unterkunft – Pension, logement – Vitto, alloggio",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "2-2": {
-        "/T": "2-2",
+      "DezZahlNull_2_2": {
+        "/T": "DezZahlNull_2_2",
         "/FT": "/Tx",
+        "/TU": "2.2 Privatanteil Geschäftswagen – Part privée voiture de service – Quota privata automobile di servizio",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "2-3-1": {
-        "/T": "2-3-1",
+      "TextLinks_2_3-Art": {
+        "/T": "TextLinks_2_3-Art",
         "/FT": "/Tx",
-        "/Ff": 4194304
+        "/TU": "2.3 Art – Genre – Genere",
+        "/Ff": 8388608
       },
-      "2-3-2": {
-        "/T": "2-3-2",
+      "DezZahlNull_2_3": {
+        "/T": "DezZahlNull_2_3",
         "/FT": "/Tx",
+        "/TU": "2.3 Andere – Autres – Altre",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "3-1": {
-        "/T": "3-1",
+      "TextLinks_4-Art": {
+        "/T": "TextLinks_4-Art",
         "/FT": "/Tx",
-        "/Ff": 4194304
+        "/TU": "4. Art – Genre – Genere",
+        "/Ff": 8388608
       },
-      "3-2": {
-        "/T": "3-2",
+      "DezZahlNull_4": {
+        "/T": "DezZahlNull_4",
         "/FT": "/Tx",
+        "/TU": "4. Kapitalleistungen – Prestations en capital – Prestazioni in capitale",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "4-1": {
-        "/T": "4-1",
+      "DezZahlNull_5": {
+        "/T": "DezZahlNull_5",
         "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "4-2": {
-        "/T": "4-2",
-        "/FT": "/Tx",
+        "/TU": "5. Beteiligungsrechte gemäss Beiblatt – Droits de participation selon annexe – Diritti di partecipazione secondo allegato",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "5": {
-        "/T": "5",
+      "DezZahlNull_6": {
+        "/T": "DezZahlNull_6",
         "/FT": "/Tx",
+        "/TU": "6. Verwaltungsratsentschädigungen – Indemnités des membres de l’administration – Indennità dei membri di consigli d’amministrazione",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "6": {
-        "/T": "6",
+      "TextLinks_7-Art": {
+        "/T": "TextLinks_7-Art",
         "/FT": "/Tx",
+        "/TU": "7. Art – Genre – Genere",
+        "/Ff": 8388608
+      },
+      "DezZahlNull_7": {
+        "/T": "DezZahlNull_7",
+        "/FT": "/Tx",
+        "/TU": "7. Andere Leistungen – Autres prestations – Altre prestazioni",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "7-1": {
-        "/T": "7-1",
+      "DezZahlNull_8": {
+        "/T": "DezZahlNull_8",
         "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "7-1-2": {
-        "/T": "7-1-2",
-        "/FT": "/Tx",
+        "/TU": "8. Bruttolohn total / Rente – Salaire brut total / Rente – Salario lordo totale / Rendita",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/C": "{'/JS': IndirectObject(65, 0, 2238563941264), '/S': '/JavaScript'}",
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "8": {
-        "/T": "8",
+      "DezZahlNull_9": {
+        "/T": "DezZahlNull_9",
         "/FT": "/Tx",
-        "/Ff": 12582912,
-        "/V": "6550",
+        "/TU": "9. Beiträge AHV/IV/EO/ALV/NBUV – Cotisations AVS/AI/APG/AC/AANP – Contributi AVS/AI/IPG/AD/AINP",
+        "/Ff": 8388608,
         "/AA": {
-          "/C": "{'/JS': IndirectObject(53, 0, 1955110334688), '/S': '/JavaScript'}",
-          "/F": "{'/JS': 'AFNumber_Format(0, 1, 0, 0, \"\", false);', '/S': '/JavaScript'}",
-          "/K": "{'/JS': 'AFNumber_Keystroke(0, 1, 0, 0, \"\", false);', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "9": {
-        "/T": "9",
+      "DezZahlNull_10_1": {
+        "/T": "DezZahlNull_10_1",
         "/FT": "/Tx",
+        "/TU": "10.1 Ordentliche Beiträge – Cotisations ordinaires – Contributi ordinari",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "10-1": {
-        "/T": "10-1",
+      "DezZahlNull_10_2": {
+        "/T": "DezZahlNull_10_2",
         "/FT": "/Tx",
+        "/TU": "10.2 Beiträge für den Einkauf – Cotisations pour le rachat – Contributi per il riscatto",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "10-2": {
-        "/T": "10-2",
+      "DezZahlNull_11": {
+        "/T": "DezZahlNull_11",
         "/FT": "/Tx",
+        "/TU": "11. Nettolohn / Rente – Salaire net / Rente – Salario netto / Rendita",
+        "/Ff": 8388608,
         "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
+          "/C": "{'/JS': 'event.value = Number(this.getField(\"DezZahlNull_8\").value) - Number(this.getField(\"DezZahlNull_9\").value) - Number(this.getField(\"DezZahlNull_10_1\").value) - Number(this.getField(\"DezZahlNull_10_2\").value); if (event.value == 0) { event.value = \\'\\' }', '/S': '/JavaScript'}",
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
         }
       },
-      "abzuege": {
-        "/T": "abzuege",
-        "/FT": "/Tx",
-        "/Ff": 4194305,
-        "/V": "0",
-        "/AA": {
-          "/C": "{'/JS': 'AFSimple_Calculate(\"SUM\", new Array (\"10-1\", \"10-2\", \"9\"));', '/S': '/JavaScript'}"
-        }
-      },
-      "11": {
-        "/T": "11",
-        "/FT": "/Tx",
-        "/Ff": 12582912,
-        "/V": "6550",
-        "/AA": {
-          "/C": "{'/JS': IndirectObject(54, 0, 1955110334688), '/S': '/JavaScript'}",
-          "/F": "{'/JS': 'AFNumber_Format(0, 1, 0, 0, \"\", false);', '/S': '/JavaScript'}",
-          "/K": "{'/JS': 'AFNumber_Keystroke(0, 1, 0, 0, \"\", false);', '/S': '/JavaScript'}"
-        }
-      },
-      "12": {
-        "/T": "12",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "13-1-1-2": {
-        "/T": "13-1-1-2",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "13-1-2-1": {
-        "/T": "13-1-2-1",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "13-1-2-2": {
-        "/T": "13-1-2-2",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "13-2-1-2": {
-        "/T": "13-2-1-2",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "13-2-2-2": {
-        "/T": "13-2-2-2",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "13-2-3-1": {
-        "/T": "13-2-3-1",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "13-2-3-2": {
-        "/T": "13-2-3-2",
-        "/FT": "/Tx",
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "13-3": {
-        "/T": "13-3",
-        "/FT": "/Tx",
-        "/Ff": 4194304,
-        "/AA": {
-          "/K": "{'/JS': 'if (event.change.match(/\\\\D+/g)) {\\r\\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\\r\\nevent.rc = false;\\r\\n}', '/S': '/JavaScript'}"
-        }
-      },
-      "14-1": {
-        "/T": "14-1",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "14-2": {
-        "/T": "14-2",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "15-1": {
-        "/T": "15-1",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "15-2": {
-        "/T": "15-2",
-        "/FT": "/Tx",
-        "/Ff": 4194304
-      },
-      "Unterschrift1": {
-        "/T": "Unterschrift1",
-        "/Kids": [
-          "{'/AP': {'/N': IndirectObject(229, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 65.3416, 567.781, 78.5771], '/Subtype': '/Widget', '/T': '0', '/Type': '/Annot'}",
-          "{'/AP': {'/N': IndirectObject(230, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 52.1063, 567.781, 65.3418], '/Subtype': '/Widget', '/T': '1', '/Type': '/Annot'}",
-          "{'/AP': {'/N': IndirectObject(231, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 38.8711, 567.781, 52.1066], '/Subtype': '/Widget', '/T': '2', '/Type': '/Annot'}",
-          "{'/AP': {'/N': IndirectObject(232, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 25.6359, 567.781, 38.8711], '/Subtype': '/Widget', '/T': '3', '/Type': '/Annot'}",
-          "{'/AP': {'/N': IndirectObject(233, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 12.4005, 567.781, 25.636], '/Subtype': '/Widget', '/T': '4', '/Type': '/Annot'}"
-        ]
-      },
-      "Unterschrift1.0": {
-        "/T": "0",
-        "/FT": "/Tx",
-        "/Parent": {
-          "/Kids": [
-            "{'/AP': {'/N': IndirectObject(229, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 65.3416, 567.781, 78.5771], '/Subtype': '/Widget', '/T': '0', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(230, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 52.1063, 567.781, 65.3418], '/Subtype': '/Widget', '/T': '1', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(231, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 38.8711, 567.781, 52.1066], '/Subtype': '/Widget', '/T': '2', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(232, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 25.6359, 567.781, 38.8711], '/Subtype': '/Widget', '/T': '3', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(233, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 12.4005, 567.781, 25.636], '/Subtype': '/Widget', '/T': '4', '/Type': '/Annot'}"
-          ],
-          "/T": "Unterschrift1"
-        },
-        "/Ff": 4194304
-      },
-      "Unterschrift1.1": {
-        "/T": "1",
-        "/FT": "/Tx",
-        "/Parent": {
-          "/Kids": [
-            "{'/AP': {'/N': IndirectObject(229, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 65.3416, 567.781, 78.5771], '/Subtype': '/Widget', '/T': '0', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(230, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 52.1063, 567.781, 65.3418], '/Subtype': '/Widget', '/T': '1', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(231, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 38.8711, 567.781, 52.1066], '/Subtype': '/Widget', '/T': '2', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(232, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 25.6359, 567.781, 38.8711], '/Subtype': '/Widget', '/T': '3', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(233, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 12.4005, 567.781, 25.636], '/Subtype': '/Widget', '/T': '4', '/Type': '/Annot'}"
-          ],
-          "/T": "Unterschrift1"
-        },
-        "/Ff": 4194304
-      },
-      "Unterschrift1.2": {
-        "/T": "2",
-        "/FT": "/Tx",
-        "/Parent": {
-          "/Kids": [
-            "{'/AP': {'/N': IndirectObject(229, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 65.3416, 567.781, 78.5771], '/Subtype': '/Widget', '/T': '0', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(230, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 52.1063, 567.781, 65.3418], '/Subtype': '/Widget', '/T': '1', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(231, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 38.8711, 567.781, 52.1066], '/Subtype': '/Widget', '/T': '2', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(232, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 25.6359, 567.781, 38.8711], '/Subtype': '/Widget', '/T': '3', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(233, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 12.4005, 567.781, 25.636], '/Subtype': '/Widget', '/T': '4', '/Type': '/Annot'}"
-          ],
-          "/T": "Unterschrift1"
-        },
-        "/Ff": 4194304
-      },
-      "Unterschrift1.3": {
-        "/T": "3",
-        "/FT": "/Tx",
-        "/Parent": {
-          "/Kids": [
-            "{'/AP': {'/N': IndirectObject(229, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 65.3416, 567.781, 78.5771], '/Subtype': '/Widget', '/T': '0', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(230, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 52.1063, 567.781, 65.3418], '/Subtype': '/Widget', '/T': '1', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(231, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 38.8711, 567.781, 52.1066], '/Subtype': '/Widget', '/T': '2', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(232, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 25.6359, 567.781, 38.8711], '/Subtype': '/Widget', '/T': '3', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(233, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 12.4005, 567.781, 25.636], '/Subtype': '/Widget', '/T': '4', '/Type': '/Annot'}"
-          ],
-          "/T": "Unterschrift1"
-        },
-        "/Ff": 4194304
-      },
-      "Unterschrift1.4": {
-        "/T": "4",
-        "/FT": "/Tx",
-        "/Parent": {
-          "/Kids": [
-            "{'/AP': {'/N': IndirectObject(229, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 65.3416, 567.781, 78.5771], '/Subtype': '/Widget', '/T': '0', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(230, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 52.1063, 567.781, 65.3418], '/Subtype': '/Widget', '/T': '1', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(231, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 38.8711, 567.781, 52.1066], '/Subtype': '/Widget', '/T': '2', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(232, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 25.6359, 567.781, 38.8711], '/Subtype': '/Widget', '/T': '3', '/Type': '/Annot'}",
-            "{'/AP': {'/N': IndirectObject(233, 0, 1955110334688)}, '/DA': '/Arial 10 Tf 0 g', '/F': 4, '/Ff': 4194304, '/FT': '/Tx', '/MK': {}, '/P': IndirectObject(17, 0, 1955110334688), '/Parent': IndirectObject(7, 0, 1955110334688), '/Rect': [409.77, 12.4005, 567.781, 25.636], '/Subtype': '/Widget', '/T': '4', '/Type': '/Annot'}"
-          ],
-          "/T": "Unterschrift1"
-        },
-        "/Ff": 4194304
-      },
-      "OrtDatum": {
-        "/T": "OrtDatum",
-        "/FT": "/Tx",
-        "/Ff": 4194304,
-        "/V": "Aarburg, 04.05.2026"
-      },
-      "A": {
-        "/T": "A",
+      "OptionKreuzOhneRahmen_13_1_1": {
+        "/T": "OptionKreuzOhneRahmen_13_1_1",
         "/FT": "/Btn",
-        "/V": "/Ja",
+        "/TU": "13.1.1 Reise, Verpflegung, Übernachtung – Voyage, repas, nuitées – Viaggio, vitto, alloggio",
+        "/Ff": 0,
         "/_States_": [
-          "/Ja",
+          "/Ja / Oui / Sì",
           "/Off"
         ]
       },
-      "B": {
-        "/T": "B",
+      "DezZahlNull_13_1_1": {
+        "/T": "DezZahlNull_13_1_1",
+        "/FT": "/Tx",
+        "/TU": "13.1.1 Reise, Verpflegung, Übernachtung – Voyage, repas, nuitées – Viaggio, vitto, alloggio",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
+      },
+      "TextLinks_13_1_2-Art": {
+        "/T": "TextLinks_13_1_2-Art",
+        "/FT": "/Tx",
+        "/TU": "13.1.2 Art – Genre – Genere",
+        "/Ff": 8388608
+      },
+      "DezZahlNull_13_1_2": {
+        "/T": "DezZahlNull_13_1_2",
+        "/FT": "/Tx",
+        "/TU": "13.1.2 Übrige – Autres – Altre",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
+      },
+      "TextLinks_14_1": {
+        "/T": "TextLinks_14_1",
+        "/FT": "/Tx",
+        "/TU": "14.1 Weitere Gehaltsnebenleistungen – Autres prestations salariales accessoires – Altre prestazioni accessorie al salario",
+        "/Ff": 8388608
+      },
+      "TextLinks_14_2": {
+        "/T": "TextLinks_14_2",
+        "/FT": "/Tx",
+        "/TU": "14.1 Weitere Gehaltsnebenleistungen – Autres prestations salariales accessoires – Altre prestazioni accessorie al salario",
+        "/Ff": 8388608
+      },
+      "TextLinks_15_1": {
+        "/T": "TextLinks_15_1",
+        "/FT": "/Tx",
+        "/TU": "15.1 Bemerkungen",
+        "/Ff": 8388608
+      },
+      "TextLinks_15_2": {
+        "/T": "TextLinks_15_2",
+        "/FT": "/Tx",
+        "/TU": "15.2 Bemerkungen",
+        "/Ff": 8388608
+      },
+      "TextLinks_3-Art": {
+        "/T": "TextLinks_3-Art",
+        "/FT": "/Tx",
+        "/TU": "3 Art – Genre – Genere",
+        "/Ff": 8388608
+      },
+      "DezZahlNull_3": {
+        "/T": "DezZahlNull_3",
+        "/FT": "/Tx",
+        "/TU": "3. Unregelmässige Leistungen – Prestations non périodiques – Prestazioni aperiodiche",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
+      },
+      "TextLinks_I": {
+        "/T": "TextLinks_I",
+        "/FT": "/Tx",
+        "/TU": "I Ort und Datum – Lieu et date – Luogo e data",
+        "/Ff": 8388608
+      },
+      "OptionKreuzOhneRahmen_G": {
+        "/T": "OptionKreuzOhneRahmen_G",
         "/FT": "/Btn",
+        "/TU": "G Kantinenverpflegung / Lunch-Checks – Repas à la cantine / chèques-repas – Pasti alla mensa / buoni pasto",
+        "/Ff": 0,
         "/_States_": [
-          "/Off",
-          "/Ja"
+          "/Ja / Oui / Sì ",
+          "/Off"
         ]
       },
-      "F": {
-        "/T": "F",
+      "TextLinks_E-von": {
+        "/T": "TextLinks_E-von",
+        "/FT": "/Tx",
+        "/TU": "E von – du – dal",
+        "/Ff": 8388608
+      },
+      "TextLinks_E-bis": {
+        "/T": "TextLinks_E-bis",
+        "/FT": "/Tx",
+        "/TU": "E bis – au – al ",
+        "/Ff": 8388608
+      },
+      "OptionKreuzOhneRahmen_B": {
+        "/T": "OptionKreuzOhneRahmen_B",
         "/FT": "/Btn",
+        "/TU": "B Rentenbescheinigung – Attestation de rentes – Attestazione delle rendite",
+        "/Ff": 0,
         "/_States_": [
-          "/Off",
-          "/Ja"
+          "/Ja / Oui / Sì",
+          "/Off"
         ]
       },
-      "G": {
-        "/T": "G",
-        "/FT": "/Btn",
-        "/_States_": [
-          "/Off",
-          "/Ja"
-        ]
+      "DezZahlNull_12": {
+        "/T": "DezZahlNull_12",
+        "/FT": "/Tx",
+        "/TU": "12. Quellensteuerabzug – Retenue de l’impôt à la source – Ritenuta d’imposta alla fonte",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
       },
-      "13-1-1-1": {
-        "/T": "13-1-1-1",
-        "/FT": "/Btn",
-        "/_States_": [
-          "/Off",
-          "/Ja"
-        ]
+      "DezZahlNull_13_3": {
+        "/T": "DezZahlNull_13_3",
+        "/FT": "/Tx",
+        "/TU": "F13.3 Beiträge an die Weiterbildung – Contributions au perfectionnement – Contributi per il perfezionamento",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
+      },
+      "TextMehrzeiligLinks_Bestaetigung": {
+        "/T": "TextMehrzeiligLinks_Bestaetigung",
+        "/FT": "/Tx",
+        "/TU": "Die Richtigkeit und Vollständigkeit bestätigt – Certifié exact et complet\r – Certificato esatto e completo\r",
+        "/Ff": 8392704
+      },
+      "DezZahlNull_13_2_1": {
+        "/T": "DezZahlNull_13_2_1",
+        "/FT": "/Tx",
+        "/TU": "13.2.1 Repräsentation – Représentation – Rappresentanza",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
+      },
+      "DezZahlNull_13_2_2": {
+        "/T": "DezZahlNull_13_2_2",
+        "/FT": "/Tx",
+        "/TU": "13.2.2 Auto – Voiture – Automobile",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
+      },
+      "TextLinks_13_2_3-Art": {
+        "/T": "TextLinks_13_2_3-Art",
+        "/FT": "/Tx",
+        "/TU": "F13.2.3 Art – Genre – Genere",
+        "/Ff": 8388608
+      },
+      "DezZahlNull_13_2_3": {
+        "/T": "DezZahlNull_13_2_3",
+        "/FT": "/Tx",
+        "/TU": "13.2.3 Übrige – Autres – Altre",
+        "/Ff": 8388608,
+        "/AA": {
+          "/F": "{'/JS': 'AFNumber_Format(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}",
+          "/K": "{'/JS': 'AFNumber_Keystroke(0, 4, 0, 0, \"\", true);', '/S': '/JavaScript'}"
+        }
       }
     },
     "widgets": [
       {
         "page": 0,
-        "object_id": 60,
-        "name": "C",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          58.5348,
-          775.477,
-          186.358,
-          790.292
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(134, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 61,
-        "name": "C2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          192.869003,
-          775.411011,
-          321.63501,
-          790.226013
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(135, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 62,
-        "name": "D",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "2026",
-        "rect": [
-          58.389198,
-          747.171997,
-          121.351997,
-          761.369019
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 63,
-        "name": "E-von",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "01.01.",
-        "rect": [
-          157.154999,
-          746.554993,
-          220.733994,
-          761.369019
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 64,
-        "name": "E-bis",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "31.08.",
-        "rect": [
-          231.227997,
-          746.554993,
-          294.19101,
-          761.369019
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 65,
-        "name": "HAnrede",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          301.104004,
-          695.031982,
-          558.848999,
-          709.700989
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 66,
-        "name": "HName",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "Anthony Ragu Devinsan",
-        "rect": [
-          301.104004,
-          678.187988,
-          558.848999,
-          692.857971
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 67,
-        "name": "HAdresse",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          301.104004,
-          660.544006,
-          558.848999,
-          675.213989
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 68,
-        "name": "HPostfach",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          301.104004,
-          644.010986,
-          558.848999,
-          658.68103
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 69,
-        "name": "HWohnort",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          301.104004,
-          626.840027,
-          558.848999,
-          641.51001
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 70,
-        "name": "1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "6550",
-        "rect": [
-          476.729004,
-          539.874023,
-          567.703979,
-          554.687988
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(136, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 71,
-        "name": "2-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          522.589,
-          567.704,
-          537.404
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(137, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 72,
-        "name": "2-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          505.922,
-          567.704,
-          520.738
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(138, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 73,
-        "name": "2-3-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          251.657,
-          488.639,
-          464.235,
-          503.453
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 74,
-        "name": "2-3-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          488.639,
-          567.704,
-          503.453
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(139, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 75,
-        "name": "3-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          57.2134,
-          454.689,
-          464.235,
-          469.504
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 76,
-        "name": "3-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          454.689,
-          567.704,
-          469.504
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(140, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 77,
-        "name": "4-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          275.272,
-          437.022,
-          464.235,
-          451.837
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 78,
-        "name": "4-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          438.022,
-          567.704,
-          452.837
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(141, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 79,
-        "name": "5",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729004,
-          420.739014,
-          567.703979,
-          435.553009
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(142, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 80,
-        "name": "6",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          404.072,
-          567.704,
-          418.887
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(143, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 81,
-        "name": "7-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          252.557,
-          386.788,
-          464.235,
-          401.603
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 82,
-        "name": "7-1-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          386.788,
-          567.704,
-          401.603
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(144, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 83,
-        "name": "8",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "6550",
-        "rect": [
-          476.729004,
-          368.837006,
-          567.703979,
-          383.653015
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/C': IndirectObject(145, 0, 1955110334688), '/F': IndirectObject(146, 0, 1955110334688), '/K': IndirectObject(147, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 84,
-        "name": "9",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729004,
-          351.553986,
-          567.703979,
-          366.368988
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(148, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 85,
-        "name": "10-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729004,
-          334.886993,
-          567.703979,
-          349.701996
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(149, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 86,
-        "name": "10-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          317.603,
-          567.704,
-          332.418
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(150, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 87,
-        "name": "abzuege",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "0",
-        "rect": [
-          324.434,
-          302.692,
-          416.262,
-          317.061
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/C': IndirectObject(151, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 88,
-        "name": "11",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "6550",
-        "rect": [
-          476.729004,
-          300.936005,
-          567.703979,
-          315.752014
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/C': IndirectObject(152, 0, 1955110334688), '/F': IndirectObject(153, 0, 1955110334688), '/K': IndirectObject(154, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 89,
-        "name": "12",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          274.986,
-          567.704,
-          289.801
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(155, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 90,
-        "name": "13-1-1-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729004,
-          241.037003,
-          567.703979,
-          255.850998
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(156, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 91,
-        "name": "13-1-2-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          245.816,
-          223.753,
-          463.397,
-          238.567
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 92,
-        "name": "13-1-2-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          223.753,
-          567.704,
-          238.567
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(157, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 93,
-        "name": "13-2-1-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729004,
-          207.085999,
-          567.703979,
-          221.901001
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(158, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 94,
-        "name": "13-2-2-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          189.802,
-          567.704,
-          204.617
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(159, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 95,
-        "name": "13-2-3-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          246.184,
-          172.254,
-          463.764,
-          187.068
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 96,
-        "name": "13-2-3-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          172.519,
-          567.704,
-          187.333
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(160, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 97,
-        "name": "13-3",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          476.729,
-          155.852,
-          567.704,
-          170.667
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "{'/K': IndirectObject(161, 0, 1955110334688)}",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 98,
-        "name": "14-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          214.031,
-          138.568,
-          567.704,
-          153.383
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 99,
-        "name": "14-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          214.399,
-          121.902,
-          567.704,
-          136.716
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 100,
-        "name": "15-1",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          109.384,
-          104.618,
-          567.704,
-          119.433
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 101,
-        "name": "15-2",
-        "type": "/Tx",
-        "parent": "None",
-        "value": null,
-        "rect": [
-          109.384,
-          87.9511,
-          567.704,
-          102.766
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 102,
-        "name": "0",
-        "type": "/Tx",
-        "parent": "{'/Kids': [IndirectObject(102, 0, 1955110334688), IndirectObject(104, 0, 1955110334688), IndirectObject(105, 0, 1955110334688), IndirectObject(106, 0, 1955110334688), IndirectObject(107, 0, 1955110334688)], '/T': 'Unterschrift1'}",
-        "value": null,
-        "rect": [
-          409.77,
-          65.3416,
-          567.781,
-          78.5771
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 103,
-        "name": "OrtDatum",
-        "type": "/Tx",
-        "parent": "None",
-        "value": "Aarburg, 04.05.2026",
-        "rect": [
-          57.469398,
-          47.3727,
-          215.253998,
-          60.9529
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 104,
-        "name": "1",
-        "type": "/Tx",
-        "parent": "{'/Kids': [IndirectObject(102, 0, 1955110334688), IndirectObject(104, 0, 1955110334688), IndirectObject(105, 0, 1955110334688), IndirectObject(106, 0, 1955110334688), IndirectObject(107, 0, 1955110334688)], '/T': 'Unterschrift1'}",
-        "value": null,
-        "rect": [
-          409.77,
-          52.1063,
-          567.781,
-          65.3418
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 105,
-        "name": "2",
-        "type": "/Tx",
-        "parent": "{'/Kids': [IndirectObject(102, 0, 1955110334688), IndirectObject(104, 0, 1955110334688), IndirectObject(105, 0, 1955110334688), IndirectObject(106, 0, 1955110334688), IndirectObject(107, 0, 1955110334688)], '/T': 'Unterschrift1'}",
-        "value": null,
-        "rect": [
-          409.77,
-          38.8711,
-          567.781,
-          52.1066
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 106,
-        "name": "3",
-        "type": "/Tx",
-        "parent": "{'/Kids': [IndirectObject(102, 0, 1955110334688), IndirectObject(104, 0, 1955110334688), IndirectObject(105, 0, 1955110334688), IndirectObject(106, 0, 1955110334688), IndirectObject(107, 0, 1955110334688)], '/T': 'Unterschrift1'}",
-        "value": null,
-        "rect": [
-          409.77,
-          25.6359,
-          567.781,
-          38.8711
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 107,
-        "name": "4",
-        "type": "/Tx",
-        "parent": "{'/Kids': [IndirectObject(102, 0, 1955110334688), IndirectObject(104, 0, 1955110334688), IndirectObject(105, 0, 1955110334688), IndirectObject(106, 0, 1955110334688), IndirectObject(107, 0, 1955110334688)], '/T': 'Unterschrift1'}",
-        "value": null,
-        "rect": [
-          409.77,
-          12.4005,
-          567.781,
-          25.636
-        ],
-        "tooltip": null,
-        "appearance_states": [],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 108,
-        "name": "A",
-        "type": "/Btn",
-        "parent": "None",
-        "value": "/Ja",
-        "rect": [
-          57.9476,
-          814.516,
-          85.9895,
-          828.736
-        ],
-        "tooltip": null,
-        "appearance_states": [
-          "/Ja"
-        ],
-        "actions": "",
-        "max_length": null
-      },
-      {
-        "page": 0,
-        "object_id": 109,
-        "name": "B",
+        "object_id": 374,
+        "name": "OptionKreuzOhneRahmen_F",
         "type": "/Btn",
         "parent": "None",
         "value": null,
         "rect": [
-          57.9476,
-          797.872,
-          85.9895,
-          811.673
+          354.331,
+          776.693,
+          382.677,
+          790.866
         ],
-        "tooltip": null,
+        "tooltip": "F Unentgeltliche Beförderung zwischen Wohn- und Arbeitsort / Transport gratuit entre le domicile et le lieu de travail / Trasporto gratuito dal domicilio al luogo di lavoro",
         "appearance_states": [
-          "/Off",
-          "/Ja"
+          "/Ja / Oui / Sì",
+          "/Off"
         ],
         "actions": "",
         "max_length": null
       },
       {
         "page": 0,
-        "object_id": 110,
-        "name": "F",
+        "object_id": 371,
+        "name": "AHVLinks_C",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          58.1102,
+          776.693,
+          185.669,
+          790.866
+        ],
+        "tooltip": "C AHV-Nr. – No AVS – N. AVS",
+        "appearance_states": [],
+        "actions": "{'/K': IndirectObject(373, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 365,
+        "name": "TextLinks_C-GebDatum",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          192.756,
+          776.693,
+          291.969,
+          790.866
+        ],
+        "tooltip": "C Geburtsdatum – Date de naissance – Data di nascita",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 369,
+        "name": "TextLinks_D",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          58.1102,
+          748.346,
+          120.472,
+          762.52
+        ],
+        "tooltip": "D Jahr – Année – Anno",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 273,
+        "name": "TextLinks_E-von",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          155.906,
+          748.346,
+          218.268,
+          762.52
+        ],
+        "tooltip": "E von – du – dal",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 271,
+        "name": "TextLinks_E-bis",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          229.606,
+          748.346,
+          291.969,
+          762.52
+        ],
+        "tooltip": "E bis – au – al ",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 275,
+        "name": "OptionKreuzOhneRahmen_G",
         "type": "/Btn",
         "parent": "None",
         "value": null,
         "rect": [
-          353.853,
-          775.415,
-          382.667,
-          790.032
+          354.331,
+          748.346,
+          382.677,
+          762.52
         ],
-        "tooltip": null,
+        "tooltip": "G Kantinenverpflegung / Lunch-Checks – Repas à la cantine / chèques-repas – Pasti alla mensa / buoni pasto",
         "appearance_states": [
-          "/Off",
-          "/Ja"
+          "/Ja / Oui / Sì ",
+          "/Off"
         ],
         "actions": "",
         "max_length": null
       },
       {
         "page": 0,
-        "object_id": 111,
-        "name": "G",
+        "object_id": 361,
+        "name": "DezZahlNull_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          538.583,
+          566.929,
+          552.756
+        ],
+        "tooltip": "1. Lohn/Rente – Salaire/Rente – Salario/Rendita",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(363, 0, 2238563941264), '/K': IndirectObject(364, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 357,
+        "name": "DezZahlNull_2_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          521.575,
+          566.929,
+          535.748
+        ],
+        "tooltip": "2.1 Verpflegung, Unterkunft – Pension, logement – Vitto, alloggio",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(359, 0, 2238563941264), '/K': IndirectObject(360, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 353,
+        "name": "DezZahlNull_2_2",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          504.567,
+          566.929,
+          518.74
+        ],
+        "tooltip": "2.2 Privatanteil Geschäftswagen – Part privée voiture de service – Quota privata automobile di servizio",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(355, 0, 2238563941264), '/K': IndirectObject(356, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 347,
+        "name": "DezZahlNull_2_3",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          487.559,
+          566.929,
+          501.732
+        ],
+        "tooltip": "2.3 Andere – Autres – Altre",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(349, 0, 2238563941264), '/K': IndirectObject(350, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 351,
+        "name": "TextLinks_2_3-Art",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          252.283,
+          487.559,
+          462.047,
+          501.732
+        ],
+        "tooltip": "2.3 Art – Genre – Genere",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 283,
+        "name": "TextLinks_3-Art",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          58.1102,
+          453.543,
+          462.047,
+          467.717
+        ],
+        "tooltip": "3 Art – Genre – Genere",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 279,
+        "name": "DezZahlNull_3",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          453.543,
+          566.929,
+          467.717
+        ],
+        "tooltip": "3. Unregelmässige Leistungen – Prestations non périodiques – Prestazioni aperiodiche",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(281, 0, 2238563941264), '/K': IndirectObject(282, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 345,
+        "name": "TextLinks_4-Art",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          274.961,
+          436.535,
+          462.047,
+          450.709
+        ],
+        "tooltip": "4. Art – Genre – Genere",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 341,
+        "name": "DezZahlNull_4",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          436.535,
+          566.929,
+          450.709
+        ],
+        "tooltip": "4. Kapitalleistungen – Prestations en capital – Prestazioni in capitale",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(343, 0, 2238563941264), '/K': IndirectObject(344, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 337,
+        "name": "DezZahlNull_5",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          419.528,
+          566.929,
+          433.701
+        ],
+        "tooltip": "5. Beteiligungsrechte gemäss Beiblatt – Droits de participation selon annexe – Diritti di partecipazione secondo allegato",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(339, 0, 2238563941264), '/K': IndirectObject(340, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 333,
+        "name": "DezZahlNull_6",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          402.52,
+          566.929,
+          416.693
+        ],
+        "tooltip": "6. Verwaltungsratsentschädigungen – Indemnités des membres de l’administration – Indennità dei membri di consigli d’amministrazione",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(335, 0, 2238563941264), '/K': IndirectObject(336, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 331,
+        "name": "TextLinks_7-Art",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          252.283,
+          385.512,
+          462.047,
+          399.685
+        ],
+        "tooltip": "7. Art – Genre – Genere",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 327,
+        "name": "DezZahlNull_7",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          385.512,
+          566.929,
+          399.685
+        ],
+        "tooltip": "7. Andere Leistungen – Autres prestations – Altre prestazioni",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(329, 0, 2238563941264), '/K': IndirectObject(330, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 322,
+        "name": "DezZahlNull_8",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          368.504,
+          566.929,
+          382.677
+        ],
+        "tooltip": "8. Bruttolohn total / Rente – Salaire brut total / Rente – Salario lordo totale / Rendita",
+        "appearance_states": [],
+        "actions": "{'/C': IndirectObject(324, 0, 2238563941264), '/F': IndirectObject(325, 0, 2238563941264), '/K': IndirectObject(326, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 318,
+        "name": "DezZahlNull_9",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          351.496,
+          566.929,
+          365.669
+        ],
+        "tooltip": "9. Beiträge AHV/IV/EO/ALV/NBUV – Cotisations AVS/AI/APG/AC/AANP – Contributi AVS/AI/IPG/AD/AINP",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(320, 0, 2238563941264), '/K': IndirectObject(321, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 314,
+        "name": "DezZahlNull_10_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          334.488,
+          566.929,
+          348.661
+        ],
+        "tooltip": "10.1 Ordentliche Beiträge – Cotisations ordinaires – Contributi ordinari",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(316, 0, 2238563941264), '/K': IndirectObject(317, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 310,
+        "name": "DezZahlNull_10_2",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          317.48,
+          566.929,
+          331.654
+        ],
+        "tooltip": "10.2 Beiträge für den Einkauf – Cotisations pour le rachat – Contributi per il riscatto",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(312, 0, 2238563941264), '/K': IndirectObject(313, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 305,
+        "name": "DezZahlNull_11",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          300.472,
+          566.929,
+          314.646
+        ],
+        "tooltip": "11. Nettolohn / Rente – Salaire net / Rente – Salario netto / Rendita",
+        "appearance_states": [],
+        "actions": "{'/C': IndirectObject(307, 0, 2238563941264), '/F': IndirectObject(308, 0, 2238563941264), '/K': IndirectObject(309, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 265,
+        "name": "DezZahlNull_12",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          274.961,
+          566.929,
+          289.134
+        ],
+        "tooltip": "12. Quellensteuerabzug – Retenue de l’impôt à la source – Ritenuta d’imposta alla fonte",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(267, 0, 2238563941264), '/K': IndirectObject(268, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 303,
+        "name": "OptionKreuzOhneRahmen_13_1_1",
         "type": "/Btn",
         "parent": "None",
         "value": null,
         "rect": [
-          354.25,
-          747.425,
-          383.063,
-          762.042
+          447.874,
+          240.945,
+          462.047,
+          255.118
         ],
-        "tooltip": null,
+        "tooltip": "13.1.1 Reise, Verpflegung, Übernachtung – Voyage, repas, nuitées – Viaggio, vitto, alloggio",
         "appearance_states": [
-          "/Off",
-          "/Ja"
+          "/Ja / Oui / Sì",
+          "/Off"
         ],
         "actions": "",
         "max_length": null
       },
       {
         "page": 0,
-        "object_id": 112,
-        "name": "13-1-1-1",
+        "object_id": 299,
+        "name": "DezZahlNull_13_1_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          240.945,
+          566.929,
+          255.118
+        ],
+        "tooltip": "13.1.1 Reise, Verpflegung, Übernachtung – Voyage, repas, nuitées – Viaggio, vitto, alloggio",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(301, 0, 2238563941264), '/K': IndirectObject(302, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 297,
+        "name": "TextLinks_13_1_2-Art",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          252.283,
+          223.937,
+          462.047,
+          238.11
+        ],
+        "tooltip": "13.1.2 Art – Genre – Genere",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 293,
+        "name": "DezZahlNull_13_1_2",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          223.937,
+          566.929,
+          238.11
+        ],
+        "tooltip": "13.1.2 Übrige – Autres – Altre",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(295, 0, 2238563941264), '/K': IndirectObject(296, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 255,
+        "name": "DezZahlNull_13_2_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          206.929,
+          566.929,
+          221.102
+        ],
+        "tooltip": "13.2.1 Repräsentation – Représentation – Rappresentanza",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(257, 0, 2238563941264), '/K': IndirectObject(258, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 251,
+        "name": "DezZahlNull_13_2_2",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          189.921,
+          566.929,
+          204.094
+        ],
+        "tooltip": "13.2.2 Auto – Voiture – Automobile",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(253, 0, 2238563941264), '/K': IndirectObject(254, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 249,
+        "name": "TextLinks_13_2_3-Art",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          252.283,
+          172.913,
+          462.047,
+          187.087
+        ],
+        "tooltip": "F13.2.3 Art – Genre – Genere",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 245,
+        "name": "DezZahlNull_13_2_3",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          172.913,
+          566.929,
+          187.087
+        ],
+        "tooltip": "13.2.3 Übrige – Autres – Altre",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(247, 0, 2238563941264), '/K': IndirectObject(248, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 261,
+        "name": "DezZahlNull_13_3",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          476.22,
+          155.906,
+          566.929,
+          170.079
+        ],
+        "tooltip": "F13.3 Beiträge an die Weiterbildung – Contributions au perfectionnement – Contributi per il perfezionamento",
+        "appearance_states": [],
+        "actions": "{'/F': IndirectObject(263, 0, 2238563941264), '/K': IndirectObject(264, 0, 2238563941264)}",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 291,
+        "name": "TextLinks_14_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          218.268,
+          138.898,
+          566.929,
+          153.071
+        ],
+        "tooltip": "14.1 Weitere Gehaltsnebenleistungen – Autres prestations salariales accessoires – Altre prestazioni accessorie al salario",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 289,
+        "name": "TextLinks_14_2",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          218.268,
+          121.89,
+          566.929,
+          136.063
+        ],
+        "tooltip": "14.1 Weitere Gehaltsnebenleistungen – Autres prestations salariales accessoires – Altre prestazioni accessorie al salario",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 287,
+        "name": "TextLinks_15_1",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          110.551,
+          104.882,
+          566.929,
+          119.055
+        ],
+        "tooltip": "15.1 Bemerkungen",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 285,
+        "name": "TextLinks_15_2",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          110.551,
+          87.874,
+          566.929,
+          102.047
+        ],
+        "tooltip": "15.2 Bemerkungen",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 277,
+        "name": "TextLinks_I",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          58.1102,
+          48.189,
+          218.268,
+          62.3622
+        ],
+        "tooltip": "I Ort und Datum – Lieu et date – Luogo e data",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 259,
+        "name": "TextMehrzeiligLinks_Bestaetigung",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          408.189,
+          14.1732,
+          566.929,
+          85.0394
+        ],
+        "tooltip": "Die Richtigkeit und Vollständigkeit bestätigt – Certifié exact et complet\r – Certificato esatto e completo\r",
+        "appearance_states": [],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 376,
+        "name": "OptionKreuzOhneRahmen_A",
         "type": "/Btn",
         "parent": "None",
         "value": null,
         "rect": [
-          449.922,
-          239.957,
-          463.047,
-          254.062
+          58.3937,
+          813.543,
+          86.7402,
+          827.717
         ],
-        "tooltip": null,
+        "tooltip": "A Lohnausweis – Certificat de salaire – Certificato di salario",
         "appearance_states": [
-          "/Off",
-          "/Ja"
+          "/Ja / Oui / Sì",
+          "/Off"
         ],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 269,
+        "name": "OptionKreuzOhneRahmen_B",
+        "type": "/Btn",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          58.3937,
+          796.535,
+          86.7402,
+          810.709
+        ],
+        "tooltip": "B Rentenbescheinigung – Attestation de rentes – Attestazione delle rendite",
+        "appearance_states": [
+          "/Ja / Oui / Sì",
+          "/Off"
+        ],
+        "actions": "",
+        "max_length": null
+      },
+      {
+        "page": 0,
+        "object_id": 367,
+        "name": "TextMehrzeiligLinks_Empfaenger",
+        "type": "/Tx",
+        "parent": "None",
+        "value": null,
+        "rect": [
+          298.638,
+          626.542,
+          552.756,
+          710.581
+        ],
+        "tooltip": "Empfängeradresse / adresse du destinataire / indirizzo del destinatario",
+        "appearance_states": [],
         "actions": "",
         "max_length": null
       }
     ],
     "text": [
-      "A\nB\nD E\nF\nG\nUnentgeltliche Beförderung zwischen Wohn- und Arbeitsort\nTransport gratuit entre le domicile et le lieu de travail\nTrasporto gratuito dal domicilio al luogo di lavoro\nKantinenverpflegung / Lunch-Checks\nRepas à la cantine / chèques-repas\nPasti alla mensa / buoni pasto\nC\nAHV-Nr. – No AVS – N. AVS\nLohnausweis – Certificat de salaire – Certificato di salario\nRentenbescheinigung – Attestation de rentes – Attestazione delle rendite\nJahr – Année – Anno von – du – dal bis – au – al\nBitte die Wegleitung beachten\nObserver s.v.p. la directive\nOsservare p.f. l’istruzioni\nH\nNur ganze Frankenbeträge\nQue des montants entiers\nUnicamente importi interi\n605.040.18N Form. 11 12.07 3‘000‘000\nNeue AHV-Nr. – Nouveau No AVS – Nuovo N. AVS\n 1. Lohn soweit nicht unter Ziffer 2–7 aufzuführen  / Rente \n Salaire qui ne concerne pas les chiffres 2 à 7 ci-dessous  / Rente\n Salario se non da indicare sotto cifre da 2 a 7 più sotto  / Rendita\n 2.  Gehaltsnebenleistungen  \nPrestations salariales accessoires  \nPrestazioni accessorie al salario  \n2.1 Verpflegung, Unterkunft – Pension, logement – Vitto, alloggio +\n2.2 Privatanteil Geschäftswagen – Part privée voiture de service – Quota privata automobile di servizio +\n2.3 Andere – Autres – Altre \n Art – Genre – Genere +\n 4. Kapitalleistungen – Prestations en capital – Prestazioni in capitale \n Art – Genre – Genere +\n 5. Beteiligungsrechte gemäss Beiblatt – Droits de participation selon annexe – Diritti di partecipazione secondo allegato +\n 6. Verwaltungsratsentschädigungen – Indemnités des membres de l’administration – Indennità dei membri di consigli d’amministrazione +\n 7. Andere Leistungen – Autres prestations – Altre prestazioni \n Art – Genre – Genere +\n 8. Bruttolohn total / Rente – Salaire brut total / Rente – Salario lordo totale / Rendita =\n 9. Beiträge AHV/IV/EO/ALV/NBUV – Cotisations AVS/AI/APG/AC/AANP – Contributi AVS/AI/IPG/AD/AINP –\n10.  Berufliche Vorsorge 2. Säule \nPrévoyance professionnelle  2e pilier \nPrevidenza professionale  2o pilastro\n10.1 Ordentliche Beiträge – Cotisations ordinaires – Contributi ordinari –\n10.2 Beiträge für den Einkauf – Cotisations pour le rachat – Contributi per il riscatto –\n11. Nettolohn / Rente – Salaire net / Rente – Salario netto / Rendita \t =\n In die Steuererklärung übertragen – A reporter sur la déclaration d’impôt – Da riportare nella dichiarazione d’imposta\n12. Quellensteuerabzug – Retenue de l’impôt à la source – Ritenuta d’imposta alla fonte\n13. Spesenvergütungen – Allocations pour frais – Indennità per spese\nNicht im Bruttolohn (gemäss Ziffer 8) enthalten – Non comprises dans le salaire brut (au chiffre 8) – Non comprese nel salario lordo (sotto cifra 8)\n13.1  Effektive Spesen \nFrais effectifs \nSpese effettive\n13.1.1 Reise, Verpflegung, Übernachtung – Voyage, repas, nuitées – Viaggio, vitto, alloggio\n13.1.2 Übrige – Autres – Altre \n Art – Genre – Genere\n13.2  Pauschalspesen \nFrais forfaitaires \nSpese forfettarie\n13.2.1 Repräsentation – Représentation – Rappresentanza\n13.2.2 Auto – Voiture – Automobile\n13.2.3 Übrige – Autres – Altre \n Art – Genre – Genere\n13.3 Beiträge an die Weiterbildung – Contributions au perfectionnement – Contributi per il perfezionamento\n14.  Weitere Gehaltsnebenleistungen  Art \nAutres prestations salariales accessoires  Genre \nAltre prestazioni accessorie al salario Genere\n \n \n15.  Bemerkungen \nObservations \nOsservazioni\n \n \n 3. Unregelmässige Leistungen – Prestations non périodiques – Prestazioni aperiodiche   Art – Genre – Genere\n+\nI Ort und Datum – Lieu et date – Luogo e data Die Richtigkeit und Vollständigkeit bestätigt\n  inkl. genauer Anschrift und Telefonnummer des Arbeitgebers\n  Certifié exact et complet\n  y.c. adresse et numéro de téléphone exacts de l’employeur\n  Certificato esatto e completo\n  compresi indirizzo e numero di telefono esatti del datore di lavoro"
+      "Lohnausweis – Certificat de salaire – Certificato di salario\nD E\nF\nG\nUnentgeltliche Beförderung zwischen Wohn- und Arbeitsort\nTransport gratuit entre le domicile et le lieu de travail\nTrasporto gratuito dal domicilio al luogo di lavoroAHV-Nr. – No AVS – N. AVS\nJahr – Année – Anno\nBitte die Wegleitung beachten\nObserver s.v.p. la directive\nOsservare p.f. l’istruzioni\nH \nNur ganze Frankenbeträge\nQue des montants entiers\nUnicamente importi interi\nGeburtsdatum  – Date de naissance  – Data di nascita\n 1. Lohn soweit nicht unter Ziffer 2–7 aufzuführen  /  Rente  \nSalaire qui ne concerne pas les chiffres 2 à 7 ci-dessous  /  Rente  \nSalario se non da indicare sotto cifre da 2 a 7 più sotto  /  Rendita \n2.1\t Verpflegung, \tUnterkunft\t–\tPension,\tl ogement  – Vitto,\ta lloggio   +  \n2.2 Privatanteil Geschäftsfahrzeug – Part privée voiture de service – Quota privata automobile di servizio   +  \n2.3 A ndere – Autres – Altre\n A rt – Genre – Genere   +  \n 4. K apitalleistungen – Prestations en capital  – Prestazioni in capitale\n A rt – Genre – Genere  + \n 5. B eteiligungsrechte gemäss Beiblatt – Droits de participation selon annexe  – Diritti di partecipazione secondo allegato  + \n 6. Verwaltungsratsentschädigungen – Indemnités des membres de l’administration – Indennità dei membri di consigli d’amministrazione + \n 7. A ndere Leistungen – Autres prestations – Altre prestazioni\n A rt – Genre – Genere  + \n 8. B ruttolohn total / Rente – Salaire brut total / Rente – Salario lordo totale / Rendita  = \n 9. B eiträge AHV/IV/EO/ALV/NBUV – Cotisations AVS/AI/APG/AC/AANP  – Contributi AVS/AI/IPG/AD/AINP  – \n10.1  O rdentliche Beiträge – Cotisations ordinaires – Contributi ordinari – \n10.2  B eiträge für den Einkauf – Cotisations pour le rachat – Contributi per il riscatto   – \n11. Nettolohn / Rente – Salaire net / Rente – Salario netto / Rendita    = \n I n die Steuererklärung übertragen – A reporter sur la déclaration d’impôt – Da riportare nella dichiarazione d’imposta  \n13.1.1\t Reise, \tVerpflegung,\tÜbernachtung\t–\tVoyage,\trepas,\tnuitées – Viaggio,\tv itto, \ta lloggio  \n13.1.2\t Übrige \t–\tAutres – Altre\n  A rt – Genre – Genere  \n14. W eitere Gehaltsnebenleistungen  Art  \nAutres prestations salariales accessoires  Genre  \nAltre prestazioni accessorie al salario  Genere  \n15.  Bemerkungen \nObservations \nOsservazioni  \n 3. U nregelmässige Leistungen – Prestations non périodiques  – Prestazioni aperiodiche  Art – Genre – Genere \n + \n I O rt und Datum – Lieu et date – Luogo e data \nForm. 11 dfi 605.040.18N 01.21\nKantinenverpflegung \t/\tL unch-Checks\nRepas à la cantine  /  c hèques-repas\nPasti alla mensa  /  b uoni pastovon – du – dal bis – au – al\nRentenbescheinigung – Attestation de rentes – Attestazione delle rendite\nA\nB\nC\n 2. Gehaltsnebenleistungen  \nPrestations salariales accessoires  \nPrestazioni accessorie al salario\n10.\t \tB erufliche \t Vorsorge\t 2. Säule \nPrévoyance professionnelle 2e pilier \nPrevidenza professionale  2o pilastro\n12. Q uellensteuerabzug – Retenue de l’impôt à la source – Ritenuta d’imposta alla fonte \n13. S pesenvergütungen – Allocations pour frais – Indennità per spese\n N icht im Bruttolohn (gemäss Ziffer 8) enthalten – Non comprises dans le salaire brut (au chiffre 8) – Non comprese nel salario lordo (sotto cifra 8)\n13.1  E ffektive Spesen  \n Frais effectifs  \n Spese effettive\n13.2  Pauschalspesen  \n Frais forfaitaires  \n Spese forfettarie\n13.3  B eiträge an die Weiterbildung – Contributions au perfectionnement  – Contributi per il perfezionamento \nDie Richtigkeit und Vollständigkeit bestätigt\ninkl. genauer Anschrift und Telefonnummer des Arbeitgebers\nCertifié\texact\tet\tcomplet\ny.c. adresse et numéro de téléphone exacts de l’employeur\nCertificato\tesatto\te\tcompleto\ncompresi indirizzo e numero di telefono esatti del datore di lavoro \n13.2.1 Re präsentation – Représentation – Rappresentanza \n13.2.2 A uto – Voiture – Automobile \n13.2.3 \t Übrige\t–\tAutres – Altre\n  A rt – Genre – Genere  "
     ],
     "field_actions": {
-      "C:/K": "AFSpecial_KeystrokeEx(\"999.99.999.999\");",
-      "C2:/K": "AFSpecial_KeystrokeEx(\"999.9999.9999.99\");",
-      "1:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "2-1:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "2-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "2-3-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "3-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "4-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "5:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "6:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "7-1-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "8:/C": "var a= AFMakeNumber(this.getField(\"1\").value);\r\nvar b = AFMakeNumber(this.getField(\"2-1\").value);\r\nvar c = AFMakeNumber(this.getField(\"2-2\").value);\r\nvar d = AFMakeNumber(this.getField(\"2-3-2\").value);\r\nvar e = AFMakeNumber(this.getField(\"3-2\").value);\r\nvar f = AFMakeNumber(this.getField(\"4-2\").value);\r\nvar g = AFMakeNumber(this.getField(\"5\").value);\r\nvar h = AFMakeNumber(this.getField(\"6\").value);\r\nvar i = AFMakeNumber(this.getField(\"7-1-2\").value);\r\n\r\nvar prod=a+b+c+d+e+f+g+h+i\r\n\r\nif (prod != 0){\r\nevent.value = a+b+c+d+e+f+g+h+i\r\n}\r\nelse{\r\nevent.value = \"\"\r\n}\r\n",
-      "8:/F": "AFNumber_Format(0, 1, 0, 0, \"\", false);",
-      "8:/K": "AFNumber_Keystroke(0, 1, 0, 0, \"\", false);",
-      "9:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "10-1:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "10-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "abzuege:/C": "AFSimple_Calculate(\"SUM\", new Array (\"10-1\", \"10-2\", \"9\"));",
-      "11:/C": "var a= AFMakeNumber(this.getField(\"1\").value);\r\nvar b = AFMakeNumber(this.getField(\"2-1\").value);\r\nvar c = AFMakeNumber(this.getField(\"2-2\").value);\r\nvar d = AFMakeNumber(this.getField(\"2-3-2\").value);\r\nvar e = AFMakeNumber(this.getField(\"3-2\").value);\r\nvar f = AFMakeNumber(this.getField(\"4-2\").value);\r\nvar g = AFMakeNumber(this.getField(\"5\").value);\r\nvar h = AFMakeNumber(this.getField(\"6\").value);\r\nvar i = AFMakeNumber(this.getField(\"7-1-2\").value);\r\nvar k = AFMakeNumber(this.getField(\"abzuege\").value);\r\n\r\nvar prod=a+b+c+d+e+f+g+h+i-k\r\n\r\nif (prod != 0){\r\nevent.value = a+b+c+d+e+f+g+h+i-k\r\n}\r\nelse{\r\nevent.value = \"\"\r\n}\r\n",
-      "11:/F": "AFNumber_Format(0, 1, 0, 0, \"\", false);",
-      "11:/K": "AFNumber_Keystroke(0, 1, 0, 0, \"\", false);",
-      "12:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "13-1-1-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "13-1-2-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "13-2-1-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "13-2-2-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "13-2-3-2:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}",
-      "13-3:/K": "if (event.change.match(/\\D+/g)) {\r\n//nur wenn hinweis erwünscht app.alert(\"Bitte nur Ziffern eingeben.\");\r\nevent.rc = false;\r\n}"
+      "AHVLinks_C:/K": "AFSpecial_KeystrokeEx(\"999.9999.9999.99\");",
+      "DezZahlNull_1:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_1:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_2_1:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_2_1:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_2_2:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_2_2:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_2_3:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_2_3:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_4:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_4:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_5:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_5:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_6:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_6:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_7:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_7:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_8:/C": "event.value = Number(this.getField(\"DezZahlNull_1\").value) + Number(this.getField(\"DezZahlNull_2_1\").value) + Number(this.getField(\"DezZahlNull_2_2\").value) + Number(this.getField(\"DezZahlNull_2_3\").value) + Number(this.getField(\"DezZahlNull_3\").value) + Number(this.getField(\"DezZahlNull_4\").value) + Number(this.getField(\"DezZahlNull_5\").value) + Number(this.getField(\"DezZahlNull_6\").value) + Number(this.getField(\"DezZahlNull_7\").value); if (event.value == 0) { event.value = '' }",
+      "DezZahlNull_8:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_8:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_9:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_9:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_10_1:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_10_1:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_10_2:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_10_2:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_11:/C": "event.value = Number(this.getField(\"DezZahlNull_8\").value) - Number(this.getField(\"DezZahlNull_9\").value) - Number(this.getField(\"DezZahlNull_10_1\").value) - Number(this.getField(\"DezZahlNull_10_2\").value); if (event.value == 0) { event.value = '' }",
+      "DezZahlNull_11:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_11:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_1_1:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_1_1:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_1_2:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_1_2:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_3:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_3:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_12:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_12:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_3:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_3:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_2_1:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_2_1:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_2_2:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_2_2:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_2_3:/F": "AFNumber_Format(0, 4, 0, 0, \"\", true);",
+      "DezZahlNull_13_2_3:/K": "AFNumber_Keystroke(0, 4, 0, 0, \"\", true);"
     }
   }
 }

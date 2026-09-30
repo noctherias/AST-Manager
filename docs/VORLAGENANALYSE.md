@@ -67,28 +67,25 @@ Die App verwendet native Tabellen und paginierte A4-Querformatberichte mit wiede
 
 ## Lohnausweis-PDF
 
-Eine Seite, 54 Einträge im AcroForm-Feldbaum, davon **53 tatsächliche Formularfelder/Widgets** und ein Gruppenknoten `Unterschrift1` mit fünf Kindern. Widget-Identität und kanonischer Feldbaum stimmen überein; es gibt keine wiederanzuhängenden verwaisten Formularfelder. Eine Wiederherstellung mit `reattach_fields()` ist somit nicht erforderlich.
+Die aktuelle offizielle ESTV-Vorlage hat eine Seite und 44 Formularfelder. Die App ordnet ihre verständlichen internen Feldnamen beim Export den offiziellen Feldnamen zu und bettet die erzeugten Darstellungen fest in die PDF-Seite ein.
 
 | Funktion | PDF-Felder |
 |---|---|
-| Art, AHV, Jahr, Zeitraum | A, B, C, C2, D, E-von, E-bis |
-| Beförderung / Verpflegung | F, G |
-| Adresse | HAnrede, HName, HAdresse, HPostfach, HWohnort |
-| Lohn und Nebenleistungen | 1, 2-1, 2-2, 2-3-1, 2-3-2, 3-1, 3-2, 4-1, 4-2, 5, 6, 7-1, 7-1-2 |
-| Brutto und Abzüge | 8, 9, 10-1, 10-2, abzuege, 11, 12 |
-| Spesen und Weiterbildung | 13-1-1-1, 13-1-1-2, 13-1-2-1, 13-1-2-2, 13-2-1-2, 13-2-2-2, 13-2-3-1, 13-2-3-2, 13-3 |
-| Weitere Angaben | 14-1, 14-2, 15-1, 15-2 |
-| Aussteller | OrtDatum, Unterschrift1.0 bis Unterschrift1.4 |
+| Art, AHV, Geburtsdatum, Jahr, Zeitraum | `OptionKreuzOhneRahmen_A/B`, `AHVLinks_C`, `TextLinks_C-GebDatum`, `TextLinks_D`, `TextLinks_E-von/bis` |
+| Beförderung / Verpflegung | `OptionKreuzOhneRahmen_F/G` |
+| Adresse | `TextMehrzeiligLinks_Empfaenger` |
+| Lohn, Abzüge und Spesen | `DezZahlNull_1` bis `DezZahlNull_13_3` sowie die zugehörigen Art-Felder |
+| Weitere Angaben | `TextLinks_14_1/14_2/15_1/15_2` |
+| Ort, Datum und Aussteller | `TextLinks_I`, `TextMehrzeiligLinks_Bestaetigung` |
 
-Die drei Berechnungsskripte in der PDF wurden gelesen und separat im Inventar dokumentiert:
+Die Summen werden unabhängig vom PDF-Viewer in Python berechnet:
 
 - `8 = 1 + 2-1 + 2-2 + 2-3-2 + 3-2 + 4-2 + 5 + 6 + 7-1-2`.
-- `abzuege = 9 + 10-1 + 10-2`.
 - `11 = 8 − abzuege`.
 
 Bei Null zeigen Brutto und Netto im Original eine leere Zeichenfolge; diese Darstellung ist übernommen. Die App verwendet ganze Franken, wie auf der Vorlage verlangt. Die JavaScript-Eingabehilfen werden nicht zur Laufzeit ausgeführt: die Masken übernehmen numerische Eingabe und die Berechnungen laufen in Python. Die PDF-Aktionen werden aus der Ausgabe entfernt, damit keine vom Viewer abhängige Neuberechnung entsteht.
 
-Die Originaldatei ist bereits mit Beispieldaten ausgefüllt. Vor jedem Export setzt die App **alle** tatsächlichen Formularfelder zurück, schreibt den gespeicherten Ausweis und berechnet die drei Summen neu. A/B und andere Checkboxen verwenden die vorhandenen Zustände `/Ja` und `/Off`. Beim Export werden Werte sowohl im Feldbaum als auch an den Widgets geprüft, einschliesslich nichtleerer Appearance-Streams. Zu lange Texte werden in einem lesbaren Bereich verkleinert oder mit konkretem Feldhinweis abgewiesen. Die Vorlage bleibt unverändert.
+Vor jedem Export setzt die App alle tatsächlichen Formularfelder zurück, schreibt den gespeicherten Ausweis und berechnet die Summen neu. Checkbox-Zustände werden direkt aus der jeweiligen offiziellen Felddefinition gelesen. Anschliessend werden die Formularansichten sichtbar in die Seite eingebettet und die interaktiven Widgets entfernt, damit Vorschau, Druck und Archiv dieselben Angaben zeigen.
 
 ## Nachweis
 

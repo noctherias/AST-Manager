@@ -6,7 +6,8 @@ import sys
 
 target = Path(sys.argv[1])
 target.mkdir(parents=True, exist_ok=True)
-for name in ["PySide6", "PySide6_Essentials", "PySide6_Addons", "shiboken6", "pypdf", "reportlab", "Pillow", "pyinstaller", "charset-normalizer"]:
+for name in ["PySide6", "PySide6_Essentials", "PySide6_Addons", "shiboken6", "pypdf", "reportlab", "Pillow",
+             "openpyxl", "et-xmlfile", "pyinstaller", "charset-normalizer"]:
     dist = distribution(name)
     folder = target / name
     folder.mkdir(exist_ok=True)

@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from ast_app.database import Database
+from ast_app.backups import run_automatic_backups
 
 
 class DatabaseTests(unittest.TestCase):
@@ -72,6 +73,19 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(self.db.invoices()[0]["valuta"], "2026-01-31")
         self.assertEqual(sum(p["amount"] for p in self.db.payments(invoice)), 10000)
 
+    def test_invoice_reminder_levels(self):
+        customer = self.db.save_customer({"name": "Mahnkunde AG"})
+        invoice = self.db.save_invoice({"number": "M-1", "customer_id": customer, "issued": "2026-01-01",
+                                        "due": "2026-01-31", "amount": 10000, "note": ""})
+        self.db.set_reminder(invoice, 2, "2026-02-15")
+        row = next(r for r in self.db.invoices() if r["id"] == invoice)
+        self.assertEqual((row["reminder_level"], row["reminder_date"]), (2, "2026-02-15"))
+        self.db.set_reminder(invoice, 0)
+        row = next(r for r in self.db.invoices() if r["id"] == invoice)
+        self.assertEqual((row["reminder_level"], row["reminder_date"]), (0, ""))
+        with self.assertRaises(ValueError):
+            self.db.set_reminder(invoice, 4, "2026-02-15")
+
     def test_backup_restore_validation(self):
         self.period(2024)
         backup = Path(self.temp.name) / "backup.sqlite3"
@@ -83,6 +97,20 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(self.db.conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(self.db.conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
         with self.assertRaises(ValueError): self.db.backup(self.path)
+
+    def test_automatic_external_backup_and_safe_retention(self):
+        external = Path(self.temp.name) / "external"
+        external.mkdir()
+        keep = external / "anderer-name.sqlite3"
+        keep.write_text("nicht von AST", encoding="utf-8")
+        old = external / "AST-Auto-2026-01-01.sqlite3"
+        old.write_text("alt", encoding="utf-8")
+        made = run_automatic_backups(self.db, Path(self.temp.name) / "local", external, 30,
+                                     __import__("datetime").date(2026, 9, 30))
+        self.assertTrue((external / "AST-Auto-2026-09-30.sqlite3").exists())
+        self.assertFalse(old.exists())
+        self.assertTrue(keep.exists())
+        self.assertEqual(len(made), 2)
 
     def test_salary_snapshot_and_year_constraint(self):
         fields = {"A": "/Ja", "B": "/Off", "HName": "Test Person", "1": "50000", "9": "4000"}
@@ -106,6 +134,18 @@ class DatabaseTests(unittest.TestCase):
         self.db.close()
         self.db = Database(self.path)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["note"], "Test")
+
+    def test_bulk_time_records_skip_or_overwrite_existing_days(self):
+        base = {"employee_id": self.person, "start_1": 450, "end_1": 720,
+                "start_2": 780, "end_2": 1020, "break_minutes": 0, "code": "", "note": "Serie"}
+        records = [{**base, "day": f"2026-01-0{day}"} for day in (5, 6, 7)]
+        first = self.db.save_time_records(records)
+        self.assertEqual(first, {"created": 3, "updated": 0, "skipped": 0})
+        second = self.db.save_time_records([{**records[0], "note": "Neu"}], overwrite=False)
+        self.assertEqual(second["skipped"], 1)
+        third = self.db.save_time_records([{**records[0], "note": "Neu"}], overwrite=True)
+        self.assertEqual(third["updated"], 1)
+        self.assertEqual(self.db.time_records(self.person, 2026)[2]["note"], "Neu")
 
 
 if __name__ == "__main__": unittest.main()

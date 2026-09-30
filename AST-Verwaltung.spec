@@ -10,7 +10,7 @@ a = Analysis([str(root / 'main.py')], pathex=[str(root)],
                                   (str(root / 'THIRD_PARTY_NOTICES.md'), '.'),
                                   (str(root / 'release_config.json'), '.')],
              hiddenimports=[], hookspath=[], hooksconfig={}, runtime_hooks=[],
-             excludes=['tkinter','matplotlib','pandas','numpy','openpyxl','PySide6.QtWebEngineCore',
+             excludes=['tkinter','matplotlib','pandas','numpy','PySide6.QtWebEngineCore',
                        'PySide6.QtWebEngineWidgets','PySide6.QtQml','PySide6.QtQuick'], noarchive=False)
 # Qt 6.11 uses the Windows system ICU API (unversioned symbols). Do not bundle
 # unrelated ICU DLLs picked up from tools such as Poppler on the build PATH.

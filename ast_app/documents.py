@@ -12,10 +12,36 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
 from .domain import KINDS, chf, number, display_date, salary_totals
+
+
+OFFICIAL_SALARY_FIELDS = {
+    "A": "OptionKreuzOhneRahmen_A", "B": "OptionKreuzOhneRahmen_B",
+    "F": "OptionKreuzOhneRahmen_F", "G": "OptionKreuzOhneRahmen_G",
+    "13-1-1-1": "OptionKreuzOhneRahmen_13_1_1", "D": "TextLinks_D",
+    "E-von": "TextLinks_E-von", "E-bis": "TextLinks_E-bis",
+    "2-3-1": "TextLinks_2_3-Art", "3-1": "TextLinks_3-Art",
+    "4-1": "TextLinks_4-Art", "7-1": "TextLinks_7-Art",
+    "13-1-2-1": "TextLinks_13_1_2-Art", "13-2-3-1": "TextLinks_13_2_3-Art",
+    "14-1": "TextLinks_14_1", "14-2": "TextLinks_14_2",
+    "15-1": "TextLinks_15_1", "15-2": "TextLinks_15_2",
+    "OrtDatum": "TextLinks_I", "1": "DezZahlNull_1", "2-1": "DezZahlNull_2_1",
+    "2-2": "DezZahlNull_2_2", "2-3-2": "DezZahlNull_2_3", "3-2": "DezZahlNull_3",
+    "4-2": "DezZahlNull_4", "5": "DezZahlNull_5", "6": "DezZahlNull_6",
+    "7-1-2": "DezZahlNull_7", "8": "DezZahlNull_8", "9": "DezZahlNull_9",
+    "10-1": "DezZahlNull_10_1", "10-2": "DezZahlNull_10_2", "11": "DezZahlNull_11",
+    "12": "DezZahlNull_12", "13-1-1-2": "DezZahlNull_13_1_1",
+    "13-1-2-2": "DezZahlNull_13_1_2", "13-2-1-2": "DezZahlNull_13_2_1",
+    "13-2-2-2": "DezZahlNull_13_2_2", "13-2-3-2": "DezZahlNull_13_2_3",
+    "13-3": "DezZahlNull_13_3",
+}
+LEGACY_SALARY_FIELDS = set(OFFICIAL_SALARY_FIELDS) | {
+    "C", "C2", "CGebDatum", "HAnrede", "HName", "HAdresse", "HPostfach", "HWohnort",
+    "Unterschrift1.0", "Unterschrift1.1", "Unterschrift1.2", "Unterschrift1.3",
+    "Unterschrift1.4", "abzuege",
+}
 
 
 def resource_path(name):
@@ -71,21 +97,44 @@ def _flatten_form_appearances(writer):
             )
 
 
+def _official_salary_values(fields, definitions):
+    unknown = set(fields) - LEGACY_SALARY_FIELDS
+    if unknown:
+        raise ValueError("Unbekannte PDF-Felder: " + ", ".join(sorted(unknown)))
+    legacy = {key: "" for key in LEGACY_SALARY_FIELDS}
+    legacy.update({"A": "/Off", "B": "/Off", "F": "/Off", "G": "/Off", "13-1-1-1": "/Off"})
+    legacy.update({key: str(value) for key, value in fields.items()})
+    legacy.update(salary_totals(legacy))
+    values = {name: "/Off" if definition.get("/FT") == "/Btn" else ""
+              for name, definition in definitions.items() if definition.get("/FT")}
+    for source, target in OFFICIAL_SALARY_FIELDS.items():
+        values[target] = legacy.get(source, "")
+    values["AHVLinks_C"] = legacy.get("C2") or legacy.get("C", "")
+    values["TextLinks_C-GebDatum"] = legacy.get("CGebDatum", "")
+    values["TextMehrzeiligLinks_Empfaenger"] = "\n".join(filter(None, (
+        legacy.get("HAnrede"), legacy.get("HName"), legacy.get("HAdresse"),
+        legacy.get("HPostfach"), legacy.get("HWohnort"),
+    )))
+    values["TextMehrzeiligLinks_Bestaetigung"] = "\n".join(filter(None, (
+        legacy.get(f"Unterschrift1.{index}", "") for index in range(5)
+    )))
+    for name, definition in definitions.items():
+        if definition.get("/FT") != "/Btn":
+            continue
+        if values.get(name) == "/Ja":
+            values[name] = next((state for state in definition.get("/_States_", []) if state != "/Off"), "/Off")
+        else:
+            values[name] = "/Off"
+    return legacy, values
+
+
 def salary_pdf(fields, destination, template=None):
     source = Path(template) if template else resource_path("templates/Vorlage_Lohnausweis.pdf")
     reader = PdfReader(source)
     writer = PdfWriter()
     writer.clone_document_from_reader(reader)
     definitions = writer.get_fields() or {}
-    # Each original widget is in the canonical field tree (verified in tests).
-    # Reset ALL original sample values, including hidden values and checkboxes.
-    values = {name: "/Off" if field.get("/FT") == "/Btn" else ""
-              for name, field in definitions.items() if field.get("/FT")}
-    unknown = set(fields) - set(values)
-    if unknown:
-        raise ValueError("Unbekannte PDF-Felder: " + ", ".join(sorted(unknown)))
-    values.update({k: str(v) for k, v in fields.items()})
-    values.update(salary_totals(values))
+    _legacy_values, values = _official_salary_values(fields, definitions)
     # Python owns calculations. Remove legacy Acrobat scripts, whose recalculation
     # otherwise depends on the viewer; totals stay read-only in the exported form.
     form = writer.root_object["/AcroForm"]
@@ -94,24 +143,13 @@ def salary_pdf(fields, destination, template=None):
         for ref in page.get("/Annots", []):
             widget = ref.get_object()
             widget.pop(NameObject("/AA"), None)
-            if field_name(widget) in ("8", "11", "abzuege"):
+            if field_name(widget) in ("DezZahlNull_8", "DezZahlNull_11"):
                 widget[NameObject("/Ff")] = NumberObject(int(widget.get("/Ff", 0)) | 1)
-    formatted = dict(values)
-    for page in writer.pages:
-        for ref in page.get("/Annots", []):
-            widget = ref.get_object()
-            name = field_name(widget)
-            if name in values and widget.get("/FT") == "/Tx" and values[name]:
-                width = float(widget["/Rect"][2]) - float(widget["/Rect"][0]) - 5
-                size = min(10.0, 10 * width / max(stringWidth(values[name], "Helvetica", 10), 1))
-                if size < 6:
-                    raise ValueError(f"Text für PDF-Feld {name} ist zu lang. Bitte kürzen oder auf Fortsetzungszeilen verteilen.")
-                formatted[name] = (values[name], "/Arial", size)
     # Qt's PDF renderer (used by the in-app preview) does not paint AcroForm
     # widgets. Paint the generated appearances into the page content so the
     # completed certificate looks identical in the preview, browser, printout
     # and archived PDF.
-    writer.update_page_form_field_values(None, formatted, auto_regenerate=False)
+    writer.update_page_form_field_values(None, values, auto_regenerate=False)
     _flatten_form_appearances(writer)
     writer.remove_annotations(subtypes="/Widget")
     writer.root_object.pop(NameObject("/AcroForm"), None)

@@ -14,8 +14,10 @@ from PySide6.QtPdfWidgets import QPdfView
 
 from .domain import KINDS, number, chf, display_date
 from .widgets import Page, Table, label, button, combo, line, guarded, confirm
-from .dialogs import CustomerDialog, EmployeeDialog, InvoiceDialog, PaymentDialog, PeriodDialog, EntryDialog, SalaryDialog
+from .dialogs import CustomerDialog, EmployeeDialog, InvoiceDialog, PaymentDialog, ReminderDialog, PeriodDialog, EntryDialog, SalaryDialog
 from .documents import salary_pdf, csv_export, report_pdf, time_report
+from .backups import run_automatic_backups
+from .excel_import import import_debtors
 
 
 def save_path(parent, title, name, extension="pdf"):
@@ -156,6 +158,7 @@ class Receivables(Page):
         super().__init__("Debitoren", "Rechnungen, Teilzahlungen und offene Beträge.")
         self.db = db
         self.header.addWidget(button("+ Neue Rechnung", self.new, True))
+        self.header.addWidget(button("Excel importieren", self.import_excel))
         self.cards = self.metrics([("Rechnungsbetrag", "Aktuelle Auswahl"), ("Bezahlt", "Summe der Zahlungen"), ("Offen", "Rechnung minus bezahlt", True)])
         row = self.toolbar()
         self.search = line(placeholder="Rechnung oder Kunde suchen …")
@@ -169,7 +172,7 @@ class Receivables(Page):
         for w in (self.status, self.year, self.quarter):
             w.currentIndexChanged.connect(self.filter_rows)
         self.search.textChanged.connect(self.filter_rows)
-        self.table = Table(["Rechnung", "Kunde", "Datum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Status"])
+        self.table = Table(["Rechnung", "Kunde", "Datum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Mahnstufe", "Status"])
         self.table.horizontalHeader().setMinimumSectionSize(65)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -179,8 +182,9 @@ class Receivables(Page):
         row = self.toolbar()
         self.edit_btn = button("Bearbeiten", self.edit)
         self.pay_btn = button("Zahlungen", self.pay, True)
+        self.reminder_btn = button("Mahnstufe", self.reminder)
         self.delete_btn = button("Löschen", self.remove)
-        for b in (self.edit_btn, self.pay_btn, self.delete_btn): row.addWidget(b)
+        for b in (self.edit_btn, self.pay_btn, self.reminder_btn, self.delete_btn): row.addWidget(b)
         row.addStretch()
         row.addWidget(button("CSV exportieren", self.export_csv))
         row.addWidget(button("PDF / Drucken", self.export_pdf))
@@ -212,7 +216,7 @@ class Receivables(Page):
             if status not in ("Alle Status", "Alle offenen") and r["status"] != status: continue
             rows.append(r)
         self.filtered = rows
-        self.table.populate([[r["number"], r["customer"], display_date(r["issued"]), display_date(r["due"]), display_date(r["valuta"]), number(r["amount"]), number(r["paid"]), number(r["open"]), r["status"]] for r in rows], [r["id"] for r in rows], [5, 6, 7])
+        self.table.populate([[r["number"], r["customer"], display_date(r["issued"]), display_date(r["due"]), display_date(r["valuta"]), number(r["amount"]), number(r["paid"]), number(r["open"]), self.reminder_text(r), r["status"]] for r in rows], [r["id"] for r in rows], [5, 6, 7])
         for card, key in zip(self.cards, ("amount", "paid", "open")):
             card.set(chf(sum(r[key] for r in rows)))
         self.summary.setText(f"{len(rows)} Rechnungen · Zeitraumfilter nach Rechnungsdatum · Valuta = letzte Zahlung" if rows else "Keine Rechnungen für diese Auswahl. Mit «Neue Rechnung» starten.")
@@ -220,13 +224,26 @@ class Receivables(Page):
 
     def selection(self):
         enabled = self.table.selected_id() is not None
-        for b in (self.edit_btn, self.pay_btn, self.delete_btn): b.setEnabled(enabled)
+        for b in (self.edit_btn, self.pay_btn, self.reminder_btn, self.delete_btn): b.setEnabled(enabled)
 
     def selected(self):
         return next((r for r in self.filtered if r["id"] == self.table.selected_id()), None)
 
     def new(self):
         if InvoiceDialog(self, self.db).exec(): self.refresh()
+
+    @guarded
+    def import_excel(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Debitoren aus Excel importieren", "",
+                                              "Excel-Dateien (*.xlsx *.xlsm)")
+        if not path:
+            return
+        result = import_debtors(self.db, path)
+        self.refresh()
+        details = f"{result['imported']} Rechnungen und {result['payments']} Zahlungen importiert. {result['skipped']} Duplikate ausgelassen."
+        if result["errors"]:
+            details += f"\n{len(result['errors'])} Zeilen konnten nicht übernommen werden.\n" + "\n".join(result["errors"][:3])
+        QMessageBox.information(self, "Excel-Import abgeschlossen", details)
 
     def edit(self):
         r = self.selected()
@@ -238,6 +255,16 @@ class Receivables(Page):
             PaymentDialog(self, self.db, r).exec()
             self.refresh()
 
+    @staticmethod
+    def reminder_text(invoice):
+        level = invoice.get("reminder_level", 0)
+        return "–" if not level else f"Stufe {level} · {display_date(invoice.get('reminder_date'))}"
+
+    def reminder(self):
+        invoice = self.selected()
+        if invoice and ReminderDialog(self, self.db, invoice).exec():
+            self.refresh()
+
     @guarded
     def remove(self):
         r = self.selected()
@@ -246,13 +273,13 @@ class Receivables(Page):
             self.refresh()
 
     def export_rows(self):
-        return [[r["number"], r["customer"], display_date(r["issued"]), display_date(r["due"]), display_date(r["valuta"]), number(r["amount"]), number(r["paid"]), number(r["open"]), r["status"]] for r in self.filtered]
+        return [[r["number"], r["customer"], display_date(r["issued"]), display_date(r["due"]), display_date(r["valuta"]), number(r["amount"]), number(r["paid"]), number(r["open"]), self.reminder_text(r), r["status"]] for r in self.filtered]
 
     @guarded
     def export_csv(self):
         path = save_path(self, "Debitoren exportieren", "Debitoren.csv", "csv")
         if path:
-            csv_export(path, ["Rechnung", "Kunde", "Rechnungsdatum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Status"], self.export_rows())
+            csv_export(path, ["Rechnung", "Kunde", "Rechnungsdatum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Mahnstufe", "Status"], self.export_rows())
             QMessageBox.information(self, "Export gespeichert", path)
 
     @guarded
@@ -260,9 +287,9 @@ class Receivables(Page):
         path = save_path(self, "Debitoren als PDF", "Debitoren.pdf")
         if path:
             report_pdf(path, "Debitoren", f"{self.year.currentText()} · {self.quarter.currentText()} · {self.status.currentText()} · Suche: {self.search.text() or '–'}",
-                       ["Rechnung", "Kunde", "Datum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Status"], self.export_rows(),
+                       ["Rechnung", "Kunde", "Datum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Mahnstufe", "Status"], self.export_rows(),
                        f"Rechnungsbetrag {chf(sum(r['amount'] for r in self.filtered))} · Bezahlt {chf(sum(r['paid'] for r in self.filtered))} · Offen {chf(sum(r['open'] for r in self.filtered))}",
-                       [72, 142, 62, 62, 62, 75, 75, 75, 75])
+                       [58, 115, 52, 52, 52, 62, 62, 62, 80, 60])
             PdfPreview(self, path).exec()
 
 
@@ -559,7 +586,25 @@ class SettingsPage(Page):
         dl.addWidget(path_label)
         dl.addWidget(button("Sicherung erstellen …", self.backup, True))
         dl.addWidget(button("Sicherung wiederherstellen …", self.restore))
-        description = label("Vor jeder Wiederherstellung wird der aktuelle Stand automatisch gesichert.\nDie Daten bleiben auf diesem Computer. Für eine externe Sicherung die Sicherungsdatei auf ein separates Laufwerk kopieren.", "muted")
+        dl.addSpacing(16)
+        dl.addWidget(label("Automatische externe Sicherung", "sectionTitle"))
+        backup_row = QHBoxLayout()
+        self.backup_directory = line("", "z. B. E:\\AST-Sicherungen oder ein Netzlaufwerk")
+        self.backup_directory.setReadOnly(True)
+        backup_row.addWidget(self.backup_directory, 1)
+        backup_row.addWidget(button("Ordner wählen …", self.choose_backup_directory))
+        backup_row.addWidget(button("Deaktivieren", self.clear_backup_directory))
+        dl.addLayout(backup_row)
+        retention_row = QHBoxLayout()
+        retention_row.addWidget(label("Aufbewahrung in Tagen", "muted"))
+        self.backup_retention = line("30")
+        self.backup_retention.setMaximumWidth(90)
+        retention_row.addWidget(self.backup_retention)
+        retention_row.addStretch()
+        retention_row.addWidget(button("Einstellungen speichern", self.save_backup_settings))
+        retention_row.addWidget(button("Jetzt extern sichern", self.backup_external, True))
+        dl.addLayout(retention_row)
+        description = label("Beim Programmstart wird täglich eine Sicherung erstellt. Ist ein externer Ordner gewählt, wird die Datenbank zusätzlich dorthin gesichert. Alte automatische externe Sicherungen werden nach der gewählten Frist entfernt.\nVor jeder Wiederherstellung wird der aktuelle Stand automatisch gesichert.", "muted")
         description.setWordWrap(True)
         dl.addWidget(description)
         dl.addStretch()
@@ -572,6 +617,8 @@ class SettingsPage(Page):
         self.customers.populate([[c[k] for k in ("name", "address", "postcode", "city", "email")] for c in customers], [c["id"] for c in customers])
         settings = self.db.settings()
         for key, widget in self.company_fields.items(): widget.setText(settings.get(key, ""))
+        self.backup_directory.setText(settings.get("backup_directory", ""))
+        self.backup_retention.setText(settings.get("backup_retention_days", "30"))
 
     def new_person(self):
         if EmployeeDialog(self, self.db).exec(): self.refresh()
@@ -598,6 +645,42 @@ class SettingsPage(Page):
         if path:
             self.db.backup(path)
             QMessageBox.information(self, "Sicherung erstellt", path)
+
+    def choose_backup_directory(self):
+        path = QFileDialog.getExistingDirectory(self, "Ordner für automatische Sicherungen wählen",
+                                                self.backup_directory.text() or str(Path.home()))
+        if path:
+            self.backup_directory.setText(path)
+            self._save_backup_settings()
+
+    def clear_backup_directory(self):
+        self.backup_directory.clear()
+        self._save_backup_settings()
+
+    def _save_backup_settings(self):
+        try:
+            retention = int(self.backup_retention.text())
+            if not 1 <= retention <= 3650:
+                raise ValueError
+        except ValueError:
+            raise ValueError("Die Aufbewahrung muss zwischen 1 und 3650 Tagen liegen.") from None
+        self.db.save_settings({"backup_directory": self.backup_directory.text(),
+                               "backup_retention_days": retention})
+
+    @guarded
+    def save_backup_settings(self):
+        self._save_backup_settings()
+        QMessageBox.information(self, "Gespeichert", "Die Einstellungen für automatische Sicherungen wurden gespeichert.")
+
+    @guarded
+    def backup_external(self):
+        if not self.backup_directory.text():
+            raise ValueError("Bitte zuerst einen externen Sicherungsordner wählen.")
+        self._save_backup_settings()
+        created = run_automatic_backups(self.db, self.db.path.parent / "backups",
+                                        self.backup_directory.text(), self.backup_retention.text())
+        QMessageBox.information(self, "Sicherung geprüft", "Die externe Tagessicherung ist aktuell.\n" +
+                                (str(created[-1]) if created else self.backup_directory.text()))
 
     @guarded
     def restore(self):

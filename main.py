@@ -18,6 +18,7 @@ def main():
     from PySide6.QtCore import QLocale, QLockFile
     from PySide6.QtWidgets import QApplication, QMessageBox
     from ast_app.database import Database
+    from ast_app.backups import run_automatic_backups
     from ast_app.demo import seed_demo
     from ast_app.theme import apply_theme
     from ast_app.window import MainWindow
@@ -42,9 +43,10 @@ def main():
         db = Database(root / filename)
         if args.demo:
             seed_demo(db)
-        backup = root / "backups" / f"{Path(filename).stem}-{date.today().isoformat()}.sqlite3"
-        if not backup.exists():
-            db.backup(backup)
+        settings = db.settings()
+        run_automatic_backups(db, root / "backups",
+                              "" if args.demo else settings.get("backup_directory", ""),
+                              settings.get("backup_retention_days", "30"))
 
         def exception_hook(kind, value, trace):
             logging.error("Unhandled exception", exc_info=(kind, value, trace))
@@ -59,11 +61,13 @@ def main():
                 app.processEvents()
             from ast_app.documents import salary_pdf, report_pdf
             from ast_app.timesheet_excel import export_timesheet
+            from ast_app.excel_import import import_timesheet
             salary_pdf({"A": "/Ja", "B": "/Off", "HName": "AST Starttest", "1": "1000"}, root / "smoke-lohnausweis.pdf")
             report_pdf(root / "smoke-report.pdf", "AST Starttest", "Test", ["Test", "Wert"], [["PDF", "OK"]], "Test erfolgreich")
             employee = db.employees()[0]
             export_timesheet(root / "smoke-stundennachweis.xlsm", employee, date.today().year,
                              db.time_records(employee["id"], date.today().year), db.settings().get("company", ""))
+            import_timesheet(db, root / "smoke-stundennachweis.xlsm", employee["id"], overwrite=True)
             (root / "smoke-test-ok.txt").write_text("Alle fünf Bereiche erfolgreich geladen.\n", encoding="utf-8")
             window.close()
             return 0

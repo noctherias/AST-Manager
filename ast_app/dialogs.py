@@ -46,9 +46,10 @@ class EmployeeDialog(FormDialog):
         self.add("job", "Funktion", line(r.get("job")))
         self.add("workload", "Pensum", numeric(r.get("workload", 10000) / 100, " %"))
         self.fields["workload"].setRange(.01, 100)
-        for key, title in [("salutation", "Anrede"), ("ahv", "Neue AHV-Nr."), ("ahv_old", "Alte AHV-Nr."),
+        for key, title in [("salutation", "Anrede"), ("ahv", "AHV-Nr."), ("ahv_old", "Alte AHV-Nr."),
                            ("address", "Strasse"), ("postcode", "PLZ"), ("city", "Ort")]:
             self.add(key, title, line(r.get(key, "")))
+        self.add("birth_date", "Geburtsdatum", line(r.get("birth_date", ""), "JJJJ-MM-TT"))
         active = QCheckBox("Aktiv")
         active.setChecked(bool(r.get("active", 1)))
         self.add("active", "Status", active)
@@ -134,6 +135,27 @@ class PaymentDialog(FormDialog):
     def submit(self):
         d = self.values()
         self.db.add_payment(self.invoice["id"], d["day"], units(d["amount"]), d["note"])
+        self.accept()
+
+
+class ReminderDialog(FormDialog):
+    def __init__(self, parent, db, invoice):
+        super().__init__(parent, "Mahnstufe festlegen", f"Rechnung {invoice['number']} · {invoice['customer']}")
+        self.db, self.invoice = db, invoice
+        self.add("level", "Mahnstufe", combo([
+            ("Keine Mahnung", 0), ("1. Zahlungserinnerung", 1),
+            ("2. Mahnung", 2), ("3. Letzte Mahnung", 3),
+        ], invoice.get("reminder_level", 0)))
+        self.add("reminder_date", "Mahndatum", day(invoice.get("reminder_date") or date.today().isoformat()))
+        hint = label("Stufe 0 entfernt die aktuelle Mahnkennzeichnung. Bereits erfasste Zahlungen bleiben unverändert.", "muted")
+        hint.setWordWrap(True)
+        self.form.addRow("", hint)
+        self.save_button.setText("Mahnstufe speichern")
+
+    @guarded
+    def submit(self):
+        values = self.values()
+        self.db.set_reminder(self.invoice["id"], values["level"], values["reminder_date"])
         self.accept()
 
 
@@ -285,6 +307,108 @@ class TimeRecordDialog(FormDialog):
         self.accept()
 
 
+class BulkTimeDialog(FormDialog):
+    """Apply one work schedule or absence to weekdays in a date range."""
+    def __init__(self, parent, db, employee, year):
+        super().__init__(parent, "Zeitraum erfassen",
+                         employee["first_name"] + " " + employee["last_name"], 700)
+        self.db, self.employee = db, employee
+        today = date.today()
+        initial = today if today.year == year else date(year, 1, 1)
+        self.add("start_day", "Von", day(initial.isoformat()))
+        self.add("end_day", "Bis", day(initial.isoformat()))
+        for widget in (self.fields["start_day"], self.fields["end_day"]):
+            widget.setDateRange(QDate(year, 1, 1), QDate(year, 12, 31))
+        week = QWidget()
+        week_row = QHBoxLayout(week)
+        week_row.setContentsMargins(0, 0, 0, 0)
+        self.weekdays = []
+        for index, title in enumerate(("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")):
+            check = QCheckBox(title)
+            check.setChecked(index < 5)
+            week_row.addWidget(check)
+            self.weekdays.append(check)
+        week_row.addStretch()
+        self.form.addRow("Wochentage", week)
+        self.add("code", "Art des Tages", combo([(title, code) for code, title in TIME_CODES.items()], ""))
+        self.has_times = QCheckBox("Arbeitszeiten erfassen")
+        self.has_times.setChecked(True)
+        self.form.addRow("", self.has_times)
+        self.start_1 = TimeRecordDialog._time(None, 7, 30)
+        self.end_1 = TimeRecordDialog._time(None, 12, 0)
+        self.start_2 = TimeRecordDialog._time(None, 13, 0)
+        self.end_2 = TimeRecordDialog._time(None, 17, 15)
+        self.form.addRow("Kommt / Geht", self._pair(self.start_1, self.end_1))
+        self.has_second = QCheckBox("Zweiten Arbeitsblock verwenden")
+        self.has_second.setChecked(True)
+        self.form.addRow("", self.has_second)
+        self.form.addRow("Kommt 2 / Geht 2", self._pair(self.start_2, self.end_2))
+        self.pause = QSpinBox()
+        self.pause.setRange(0, 1440)
+        self.pause.setSuffix(" min")
+        self.pause.setMinimumHeight(38)
+        self.add("break_minutes", "Zusätzliche Pause", self.pause)
+        self.add("note", "Bemerkung", line("", "gilt für alle ausgewählten Tage"))
+        self.overwrite = QCheckBox("Bereits erfasste Tage überschreiben")
+        self.form.addRow("", self.overwrite)
+        hint = label("Bestehende Einträge bleiben standardmässig unverändert. Samstag und Sonntag sind abgewählt.", "muted")
+        hint.setWordWrap(True)
+        self.form.addRow("", hint)
+        self.has_times.toggled.connect(self._state)
+        self.has_second.toggled.connect(self._state)
+        self.fields["code"].currentIndexChanged.connect(self._code_changed)
+        self._state()
+
+    @staticmethod
+    def _pair(first, second):
+        pane = QWidget()
+        row = QHBoxLayout(pane)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(first)
+        row.addWidget(label("bis", "muted"))
+        row.addWidget(second)
+        return pane
+
+    def _code_changed(self):
+        if self.fields["code"].currentData():
+            self.has_times.setChecked(False)
+
+    def _state(self):
+        enabled = self.has_times.isChecked()
+        self.has_second.setEnabled(enabled)
+        for widget in (self.start_1, self.end_1):
+            widget.setEnabled(enabled)
+        for widget in (self.start_2, self.end_2):
+            widget.setEnabled(enabled and self.has_second.isChecked())
+        self.pause.setEnabled(enabled)
+
+    @guarded
+    def submit(self):
+        start = date.fromisoformat(day_value(self.fields["start_day"]))
+        end = date.fromisoformat(day_value(self.fields["end_day"]))
+        if start > end:
+            raise ValueError("Das Enddatum muss nach dem Startdatum liegen.")
+        selected = {index for index, check in enumerate(self.weekdays) if check.isChecked()}
+        if not selected:
+            raise ValueError("Bitte mindestens einen Wochentag auswählen.")
+        common = {"employee_id": self.employee["id"], "code": self.fields["code"].currentData() or "",
+                  "note": self.fields["note"].text(), "break_minutes": self.pause.value() if self.has_times.isChecked() else 0}
+        if self.has_times.isChecked():
+            common.update(start_1=TimeRecordDialog._minutes(self.start_1), end_1=TimeRecordDialog._minutes(self.end_1),
+                          start_2=TimeRecordDialog._minutes(self.start_2) if self.has_second.isChecked() else None,
+                          end_2=TimeRecordDialog._minutes(self.end_2) if self.has_second.isChecked() else None)
+        else:
+            common.update(start_1=None, end_1=None, start_2=None, end_2=None)
+        records = []
+        current = start
+        while current <= end:
+            if current.weekday() in selected:
+                records.append({**common, "day": current.isoformat()})
+            current += timedelta(days=1)
+        self.result_counts = self.db.save_time_records(records, self.overwrite.isChecked())
+        self.accept()
+
+
 class SalaryDialog(QDialog):
     def __init__(self, parent, db, row=None):
         super().__init__(parent)
@@ -332,7 +456,7 @@ class SalaryDialog(QDialog):
         address = Disclosure("Übernommene Personalangaben prüfen / ändern")
         identity.addRow(address)
         identity = address.form
-        for k, title in [("C", "Alte AHV-Nr."), ("C2", "Neue AHV-Nr."), ("HAnrede", "Anrede"), ("HName", "Name im Formular"),
+        for k, title in [("C", "Alte AHV-Nr."), ("C2", "AHV-Nr."), ("CGebDatum", "Geburtsdatum"), ("HAnrede", "Anrede"), ("HName", "Name im Formular"),
                           ("HAdresse", "Strasse"), ("HPostfach", "Adresszusatz / Postfach"), ("HWohnort", "PLZ und Ort")]:
             self.pdf[k] = line(max_length=100)
             identity.addRow(title, self.pdf[k])
@@ -422,7 +546,8 @@ class SalaryDialog(QDialog):
         if not e:
             return
         s = self.db.settings()
-        values = {"C": e["ahv_old"], "C2": e["ahv"], "HAnrede": e["salutation"], "HName": e["first_name"] + " " + e["last_name"],
+        birth = date.fromisoformat(e["birth_date"]).strftime("%d.%m.%Y") if e.get("birth_date") else ""
+        values = {"C": e["ahv_old"], "C2": e["ahv"], "CGebDatum": birth, "HAnrede": e["salutation"], "HName": e["first_name"] + " " + e["last_name"],
                   "HAdresse": e["address"], "HPostfach": "", "HWohnort": (e["postcode"] + " " + e["city"]).strip(),
                   "OrtDatum": (s.get("city", "") + ", " if s.get("city") else "") + date.today().strftime("%d.%m.%Y"),
                   "Unterschrift1.0": s.get("company", ""), "Unterschrift1.1": s.get("address", ""),

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS customers(
 CREATE TABLE IF NOT EXISTS employees(
  id INTEGER PRIMARY KEY, code TEXT NOT NULL COLLATE NOCASE UNIQUE, first_name TEXT NOT NULL,
  last_name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('employee','apprentice')),
- salutation TEXT NOT NULL DEFAULT '', ahv TEXT NOT NULL DEFAULT '', ahv_old TEXT NOT NULL DEFAULT '',
+ salutation TEXT NOT NULL DEFAULT '', ahv TEXT NOT NULL DEFAULT '', ahv_old TEXT NOT NULL DEFAULT '', birth_date TEXT NOT NULL DEFAULT '',
  address TEXT NOT NULL DEFAULT '', postcode TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '',
  hired TEXT NOT NULL, job TEXT NOT NULL DEFAULT '', workload INTEGER NOT NULL DEFAULT 10000 CHECK(workload>0 AND workload<=10000),
  allowance INTEGER NOT NULL DEFAULT 21625 CHECK(allowance>=0), active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)));
@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS time_records(
 CREATE TABLE IF NOT EXISTS invoices(
  id INTEGER PRIMARY KEY, number TEXT NOT NULL COLLATE NOCASE UNIQUE,
  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
- issued TEXT NOT NULL, due TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), note TEXT NOT NULL DEFAULT '', CHECK(due>=issued));
+ issued TEXT NOT NULL, due TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), note TEXT NOT NULL DEFAULT '',
+ reminder_level INTEGER NOT NULL DEFAULT 0 CHECK(reminder_level BETWEEN 0 AND 3), reminder_date TEXT NOT NULL DEFAULT '',
+ CHECK(due>=issued));
 CREATE TABLE IF NOT EXISTS payments(
  id INTEGER PRIMARY KEY, invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE RESTRICT,
  day TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), note TEXT NOT NULL DEFAULT '');
@@ -57,7 +59,7 @@ CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
 CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
 """
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 
 class Database:
@@ -74,7 +76,16 @@ class Database:
             self.conn.close()
             raise ValueError("Diese Datenbank stammt aus einer neueren Programmversion.")
         self.conn.executescript(SCHEMA)
+        employee_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(employees)")}
+        if "birth_date" not in employee_columns:
+            self.conn.execute("ALTER TABLE employees ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''")
+        invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
+        if "reminder_level" not in invoice_columns:
+            self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
+        if "reminder_date" not in invoice_columns:
+            self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_date TEXT NOT NULL DEFAULT ''")
         self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+        self.conn.commit()
 
     def close(self):
         self.conn.close()
@@ -137,11 +148,13 @@ class Database:
         return self.one("SELECT * FROM employees WHERE id=?", (key,))
 
     def save_employee(self, data, key=None):
-        fields = ("code", "first_name", "last_name", "kind", "salutation", "ahv", "ahv_old", "address", "postcode", "city", "hired", "job", "workload", "allowance", "active")
-        d = {k: data[k].strip() if isinstance(data[k], str) else data[k] for k in fields}
+        fields = ("code", "first_name", "last_name", "kind", "salutation", "ahv", "ahv_old", "birth_date", "address", "postcode", "city", "hired", "job", "workload", "allowance", "active")
+        d = {k: data.get(k, "").strip() if isinstance(data.get(k, ""), str) else data.get(k) for k in fields}
         if not all(d[k] for k in ("code", "first_name", "last_name")):
             raise ValueError("Personalnummer, Vorname und Nachname sind erforderlich.")
         iso(d["hired"])
+        if d["birth_date"]:
+            iso(d["birth_date"])
         if d["kind"] not in ("employee", "apprentice") or not 0 < d["workload"] <= 10000 or d["allowance"] < 0:
             raise ValueError("Bitte Pensum und Ferienanspruch prüfen.")
         return self._save("employees", d, key)
@@ -180,6 +193,21 @@ class Database:
             if not r or amount <= 0 or amount > r["remaining"]:
                 raise ValueError("Die Zahlung muss positiv sein und darf den offenen Betrag nicht übersteigen.")
             return self._save("payments", {"invoice_id": invoice_id, "day": day, "amount": amount, "note": note})
+
+    def set_reminder(self, invoice_id, level, reminder_date=""):
+        level = int(level)
+        if level not in range(4):
+            raise ValueError("Die Mahnstufe muss zwischen 0 und 3 liegen.")
+        invoice = next((row for row in self.invoices() if row["id"] == invoice_id), None)
+        if not invoice:
+            raise ValueError("Die Rechnung existiert nicht mehr.")
+        if invoice["open"] <= 0 and level:
+            raise ValueError("Eine bezahlte Rechnung kann nicht gemahnt werden.")
+        value = "" if level == 0 else iso(reminder_date)
+        with self.conn:
+            self.conn.execute("UPDATE invoices SET reminder_level=?,reminder_date=? WHERE id=?",
+                              (level, value, invoice_id))
+            self.log("reminder", "invoices", invoice_id, {"level": level, "date": value})
 
     def delete(self, table, key):
         if table not in ("entries", "time_records", "payments", "invoices", "salaries"):
@@ -263,6 +291,24 @@ class Database:
         elif not d["code"]:
             raise ValueError("Bitte Arbeitszeiten oder einen Code erfassen.")
         return self._save("time_records", d, key)
+
+    def save_time_records(self, records, overwrite=False):
+        """Save a prepared date range, optionally replacing existing days."""
+        created = updated = skipped = 0
+        for record in records:
+            existing = self.conn.execute(
+                "SELECT id FROM time_records WHERE employee_id=? AND day=?",
+                (record["employee_id"], record["day"]),
+            ).fetchone()
+            if existing and not overwrite:
+                skipped += 1
+                continue
+            self.save_time_record(record, existing["id"] if existing else None)
+            if existing:
+                updated += 1
+            else:
+                created += 1
+        return {"created": created, "updated": updated, "skipped": skipped}
 
     def balances(self, employee_id):
         results = []
