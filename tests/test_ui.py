@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
 from ast_app.database import Database
 from ast_app.demo import seed_demo
 from ast_app.window import MainWindow
-from ast_app.dialogs import EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog, SalaryDialog, PaymentDialog, TimeRecordDialog
+from ast_app.dialogs import EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog, SalaryDialog, PaymentDialog, TimeRecordDialog, ManualReminderDialog
 from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
@@ -145,6 +145,24 @@ class UiTests(unittest.TestCase):
         saved = next(row for row in self.db.time_records(employee["id"]) if row["note"] == "Baustelle")
         self.assertEqual(saved["start_1"], 450)
         self.assertEqual(saved["start_2"], 780)
+
+    def test_manual_reminder_dialog_builds_standalone_claim(self):
+        dialog = ManualReminderDialog(None, self.db)
+        customer = self.db.customers()[0]
+        dialog.customer_picker.setCurrentIndex(dialog.customer_picker.findData(customer["id"]))
+        dialog.fields["number"].setText("MAN-2026-01")
+        dialog.fields["open"].setValue(245.75)
+        dialog.fields["level"].setCurrentIndex(dialog.fields["level"].findData(2))
+        dialog.show(); APP.processEvents()
+        if os.environ.get("AST_QA_DIR"):
+            folder = Path(os.environ["AST_QA_DIR"])
+            folder.mkdir(parents=True, exist_ok=True)
+            dialog.grab().save(str(folder / "manuelle-mahnung.png"))
+        dialog.submit()
+        self.assertEqual(dialog.result(), QDialog.DialogCode.Accepted)
+        self.assertEqual(dialog.invoice["customer"], customer["name"])
+        self.assertEqual(dialog.invoice["open"], 24575)
+        self.assertEqual(dialog.level, 2)
 
     def test_wizard_advances_and_saves_from_review(self):
         salary = SalaryDialog(None, self.db)

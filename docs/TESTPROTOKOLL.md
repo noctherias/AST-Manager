@@ -4,7 +4,7 @@ Stand: 30.09.2026, Version 0.5.0. Geprüft unter Windows 11 x64 (10.0.26200), Py
 
 ## Automatisierte Tests
 
-`python -m unittest discover -s tests -v`: **38 Tests**. Die fachlichen, Dokument-, Mahnbrief-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
+`python -m unittest discover -s tests -v`: **39 Tests**. Die fachlichen, Dokument-, Mahnbrief-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
 
 | Bereich | Geprüfte Fälle |
 |---|---|

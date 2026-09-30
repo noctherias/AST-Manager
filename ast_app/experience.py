@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStack
                               QTabWidget, QPlainTextEdit)
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
-from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog
+from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
 from .domain import TIME_CODES, chf, number, display_date
 from .timesheet_excel import export_timesheet
 from .excel_import import import_timesheet
@@ -201,6 +201,8 @@ class Reminders(Page):
     def __init__(self, db, window):
         super().__init__("Mahnungen", "Offene Forderungen mahnen, Brieftexte pflegen und druckfertige PDFs erstellen.")
         self.db, self.window, self.filtered = db, window, []
+        self.manual_button = button("+ Mahnung manuell", self.create_manual_letter, True)
+        self.header.addWidget(self.manual_button)
         self.header.addWidget(button("Logo & Firmendaten", self.open_company_settings))
         self.cards = self.metrics([(REMINDER_LEVELS[level], "Offene Rechnungen") for level in range(1, 5)])
         self.tabs = QTabWidget()
@@ -319,6 +321,21 @@ class Reminders(Page):
             reminder_pdf(path, invoice, settings, level, reminder_text(settings, level))
             self.db.set_reminder(invoice["id"], level, date.today().isoformat())
             self.refresh()
+            PdfPreview(self, path).exec()
+
+    @guarded
+    def create_manual_letter(self):
+        dialog = ManualReminderDialog(self, self.db)
+        if not dialog.exec():
+            return
+        settings = self.db.settings()
+        if not settings.get("company", "").strip():
+            raise ValueError("Bitte zuerst unter Einstellungen die Firmendaten erfassen.")
+        invoice, level = dialog.invoice, dialog.level
+        path = save_path(self, "Manuellen Mahnbrief speichern",
+                         f"{REMINDER_LEVELS[level].replace(' ', '-')}-{invoice['number']}.pdf")
+        if path:
+            reminder_pdf(path, invoice, settings, level, reminder_text(settings, level))
             PdfPreview(self, path).exec()
 
     @guarded

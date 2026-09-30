@@ -159,6 +159,69 @@ class ReminderDialog(FormDialog):
         self.accept()
 
 
+class ManualReminderDialog(FormDialog):
+    """Collect a complete reminder letter without creating an invoice first."""
+    def __init__(self, parent, db):
+        super().__init__(parent, "Mahnung manuell erstellen",
+                         "Empfänger und Forderung direkt erfassen. Es wird keine Rechnung in den Debitoren angelegt.", 680)
+        self.db = db
+        customers = [("– Empfänger manuell eingeben –", None)] + [
+            (customer["name"], customer["id"]) for customer in db.customers()
+        ]
+        self.customer_picker = self.add("customer_id", "Aus Stammdaten übernehmen", combo(customers, None))
+        self.add("customer", "Name / Firma *", line())
+        self.add("customer_address", "Strasse", line())
+        self.add("customer_postcode", "PLZ", line())
+        self.add("customer_city", "Ort", line())
+        self.add("number", "Rechnungsnummer *", line(placeholder="z. B. 2026-1042"))
+        self.add("issued", "Rechnungsdatum", day())
+        self.add("due", "Fällig am", day((date.today() + timedelta(days=30)).isoformat()))
+        self.add("open", "Geforderter Betrag", numeric(0, " CHF"))
+        self.add("level", "Mahnstufe", combo([
+            ("1. Zahlungserinnerung", 1), ("2. Mahnung 1", 2),
+            ("3. Mahnung 2", 3), ("4. Betreibung", 4),
+        ], 1))
+        hint = label("Der passende Mahntext und das Firmenlogo werden automatisch aus den Einstellungen übernommen.", "muted")
+        hint.setWordWrap(True)
+        self.form.addRow("", hint)
+        self.customer_picker.currentIndexChanged.connect(self.use_customer)
+        self.save_button.setText("Mahnbrief erstellen")
+        self.invoice = None
+        self.level = 1
+
+    def use_customer(self):
+        key = self.customer_picker.currentData()
+        customer = next((row for row in self.db.customers() if row["id"] == key), None)
+        if not customer:
+            return
+        for field, source in (("customer", "name"), ("customer_address", "address"),
+                              ("customer_postcode", "postcode"), ("customer_city", "city")):
+            self.fields[field].setText(customer.get(source, ""))
+
+    @guarded
+    def submit(self):
+        values = self.values()
+        if not values["customer"] or not values["number"]:
+            raise ValueError("Bitte Name/Firma und Rechnungsnummer eingeben.")
+        if values["due"] < values["issued"]:
+            raise ValueError("Das Fälligkeitsdatum darf nicht vor dem Rechnungsdatum liegen.")
+        amount = units(values["open"])
+        if amount <= 0:
+            raise ValueError("Bitte einen positiven geforderten Betrag eingeben.")
+        self.invoice = {
+            "customer": values["customer"],
+            "customer_address": values["customer_address"],
+            "customer_postcode": values["customer_postcode"],
+            "customer_city": values["customer_city"],
+            "number": values["number"],
+            "issued": values["issued"],
+            "due": values["due"],
+            "open": amount,
+        }
+        self.level = int(values["level"])
+        self.accept()
+
+
 class PeriodDialog(FormDialog):
     def __init__(self, parent, db, employee, row=None):
         super().__init__(parent, "Jahr bearbeiten" if row else "Jahr einrichten",
