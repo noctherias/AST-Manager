@@ -1,4 +1,5 @@
 """Task-focused screens; the shared data and calculation services remain central."""
+import json
 from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStackedWidget,
@@ -132,6 +133,12 @@ class Start(Page):
 
 
 class Invoices(Receivables):
+    COLUMNS = (
+        ("number", "Rechnung"), ("customer", "Kunde"), ("due", "Fällig am"),
+        ("quarter", "Quartal"), ("amount", "Betrag CHF"), ("open", "Offen CHF"),
+        ("reminder", "Mahnstufe"), ("status", "Status"), ("note", "Bemerkung"),
+    )
+
     def __init__(self, db):
         Page.__init__(self, "Debitoren", "Rechnungen und Zahlungseingänge zentral bearbeiten.")
         self.db, self.filtered = db, []
@@ -152,8 +159,16 @@ class Invoices(Receivables):
         filters.form.addRow("Rechnungsjahr", self.year)
         filters.form.addRow("Quartal", self.quarter)
         self.layout.addWidget(filters)
-        self.table = Table(["Rechnung", "Kunde", "Fällig am", "Betrag CHF", "Offen CHF", "Mahnstufe", "Status"])
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table = Table([title for _, title in self.COLUMNS])
+        table_header = self.table.horizontalHeader()
+        table_header.setSectionsMovable(True)
+        table_header.setFirstSectionMovable(True)
+        table_header.setToolTip("Spaltenüberschrift mit der Maus ziehen, um die Reihenfolge zu ändern.")
+        table_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        for logical, width in enumerate((115, 180, 105, 90, 105, 105, 175, 100, 220)):
+            table_header.resizeSection(logical, width)
+        table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        table_header.setSectionResizeMode(8, QHeaderView.ResizeMode.Stretch)
         self.layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(self.layout, "Bitte eine Rechnung auswählen.")
         self.edit_btn = button("Details bearbeiten", self.edit)
@@ -164,6 +179,18 @@ class Invoices(Receivables):
         row.addWidget(self.reminder_btn)
         more, actions = menu_button("Weitere Aktionen", [("Auswahl als PDF / Drucken", self.export_pdf), ("Auswahl als CSV exportieren", self.export_csv), ("Rechnung löschen …", self.remove)])
         self.delete_btn = actions[-1]
+        self.column_menu = QMenu(self)
+        self.column_actions = {}
+        for logical, (key, title) in enumerate(self.COLUMNS):
+            action = self.column_menu.addAction(title)
+            action.setCheckable(True)
+            action.setChecked(True)
+            action.toggled.connect(lambda checked, key=key: self.set_column_visible(key, checked))
+            self.column_actions[key] = action
+        self.column_button = button("Spalten")
+        self.column_button.setMenu(self.column_menu)
+        self.column_button.setToolTip("Spalten ein- oder ausblenden. Die Auswahl wird automatisch gespeichert.")
+        self.header.addWidget(self.column_button)
         self.header.addWidget(more)
         self.summary = label("", "muted")
         self.layout.addWidget(self.summary)
@@ -171,6 +198,8 @@ class Invoices(Receivables):
         for w in (self.status, self.year, self.quarter): w.currentIndexChanged.connect(self.filter_rows)
         self.table.itemSelectionChanged.connect(self.selection)
         self.table.cellDoubleClicked.connect(self.pay)
+        self.restore_column_layout()
+        table_header.sectionMoved.connect(lambda *_: self.save_column_layout())
         self.selection()
 
     def set_status(self, value):
@@ -185,10 +214,68 @@ class Invoices(Receivables):
             and (not year or int(r["issued"][:4]) == year)
             and (not quarter or (int(r["issued"][5:7]) - 1) // 3 + 1 == quarter)
             and (status == "Alle Status" or status == "Alle offenen" and r["open"] > 0 or r["status"] == status)]
-        self.table.populate([[r["number"], r["customer"], display_date(r["due"]), number(r["amount"]), number(r["open"]), self.reminder_text(r), r["status"]] for r in self.filtered], [r["id"] for r in self.filtered], [3, 4])
+        self.table.populate([[r["number"], r["customer"], display_date(r["due"]), self.quarter_text(r["issued"]),
+                              number(r["amount"]), number(r["open"]), self.reminder_text(r), r["status"],
+                              r["note"] or "–"] for r in self.filtered],
+                            [r["id"] for r in self.filtered], [4, 5])
         for c, key in zip(self.cards, ("amount", "paid", "open")): c.set(chf(sum(r[key] for r in self.filtered)))
         self.summary.setText(f"{len(self.filtered)} Rechnungen · {self.year.currentText()} · {self.quarter.currentText()}" if self.filtered else "Keine Rechnungen in dieser Auswahl. Erstelle eine Rechnung oder ändere den Filter.")
         self.selection()
+
+    @staticmethod
+    def quarter_text(issued):
+        return f"Q{(int(issued[5:7]) - 1) // 3 + 1} / {issued[:4]}"
+
+    def restore_column_layout(self):
+        settings = self.db.settings()
+        keys = [key for key, _ in self.COLUMNS]
+        try:
+            saved_order = json.loads(settings.get("debtor_columns_order", "[]"))
+            order = [key for key in saved_order if key in keys]
+        except (TypeError, ValueError):
+            order = []
+        order.extend(key for key in keys if key not in order)
+        header = self.table.horizontalHeader()
+        header.blockSignals(True)
+        for target_visual, key in enumerate(order):
+            logical = keys.index(key)
+            header.moveSection(header.visualIndex(logical), target_visual)
+        header.blockSignals(False)
+        try:
+            saved_visible = json.loads(settings.get("debtor_columns_visible", "null"))
+            visible = set(saved_visible) if isinstance(saved_visible, list) else set(keys)
+        except (TypeError, ValueError):
+            visible = set(keys)
+        if not visible.intersection(keys):
+            visible = set(keys)
+        for logical, key in enumerate(keys):
+            shown = key in visible
+            self.table.setColumnHidden(logical, not shown)
+            action = self.column_actions[key]
+            action.blockSignals(True)
+            action.setChecked(shown)
+            action.blockSignals(False)
+
+    def set_column_visible(self, key, visible):
+        keys = [column_key for column_key, _ in self.COLUMNS]
+        if key not in keys:
+            return
+        if not visible and sum(not self.table.isColumnHidden(i) for i in range(len(keys))) <= 1:
+            action = self.column_actions[key]
+            action.blockSignals(True)
+            action.setChecked(True)
+            action.blockSignals(False)
+            return
+        self.table.setColumnHidden(keys.index(key), not visible)
+        self.save_column_layout()
+
+    def save_column_layout(self):
+        keys = [key for key, _ in self.COLUMNS]
+        header = self.table.horizontalHeader()
+        order = [keys[header.logicalIndex(visual)] for visual in range(header.count())]
+        visible = [key for logical, key in enumerate(keys) if not self.table.isColumnHidden(logical)]
+        self.db.save_settings({"debtor_columns_order": json.dumps(order),
+                               "debtor_columns_visible": json.dumps(visible)})
 
     def selection(self):
         super().selection()

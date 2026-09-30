@@ -2,6 +2,7 @@
 import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -110,6 +111,35 @@ class UiTests(unittest.TestCase):
         QTest.mouseClick(payment.save_button, Qt.MouseButton.LeftButton)
         saved = next(r for r in self.db.invoices() if r["id"] == invoice.saved_id)
         self.assertEqual(saved["open"], 10000)
+
+    def test_debtor_columns_quarter_note_and_saved_layout(self):
+        window = MainWindow(self.db, True)
+        page = window.pages[1]
+        window.navigate(1)
+        page.refresh()
+        headers = [page.table.horizontalHeaderItem(i).text() for i in range(page.table.columnCount())]
+        self.assertEqual(headers[-1], "Bemerkung")
+        self.assertIn("Quartal", headers)
+        quarter_column = headers.index("Quartal")
+        note_column = headers.index("Bemerkung")
+        self.assertRegex(page.table.item(0, quarter_column).text(), r"^Q[1-4] / \d{4}$")
+        self.assertEqual(page.table.item(0, note_column).text(), "Demodaten")
+        window.show(); APP.processEvents()
+        if os.environ.get("AST_QA_DIR"):
+            folder = Path(os.environ["AST_QA_DIR"])
+            folder.mkdir(parents=True, exist_ok=True)
+            window.grab().save(str(folder / "debitoren-spalten.png"))
+
+        page.set_column_visible("status", False)
+        header = page.table.horizontalHeader()
+        header.moveSection(header.visualIndex(note_column), 0)
+        saved = self.db.settings()
+        self.assertNotIn("status", json.loads(saved["debtor_columns_visible"]))
+        self.assertEqual(json.loads(saved["debtor_columns_order"])[0], "note")
+
+        reopened = MainWindow(self.db, True).pages[1]
+        self.assertTrue(reopened.table.isColumnHidden(headers.index("Status")))
+        self.assertEqual(reopened.table.horizontalHeader().visualIndex(note_column), 0)
 
     def test_time_and_salary_dialogs(self):
         e = self.db.employees()[0]
