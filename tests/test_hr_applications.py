@@ -2,11 +2,12 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from pypdf import PdfReader
 
-from ast_app.applications import (DEFAULT_FTP_ROOT, delete_remote_application, normalize_ftp_root,
-                                  sync_manifests, sync_ftp)
+from ast_app.applications import (DEFAULT_FTP_ROOT, FtpDeleteWorker, delete_remote_application,
+                                  normalize_ftp_root, sync_manifests, sync_ftp)
 from ast_app.database import Database
 from ast_app.references import generate_reference_text, reference_pdf, question_groups
 
@@ -145,6 +146,14 @@ class HrApplicationTests(unittest.TestCase):
             normalize_ftp_root("ftp://lp2qfs_admin@lp2qfs.ftp.infomaniak.com/sites/ast-elektro.ch/uploads"),
             DEFAULT_FTP_ROOT)
         self.assertEqual(normalize_ftp_root(r"\sites\ast-elektro.ch\uploads"), DEFAULT_FTP_ROOT)
+
+    def test_delete_worker_passes_source_id_before_remote_root(self):
+        connection = ("ftp.example.test", "user", "secret", DEFAULT_FTP_ROOT)
+        worker = FtpDeleteWorker(connection, "Lia_Test_20261005")
+        with patch("ast_app.applications.delete_remote_application") as delete:
+            worker.run()
+        delete.assert_called_once_with("ftp.example.test", "user", "secret",
+                                       "Lia_Test_20261005", DEFAULT_FTP_ROOT)
 
 
 if __name__ == "__main__":

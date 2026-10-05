@@ -327,7 +327,8 @@ class FtpDeleteWorker(QObject):
     @Slot()
     def run(self):
         try:
-            delete_remote_application(*self.connection, self.source_id)
+            host, user, password, remote_root = self.connection
+            delete_remote_application(host, user, password, self.source_id, remote_root)
             self.finished.emit()
         except Exception as exc:
             logging.exception("Application FTP deletion failed")
