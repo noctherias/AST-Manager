@@ -24,6 +24,7 @@ from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
 from ast_app.widgets import Table
 from ast_app.references import ReferenceDialog
+from ast_app.applications import ApplicationsPage
 
 APP = QApplication.instance() or QApplication([])
 if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
@@ -224,6 +225,22 @@ class UiTests(unittest.TestCase):
         dialog.generate()
         self.assertIn("Gesamtleistung", dialog.text.toPlainText())
         self.assertIn("Verhalten gegenüber Vorgesetzten", dialog.text.toPlainText())
+
+    def test_background_application_sync_returns_to_ui_thread(self):
+        self.db.save_settings({"applications_ftp_password": "encrypted-test"})
+        page = ApplicationsPage(self.db)
+        page.show(); APP.processEvents()
+        result = {"created": 0, "updated": 0, "files": 0}
+        with patch("ast_app.applications.unprotect_secret", return_value="secret"), \
+             patch("ast_app.applications.sync_ftp", return_value=result):
+            page._start_sync(False)
+            for _ in range(100):
+                APP.processEvents()
+                if page.sync_thread is None:
+                    break
+                QTest.qWait(10)
+        self.assertIsNone(page.sync_thread)
+        self.assertIn("Automatischer Serverabgleich aktiv", page.server_status.text())
 
     def test_time_and_salary_dialogs(self):
         e = self.db.employees()[0]

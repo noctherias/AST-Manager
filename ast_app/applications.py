@@ -346,6 +346,7 @@ class ApplicationsPage(Page):
         super().__init__("Bewerbungen", "Jede Bewerbung als eigenes Dossier mit Status, Kontaktdaten und Unterlagen verwalten.")
         self.db, self.rows = db, []
         self.sync_thread = self.sync_worker = None
+        self.sync_manual = False
         self.header.addWidget(button("Vom Webserver einlesen", self.sync, True))
         self.header.addWidget(button("Serverzugang", self.configure_server))
         self.header.addWidget(button("+ Manuell erfassen", self.new))
@@ -446,8 +447,9 @@ class ApplicationsPage(Page):
                                settings.get("applications_ftp_root", DEFAULT_FTP_ROOT))
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.finished.connect(lambda result: self._sync_finished(result, manual))
-        worker.failed.connect(lambda message: self._sync_failed(message, manual))
+        self.sync_manual = manual
+        worker.finished.connect(self._sync_finished)
+        worker.failed.connect(self._sync_failed)
         worker.finished.connect(thread.quit); worker.failed.connect(thread.quit)
         worker.finished.connect(worker.deleteLater); worker.failed.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
@@ -458,7 +460,9 @@ class ApplicationsPage(Page):
     def _sync_cleanup(self):
         self.sync_thread = self.sync_worker = None
 
-    def _sync_finished(self, result, manual):
+    @Slot(dict)
+    def _sync_finished(self, result):
+        manual = self.sync_manual
         self.refresh()
         now = datetime.now().strftime("%H:%M")
         addition = f" · {result['created']} neu · {result['files']} Dokumente" if result["created"] or result["files"] else ""
@@ -467,7 +471,9 @@ class ApplicationsPage(Page):
             QMessageBox.information(self, "Bewerbungen eingelesen",
                                     f"Neu: {result['created']}\nAktualisiert: {result['updated']}\nDokumente kopiert: {result['files']}")
 
-    def _sync_failed(self, message, manual):
+    @Slot(str)
+    def _sync_failed(self, message):
+        manual = self.sync_manual
         logging.warning("Automatic application FTP sync failed: %s", message)
         self.server_status.setText("Serverabgleich vorübergehend nicht möglich · nächster Versuch automatisch")
         if manual:

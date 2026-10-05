@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--data-dir", type=Path, help="Abweichender Speicherordner")
     parser.add_argument("--smoke-test", action="store_true", help="Start, Datenbank und alle Seiten prüfen, dann beenden")
     args = parser.parse_args()
-    from PySide6.QtCore import QLocale, QLockFile
+    from PySide6.QtCore import QLocale, QLockFile, QObject, Signal, Slot
     from PySide6.QtWidgets import QApplication, QMessageBox
     from ast_app.database import Database
     from ast_app.backups import run_automatic_backups
@@ -48,12 +48,26 @@ def main():
                               "" if args.demo else settings.get("backup_directory", ""),
                               settings.get("backup_retention_days", "30"))
 
+        class ExceptionBridge(QObject):
+            message = Signal(str)
+
+        exception_bridge = ExceptionBridge()
+
+        @Slot(str)
+        def show_exception(message):
+            QMessageBox.critical(None, "AST · Fehler", message)
+
+        exception_bridge.message.connect(show_exception)
+
         def exception_hook(kind, value, trace):
             logging.error("Unhandled exception", exc_info=(kind, value, trace))
-            QMessageBox.critical(None, "AST · Fehler", f"Die Aktion konnte nicht abgeschlossen werden.\n{value}\nDetails stehen in ast.log im Datenordner.")
+            detail = str(value).strip() or kind.__name__
+            exception_bridge.message.emit("Die Aktion konnte nicht abgeschlossen werden.\n" + detail +
+                                          "\n\nDetails stehen in ast.log im Datenordner.")
 
         sys.excepthook = exception_hook
         window = MainWindow(db, args.demo)
+        window.exception_bridge = exception_bridge
         if args.smoke_test:
             window.show()
             for index in range(len(window.pages)):
