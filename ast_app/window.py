@@ -4,8 +4,10 @@ from PySide6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget,
                                QButtonGroup, QFrame, QScrollArea, QApplication, QStyle)
 
-from .widgets import label, button
+from .widgets import label, button, Table
 from .experience import Start, Invoices, Reminders, Team, Salaries, Settings
+from .references import ReferencesPage
+from .applications import ApplicationsPage
 from .update_ui import UpdateController
 from . import __version__
 from .documents import resource_path
@@ -76,13 +78,15 @@ class MainWindow(QMainWindow):
         self.nav.addSpacing(4)
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
-        self.buttons = [None] * 6
+        self.buttons = [None] * 8
         self.nav_items = {}
         for page_index, name, child, icon in [
             (0, "Übersicht", False, QStyle.StandardPixmap.SP_DesktopIcon),
             (1, "Debitoren", False, QStyle.StandardPixmap.SP_FileDialogDetailedView),
             (5, "Mahnungen", True, QStyle.StandardPixmap.SP_MessageBoxWarning),
             (2, "Stundennachweis", False, QStyle.StandardPixmap.SP_FileDialogListView),
+            (6, "Zeugnisse", False, QStyle.StandardPixmap.SP_FileDialogContentsView),
+            (7, "Bewerbungen", False, QStyle.StandardPixmap.SP_DirHomeIcon),
             (3, "Lohnausweise", False, QStyle.StandardPixmap.SP_FileIcon),
             (4, "Einstellungen", False, QStyle.StandardPixmap.SP_ComputerIcon),
         ]:
@@ -110,12 +114,16 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stack, 1)
         self.updates = UpdateController(self, db, demo)
         self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db),
-                      Settings(db, self.updates), Reminders(db, self)]
+                      Settings(db, self.updates), Reminders(db, self), ReferencesPage(db),
+                      ApplicationsPage(db)]
         for page in self.pages:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setWidget(page)
             self.stack.addWidget(scroll)
+        for page_index, page in enumerate(self.pages):
+            for table_index, table in enumerate(page.findChildren(Table)):
+                table.bind_layout(db, f"page_{page_index}_{table_index}")
         self.watermark = BackgroundWatermark(self.root)
         self.stack.currentChanged.connect(self._position_watermark)
         QTimer.singleShot(0, self._position_watermark)

@@ -103,6 +103,7 @@ class PaymentDialog(FormDialog):
         super().__init__(parent, "Zahlungen · " + invoice["number"], invoice["customer"], 690)
         self.db, self.invoice = db, invoice
         self.table = Table(["Valutadatum", "Betrag", "Bemerkung"])
+        self.table.bind_layout(db, "dialog_payments")
         self.table.setMaximumHeight(220)
         previous = Disclosure("Bisherige Zahlungen anzeigen")
         previous.form.addRow(self.table)

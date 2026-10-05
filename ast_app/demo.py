@@ -2,6 +2,7 @@
 from datetime import date, timedelta
 
 from .domain import scheduled_work_minutes
+from .references import generate_reference_text
 
 
 def seed_demo(db):
@@ -17,11 +18,13 @@ def seed_demo(db):
                  for code, n, a, z, c in [("1001", "Alpenblick Immobilien AG", "Bergstrasse 8", "5000", "Aarau"),
                                           ("1002", "Werkraum Architektur", "Bahnhofstrasse 21", "4600", "Olten"),
                                           ("1003", "Gemeinde Musterwil", "Dorfplatz 1", "4800", "Musterwil")]]
+    people = []
     for index, (first, last, kind) in enumerate([("Lena", "Keller", "employee"), ("Marco", "Steiner", "employee"), ("Nora", "Frei", "apprentice")]):
         key = db.save_employee({"code": f"AST-{index+1:03}", "first_name": first, "last_name": last,
                                "kind": kind, "salutation": "", "ahv": "", "ahv_old": "", "address": "Musterstrasse 1",
                                "postcode": "4663", "city": "Aarburg", "hired": f"{year-1}-01-01", "job": "Lernende" if kind == "apprentice" else "Elektroinstallation",
                                "workload": 10000, "allowance": 21625, "active": 1})
+        people.append(key)
         p = db.save_period({"employee_id": key, "label": "Lehrjahr 1" if kind == "apprentice" else str(year - 1),
                             "start": f"{year-1}-01-01", "end": f"{year-1}-12-31", "allowance": 21625, "opening": 0, "opening_sick": 0, "opening_accident": 0})
         db.save_entry({"period_id": p, "day": f"{year-1}-06-16", "kind": "vacation", "hours": 18000, "note": "Ferien Vorperiode"})
@@ -54,3 +57,17 @@ def seed_demo(db):
         invoice = db.save_invoice({"number": f"{year}-{1041+idx}", "customer_id": customer, "issued": (due - timedelta(days=30)).isoformat(), "due": due.isoformat(), "amount": amount, "note": "Demodaten"})
         if paid:
             db.add_payment(invoice, min(due, today).isoformat(), paid, "Überweisung")
+    employee = db.employee(people[0])
+    ratings = {key: 4 for key in ("knowledge", "quality", "quantity", "independence", "reliability", "initiative", "learning", "conduct")}
+    reference = {"employee_id": people[0], "reference_type": "interim", "issue_date": today.isoformat(),
+                 "end_date": today.isoformat(), "reason": "auf Wunsch", "tasks": "Elektroinstallationen\nServicearbeiten",
+                 "ratings": ratings}
+    reference["text"] = generate_reference_text(employee, reference["reference_type"], reference["issue_date"],
+                                                reference["end_date"], reference["reason"], reference["tasks"], ratings)
+    db.save_reference(reference)
+    db.save_applicant({"source_id": "demo-001", "category": "installer", "status": "review",
+                       "first_name": "Sina", "last_name": "Muster", "address": "Dorfstrasse 4",
+                       "postcode": "4663", "city": "Aarburg", "email": "sina@example.invalid",
+                       "phone": "079 000 00 00", "vocational_baccalaureate": True,
+                       "message": "Ich interessiere mich für eine Lehrstelle.", "notes": "Fiktive Demobewerbung",
+                       "submitted_at": today.isoformat() + "T09:00:00"})

@@ -6,6 +6,7 @@ import sqlite3
 from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from .domain import KINDS, iso, invoice_state, period_balance, salary_totals, worked_minutes
 
@@ -53,15 +54,35 @@ CREATE TABLE IF NOT EXISTS salaries(
  id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
  year INTEGER NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL, fields TEXT NOT NULL, updated TEXT NOT NULL,
  UNIQUE(employee_id,year));
+CREATE TABLE IF NOT EXISTS employment_references(
+ id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+ reference_type TEXT NOT NULL CHECK(reference_type IN ('work','interim','apprentice')),
+ issue_date TEXT NOT NULL, end_date TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
+ tasks TEXT NOT NULL DEFAULT '', ratings TEXT NOT NULL, text TEXT NOT NULL, updated TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS applicants(
+ id INTEGER PRIMARY KEY, source_id TEXT NOT NULL DEFAULT '' COLLATE NOCASE UNIQUE,
+ category TEXT NOT NULL CHECK(category IN ('trial','installer','assembly')),
+ status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new','review','interview','trial','offer','rejected','hired')),
+ first_name TEXT NOT NULL, last_name TEXT NOT NULL, address TEXT NOT NULL DEFAULT '',
+ postcode TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
+ phone TEXT NOT NULL DEFAULT '', vocational_baccalaureate INTEGER NOT NULL DEFAULT 0 CHECK(vocational_baccalaureate IN (0,1)),
+ message TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', submitted_at TEXT NOT NULL, updated TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS applicant_files(
+ id INTEGER PRIMARY KEY, applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+ category TEXT NOT NULL DEFAULT 'other', original_name TEXT NOT NULL, local_path TEXT NOT NULL,
+ source_ref TEXT NOT NULL DEFAULT '', UNIQUE(applicant_id,source_ref));
 CREATE TABLE IF NOT EXISTS audit_log(
  id INTEGER PRIMARY KEY, at TEXT NOT NULL, action TEXT NOT NULL, entity TEXT NOT NULL, entity_id INTEGER, detail TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS entries_period ON entries(period_id,day);
 CREATE INDEX IF NOT EXISTS payments_invoice ON payments(invoice_id);
 CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
 CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
+CREATE INDEX IF NOT EXISTS references_employee ON employment_references(employee_id,issue_date);
+CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submitted_at);
+CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 9
 
 
 class Database:
@@ -239,7 +260,8 @@ class Database:
             self.log("reminder", "invoices", invoice_id, {"level": level, "date": value})
 
     def delete(self, table, key):
-        if table not in ("entries", "time_records", "payments", "invoices", "salaries"):
+        if table not in ("entries", "time_records", "payments", "invoices", "salaries",
+                         "employment_references", "applicants", "applicant_files"):
             raise ValueError("Dieser Datensatz kann nicht gelöscht werden.")
         try:
             with self.conn:
@@ -383,6 +405,92 @@ class Database:
             raise ValueError("Der Name auf dem Lohnausweis fehlt.")
         return self._save("salaries", {"employee_id": employee_id, "year": year, "start": start, "end": end,
                                      "fields": json.dumps(clean, ensure_ascii=False), "updated": datetime.now().isoformat(timespec="seconds")}, key)
+
+    def references(self, employee_id=None):
+        sql = """SELECT r.*,e.first_name||' '||e.last_name AS name,e.kind AS employee_kind
+                 FROM employment_references r JOIN employees e ON e.id=r.employee_id"""
+        args = ()
+        if employee_id is not None:
+            sql += " WHERE r.employee_id=?"
+            args = (employee_id,)
+        rows = self.rows(sql + " ORDER BY r.issue_date DESC,r.id DESC", args)
+        for row in rows:
+            row["ratings"] = json.loads(row["ratings"])
+        return rows
+
+    def reference(self, key):
+        row = self.one("SELECT * FROM employment_references WHERE id=?", (key,))
+        if row:
+            row["ratings"] = json.loads(row["ratings"])
+        return row
+
+    def save_reference(self, data, key=None):
+        reference_type = str(data.get("reference_type", "")).strip()
+        employee_id = int(data.get("employee_id") or 0)
+        issue_date = iso(data.get("issue_date"))
+        end_date = str(data.get("end_date", "")).strip()
+        if end_date:
+            end_date = iso(end_date)
+        if reference_type not in ("work", "interim", "apprentice") or not self.employee(employee_id):
+            raise ValueError("Bitte Person und Zeugnisart prüfen.")
+        ratings = {str(k): int(v) for k, v in dict(data.get("ratings", {})).items()}
+        if not ratings or any(value not in range(1, 6) for value in ratings.values()):
+            raise ValueError("Bitte alle Beurteilungen beantworten.")
+        text = str(data.get("text", "")).strip()
+        if len(text) < 80:
+            raise ValueError("Der Zeugnistext ist noch unvollständig.")
+        values = {"employee_id": employee_id, "reference_type": reference_type,
+                  "issue_date": issue_date, "end_date": end_date,
+                  "reason": str(data.get("reason", "")).strip(),
+                  "tasks": str(data.get("tasks", "")).strip(),
+                  "ratings": json.dumps(ratings, ensure_ascii=False), "text": text,
+                  "updated": datetime.now().isoformat(timespec="seconds")}
+        return self._save("employment_references", values, key)
+
+    def applicants(self):
+        return self.rows("SELECT * FROM applicants ORDER BY submitted_at DESC,id DESC")
+
+    def applicant(self, key):
+        return self.one("SELECT * FROM applicants WHERE id=?", (key,))
+
+    def save_applicant(self, data, key=None):
+        category = str(data.get("category", "")).strip()
+        status = str(data.get("status", "new")).strip()
+        if category not in ("trial", "installer", "assembly"):
+            raise ValueError("Bitte eine Bewerbungsart auswählen.")
+        if status not in ("new", "review", "interview", "trial", "offer", "rejected", "hired"):
+            raise ValueError("Bitte einen gültigen Bewerbungsstatus auswählen.")
+        submitted_at = str(data.get("submitted_at") or datetime.now().isoformat(timespec="seconds")).strip()
+        try:
+            datetime.fromisoformat(submitted_at)
+        except ValueError:
+            raise ValueError("Das Eingangsdatum ist ungültig.") from None
+        values = {field: str(data.get(field, "")).strip() for field in
+                  ("source_id", "first_name", "last_name", "address", "postcode", "city",
+                   "email", "phone", "message", "notes")}
+        if not values["source_id"]:
+            values["source_id"] = f"manual-{uuid4().hex}"
+        if not values["first_name"] or not values["last_name"]:
+            raise ValueError("Vorname und Nachname sind erforderlich.")
+        values.update({"category": category, "status": status,
+                       "vocational_baccalaureate": 1 if data.get("vocational_baccalaureate") else 0,
+                       "submitted_at": submitted_at,
+                       "updated": datetime.now().isoformat(timespec="seconds")})
+        return self._save("applicants", values, key)
+
+    def applicant_files(self, applicant_id):
+        return self.rows("SELECT * FROM applicant_files WHERE applicant_id=? ORDER BY category,original_name",
+                         (applicant_id,))
+
+    def save_applicant_file(self, applicant_id, category, original_name, local_path, source_ref=""):
+        if not self.applicant(applicant_id):
+            raise ValueError("Die Bewerbung existiert nicht mehr.")
+        values = {"applicant_id": applicant_id, "category": str(category or "other").strip(),
+                  "original_name": str(original_name).strip(), "local_path": str(local_path).strip(),
+                  "source_ref": str(source_ref).strip()}
+        if not values["original_name"] or not values["local_path"]:
+            raise ValueError("Die Dokumentangaben sind unvollständig.")
+        return self._save("applicant_files", values)
 
     def backup(self, destination):
         target = Path(destination)

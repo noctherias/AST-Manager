@@ -68,7 +68,7 @@ class UiTests(unittest.TestCase):
         self.assertEqual(window.watermark.geometry(), window.stack.geometry())
         self.assertTrue(window.watermark.testAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents))
-        for index in range(6):
+        for index in range(8):
             QTest.mouseClick(window.buttons[index], Qt.MouseButton.LeftButton)
             for _ in range(4): APP.processEvents()
             self.assertEqual(window.stack.currentIndex(), index)
@@ -78,6 +78,8 @@ class UiTests(unittest.TestCase):
                 window.grab().save(str(folder / f"page-{index}.png"))
         self.assertEqual(window.buttons[5].objectName(), "navSubButton")
         self.assertGreater(window.pages[5].table.rowCount(), 0)
+        self.assertGreater(window.pages[6].table.rowCount(), 0)
+        self.assertGreater(window.pages[7].table.rowCount(), 0)
         reminders = window.pages[5]
         reminders.tabs.setCurrentIndex(1)
         reminders.template_editors[1].clear()
@@ -186,6 +188,26 @@ class UiTests(unittest.TestCase):
         self.assertEqual(reopened.sidebar.width(), 250)
         self.assertEqual(reopened.buttons[1].text(), "Debitoren")
         self.assertEqual(self.db.settings()["sidebar_collapsed"], "0")
+
+    def test_table_columns_rows_and_visibility_persist(self):
+        window = MainWindow(self.db, True)
+        window.show(); window.navigate(7); APP.processEvents()
+        table = window.pages[7].table
+        self.assertGreater(table.columnCount(), 2)
+        self.assertGreater(table.rowCount(), 0)
+        table._set_column_visible(4, False)
+        table._set_row_visible(0, False)
+        last = table.columnCount() - 1
+        table.horizontalHeader().moveSection(table.horizontalHeader().visualIndex(last), 0)
+        APP.processEvents()
+
+        reopened = MainWindow(self.db, True)
+        reopened.navigate(7); APP.processEvents()
+        restored = reopened.pages[7].table
+        self.assertTrue(restored.isColumnHidden(4))
+        self.assertTrue(restored.isRowHidden(0))
+        self.assertEqual(restored.horizontalHeader().visualIndex(last), 0)
+        restored._reset_columns(); restored._reset_rows()
 
     def test_time_and_salary_dialogs(self):
         e = self.db.employees()[0]

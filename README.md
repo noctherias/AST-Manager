@@ -1,6 +1,6 @@
 # AST Manager
 
-Windows-Desktopanwendung in Python mit fünf klaren Arbeitsbereichen, zentraler SQLite-Datenbank, Excel-Stundennachweis und Ausgabe in der bereitgestellten Lohnausweis-PDF. Excel wird zur Erfassung und zum Export nicht benötigt; die exportierte `.xlsm` kann anschliessend in Excel geöffnet, berechnet und gedruckt werden.
+Windows-Desktopanwendung in Python mit acht klaren Arbeitsbereichen, zentraler SQLite-Datenbank, Excel-Stundennachweis und Ausgabe in der bereitgestellten Lohnausweis-PDF. Excel wird zur Erfassung und zum Export nicht benötigt; die exportierte `.xlsm` kann anschliessend in Excel geöffnet, berechnet und gedruckt werden.
 
 ## Sofort ausprobieren
 
@@ -20,9 +20,11 @@ Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfens
 2. **Debitoren:** Die Ansicht startet mit offenen Rechnungen. «Bezahlt» und «Alle» wechseln die Auswahl. Rechnung auswählen, dann **Zahlung erfassen**, **Mahnstufe** oder **Details bearbeiten**. Die Tabelle zeigt das Quartal automatisch aus dem Rechnungsdatum und besitzt eine Bemerkungsspalte. Über **Spalten** lassen sich Spalten ein- und ausblenden; ihre Reihenfolge kann direkt an den Überschriften verschoben werden. Beide Einstellungen bleiben nach dem Neustart erhalten. Eine bestehende Debitoren-Datei lässt sich über **Excel importieren** übernehmen. Zeitraumfilter und Export liegen bei den weiteren Optionen. Der eingerückte Unterpunkt **Mahnungen** führt durch Zahlungserinnerung, Mahnung 1, Mahnung 2 und Betreibung. Jede Stufe besitzt einen frei bearbeitbaren Brieftext. Variablen wie `{rechnungsnummer}`, `{betrag}`, `{frist}`, `{kunde}` oder `{tage_ueberfaellig}` lassen sich aus einer Liste in den Text einfügen und werden aus der Rechnung oder der manuellen Eingabemaske ersetzt. Der druckfertige PDF-Brief folgt dem AST-Briefstil mit Logo und Firmendaten links, Empfänger rechts, Zahlungsstand, Rechnungstabelle, Gruss und dreigeteilter Fusszeile. Kunden-Nr., Firmen-E-Mail und Website können in den Stammdaten ergänzt werden. Über **Mahnung manuell** kann derselbe Brief auch ohne zuvor erfasste Debitorenrechnung erstellt werden.
 3. **Stundennachweis:** Person auswählen und **Arbeitstag erfassen**. Pro Tag wird nur noch die effektive Arbeitszeit eingegeben. Montag bis Donnerstag werden automatisch mit 8.75 h, Freitag mit 8.25 h vorgeschlagen. **Zeitraum erfassen** setzt diese Regelzeiten automatisch für alle gewählten Tage ein. **Excel importieren** liest neue und bisherige AST-Jahresdateien; **Excel-Liste exportieren** befüllt die zwölf Monatsblätter der Vorlage.
 4. **Lohnausweise:** Vier Schritte führen durch Person/Zeitraum, Lohn/Abzüge, Zusatzangaben und abschliessende Prüfung. Die häufigen Lohnfelder stehen zuerst. Nach dem Speichern **PDF ansehen** oder **PDF speichern** wählen.
-5. **Einstellungen:** Das Team wird hier einmalig angelegt und bearbeitet. Daneben liegen Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert.
+5. **Zeugnisse:** Ein Assistent erstellt Arbeitszeugnisse, Zwischenzeugnisse und Lehrzeugnisse. Person, Art, Austrittsgrund, Aufgaben und Beurteilungen werden schrittweise erfasst. Aus den Multiple-Choice-Antworten entsteht ein vollständiger Text, der vor dem Speichern frei bearbeitet und anschliessend als AST-PDF ausgegeben werden kann.
+6. **Bewerbungen:** Jede Bewerbung wird als eigenes Dossier mit Kategorie, Status, Kontaktdaten, Nachricht, internen Notizen und Unterlagen geführt. Unterstützt werden Schnupperlehre, Elektroinstallateur/in EFZ und Montage-Elektriker/in EFZ. **Vom Webserver einlesen** übernimmt neue Formulareingänge und kopiert deren Uploads in die lokale AST-Datenablage. Bewerbungen können auch manuell erfasst werden.
+7. **Einstellungen:** Das Team wird hier einmalig angelegt und bearbeitet. Daneben liegen Firmendaten, Kunden, Datensicherung und Updates. Firmendaten werden beim Verlassen eines Feldes oder Bereichs gespeichert.
 
-Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Eingaben. `F5` aktualisiert die aktuelle Seite. Listen erklären, welche Auswahl für die nächste Aktion nötig ist. Tabellenüberschriften und Zellinhalte sind einheitlich mittig ausgerichtet. Die linke Navigation lässt sich über den Pfeil beim AST-Schriftzug einklappen; die gewählte Ansicht bleibt nach einem Neustart erhalten. Grössere Formulare und ausgeklappte Details können gescrollt werden.
+Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Eingaben. `F5` aktualisiert die aktuelle Seite. Listen erklären, welche Auswahl für die nächste Aktion nötig ist. Tabellenüberschriften und Zellinhalte sind einheitlich mittig ausgerichtet. In jeder Tabelle lassen sich Spalten und Zeilen an ihren Überschriften ziehen; per Rechtsklick können sie aus- und wieder eingeblendet oder zurückgesetzt werden. Die Anordnung und Sichtbarkeit bleiben nach einem Neustart erhalten. Die linke Navigation lässt sich über den Pfeil beim AST-Schriftzug einklappen; die gewählte Ansicht bleibt ebenfalls erhalten. Grössere Formulare und ausgeklappte Details können gescrollt werden.
 
 Die Arbeitszeit entspricht der bereits bereinigten Tageszeit: Montag bis Donnerstag 07:00–12:00 abzüglich 0.25 h Pause plus 13:00–17:00 ergibt 8.75 h; Freitag endet der Nachmittag um 16:30 und ergibt 8.25 h. Personen mit bestehenden Daten können in den Einstellungen auf inaktiv gesetzt werden.
 
@@ -46,6 +48,7 @@ Standard: `%LOCALAPPDATA%\AST-Erfassungstool\`.
 - `backups\`: tägliche Start-Sicherungen und Sicherungen vor einer Wiederherstellung. Unter Einstellungen kann zusätzlich ein externer Ordner mit Aufbewahrungsfrist gewählt werden.
 - `vorschau\`: erzeugte PDF-Vorschauen.
 - `updates\`: heruntergeladene und geprüfte Setups.
+- `applications\`: lokale Kopien der eingelesenen Bewerbungsunterlagen, nach Dossier geordnet.
 - `ast.log`: Fehlermeldungen.
 
 Ein anderer Ordner lässt sich mit `python main.py --data-dir "D:\AST-Daten"` wählen. Eine zweite Instanz derselben Datenbank wird verhindert. Die App ist für einen lokalen Arbeitsplatz gedacht. Die SQLite-Datei ist nicht verschlüsselt; sie übernimmt die Windows-Dateizugriffsrechte.
@@ -65,12 +68,14 @@ ast_app/
   window.py                Hauptfenster und Navigation
   documents.py             Original-PDF befüllen, Berichte, CSV
   reminders.py             Mahnstufen, Textvorlagen und PDF-Briefe
+  references.py            Zeugnisassistent, Textbausteine und PDF-Ausgabe
+  applications.py          Bewerbungsdossiers und Website-Import
   timesheet_excel.py       Makrovorlage verlustfrei befüllen und prüfen
   demo.py                  Fiktive Demo, nur im Demomodus
 templates/                 Originalvorlagen für Lohnausweis und Zeiterfassung
 docs/                      Vorlagenanalyse und Testprotokoll
 tests/                     Fachlogik, Vorlagenvergleich, Datenbank, PDF, UI
-tools/                     Reproduzierbare Analyse und Build-Hilfen
+tools/                     Analyse, Build-Hilfen und reversible Website-Anbindung
 scripts/                   Windows-Start-, Test- und Build-Skripte
 assets/                    Anwendungssymbol
 requirements*.txt          Fixierte Abhängigkeiten

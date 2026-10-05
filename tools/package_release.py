@@ -29,7 +29,7 @@ def main():
     shutil.copy2(ROOT / "THIRD_PARTY_NOTICES.md", DIST / "THIRD_PARTY_NOTICES.md")
     shutil.copytree(ROOT / "docs", DIST / "docs", dirs_exist_ok=True)
     packages = []
-    for folder, filename, exclude in [(ROOT, "AST-Erfassungstool-Quellcode.zip", {"dist", "build", ".venv", "__pycache__", ".git", "credentials", "installer-output"}),
+    for folder, filename, exclude in [(ROOT, "AST-Erfassungstool-Quellcode.zip", {"dist", "build", "build-smoke", "tmp", "output", ".venv", "__pycache__", ".git", ".pytest_cache", "credentials", "installer-output"}),
                                        (DIST, "AST-Verwaltung-Windows.zip", {"__pycache__"})]:
         path = OUT / filename
         with ZipFile(path, "w", ZIP_DEFLATED, compresslevel=6) as archive:
