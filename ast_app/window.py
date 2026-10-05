@@ -1,6 +1,6 @@
 from datetime import date
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget,
                                QButtonGroup, QFrame, QScrollArea, QApplication, QStyle)
 
@@ -9,6 +9,34 @@ from .experience import Start, Invoices, Reminders, Team, Salaries, Settings
 from .update_ui import UpdateController
 from . import __version__
 from .documents import resource_path
+
+
+class BackgroundWatermark(QWidget):
+    """Subtle, click-through company logo above the working area."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("backgroundWatermark")
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._logo = QPixmap(str(resource_path("assets/logo_ast_black.png")))
+
+    def paintEvent(self, event):
+        if self._logo.isNull():
+            return
+        maximum = QSize(max(1, int(self.width() * 0.64)),
+                        max(1, int(self.height() * 0.46)))
+        logo = self._logo.scaled(
+            maximum, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        x = (self.width() - logo.width()) // 2
+        y = (self.height() - logo.height()) // 2
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setOpacity(0.035)
+        painter.drawPixmap(x, y, logo)
 
 
 class MainWindow(QMainWindow):
@@ -22,6 +50,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1120, 720)
         root = QWidget()
         root.setObjectName("appRoot")
+        self.root = root
         self.setCentralWidget(root)
         layout = QHBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -87,12 +116,24 @@ class MainWindow(QMainWindow):
             scroll.setWidgetResizable(True)
             scroll.setWidget(page)
             self.stack.addWidget(scroll)
+        self.watermark = BackgroundWatermark(self.root)
+        self.stack.currentChanged.connect(self._position_watermark)
+        QTimer.singleShot(0, self._position_watermark)
         self.statusBar().showMessage(("DEMO · Fiktive Beispieldaten · " if demo else "") + "Bereit · Änderungen werden beim Speichern übernommen")
         self.navigate(0)
         QApplication.instance().aboutToQuit.connect(self.prepare_shutdown)
         self.refresh_shortcut = QShortcut(QKeySequence("F5"), self)
         self.refresh_shortcut.activated.connect(lambda: self.pages[self.stack.currentIndex()].refresh())
         self.set_sidebar_collapsed(self.db.settings().get("sidebar_collapsed", "0") == "1", save=False)
+
+    def _position_watermark(self, *_):
+        self.watermark.setGeometry(self.stack.geometry())
+        self.watermark.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "watermark"):
+            self._position_watermark()
 
     def toggle_sidebar(self):
         self.set_sidebar_collapsed(not self.sidebar_collapsed)
@@ -115,6 +156,8 @@ class MainWindow(QMainWindow):
             nav_button.style().polish(nav_button)
         if save:
             self.db.save_settings({"sidebar_collapsed": "1" if collapsed else "0"})
+        if hasattr(self, "watermark"):
+            QTimer.singleShot(0, self._position_watermark)
 
     def navigate(self, index):
         if not hasattr(self, "pages"):

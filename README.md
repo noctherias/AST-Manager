@@ -8,6 +8,8 @@ Windows-Desktopanwendung in Python mit fünf klaren Arbeitsbereichen, zentraler 
 
 **Portable Windows-Version:** Das komplette Windows-Paket entpacken. `Demo starten.bat` öffnet eine getrennte Demo mit fiktiven Personen, Rechnungen, Stunden und einem Lohnausweis. `AST-Verwaltung.exe` öffnet die zunächst leere produktive Datenbank. Der Ordner `_internal` muss neben der EXE bleiben. Python und Excel sind nicht nötig. Die Datenerfassung funktioniert offline; nur die Update-Suche benötigt Internet.
 
+Das AST-Firmenlogo liegt als dezentes, transparentes Wasserzeichen im hellen Arbeitsbereich. Es wird mit dem Programm ausgeliefert und benötigt keinen Zugriff auf das ursprüngliche Netzlaufwerk.
+
 **Aus dem Quellcode:** Python 3.12, 64 Bit, installieren und `start_demo.bat` doppelklicken. Beim ersten Start werden die Bibliotheken aus `requirements.txt` in eine lokale `.venv` installiert. Dafür ist Internet nötig. Danach startet die App offline. `start.bat` öffnet die produktive Datenbank.
 
 Getestet unter Windows 11 x64 mit Python 3.12.14 und PySide6 6.11.2. Mindestfenstergrösse 1120 × 720 logische Pixel; 1380 × 880 oder grösser empfohlen.

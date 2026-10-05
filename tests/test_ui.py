@@ -63,6 +63,11 @@ class UiTests(unittest.TestCase):
     def test_navigation_and_all_pages(self):
         window = MainWindow(self.db, True)
         window.show()
+        APP.processEvents()
+        self.assertFalse(window.watermark._logo.isNull())
+        self.assertEqual(window.watermark.geometry(), window.stack.geometry())
+        self.assertTrue(window.watermark.testAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents))
         for index in range(6):
             QTest.mouseClick(window.buttons[index], Qt.MouseButton.LeftButton)
             for _ in range(4): APP.processEvents()

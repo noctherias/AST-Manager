@@ -1,6 +1,6 @@
 # Testprotokoll
 
-Stand: 05.10.2026, Version 0.9.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
+Stand: 05.10.2026, Version 0.10.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
 
 ## Automatisierte Tests
 
@@ -18,7 +18,7 @@ Stand: 05.10.2026, Version 0.9.0. Geprüft unter Windows 11 x64 (10.0.26200), Py
 | PDF-Struktur | Vollständige Widget-/Feldbaum-Zuordnung der Quelle, alle Eingabefelder, Checkboxen und fünf Aussteller-Unterfelder; sichtbare Einbettung in die fertige Seite, keine verbleibenden Widgets, entfernte Vorlagenwerte, Ablehnung unbekannter Felder. |
 | Berichte/CSV | Mehrseitiger PDF-Bericht, Unicode-CSV, Schutz vor Formelinterpretation beim späteren Öffnen in Tabellenprogrammen. |
 | Updates | Fest eingebauter öffentlicher Update-Kanal, Versionsvergleich, stabile Releases, sichere Weiterleitungsziele, Hash-/Grössenprüfung, Abbruchbereinigung, Offline-/Zugriffsfehler, Datenbanksicherung vor Installation, Startparameter und erneute Integritätsprüfung. |
-| Oberfläche | Fünf Arbeitsbereiche navigiert, Filter, Auswahlaktionen, reale Qt-Klicks zum Speichern von Kunden, Rechnung, Teilzahlung und Arbeitstag; Lohnausweis speichern/wiederöffnen, integrierte PDF-Vorschau; Teamverwaltung unter Einstellungen und Erhalt der Firmendaten beim Schliessen. Die explizite helle Palette wurde mit Bildausgaben der Seiten und Dialoge geprüft. |
+| Oberfläche | Fünf Arbeitsbereiche navigiert, Filter, Auswahlaktionen, reale Qt-Klicks zum Speichern von Kunden, Rechnung, Teilzahlung und Arbeitstag; Lohnausweis speichern/wiederöffnen, integrierte PDF-Vorschau; Teamverwaltung unter Einstellungen und Erhalt der Firmendaten beim Schliessen. Das gebündelte Firmenlogo wird als dezentes, klickdurchlässiges Wasserzeichen im Arbeitsbereich dargestellt. Die explizite helle Palette wurde mit Bildausgaben der Seiten und Dialoge geprüft. |
 
 Die Qt-Tests laufen mit dem Offscreen-Plugin. Für die Bildkontrolle wurden die Windows-Schriften explizit geladen. Es wurden zusätzlich die Hauptseiten und der Lohnausweisdialog als Bilder geprüft. Die drei PDF-Arten wurden mit Poppler gerendert und visuell auf Text, Feldpositionen, Summen und Seitenränder kontrolliert.
 
