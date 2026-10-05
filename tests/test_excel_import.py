@@ -40,15 +40,15 @@ class ExcelImportTests(unittest.TestCase):
         self.assertEqual(import_debtors(self.db, path)["skipped"], 1)
 
     def test_exported_timesheet_can_be_imported_for_another_person(self):
-        source = [{"day": "2026-09-30", "start_1": 420, "end_1": 720, "start_2": 780,
-                   "end_2": 1020, "break_minutes": 15, "code": "H", "note": "Baustelle"}]
+        source = [{"day": "2026-09-30", "worked_minutes": 525,
+                   "code": "H", "note": "Baustelle"}]
         path = self.root / "zeiten.xlsm"
         export_timesheet(path, self.db.employee(self.employee), 2026, source, "AST AG")
         result = import_timesheet(self.db, path, self.employee)
         self.assertEqual(result["created"], 1)
         record = self.db.time_records(self.employee, 2026)[0]
-        self.assertEqual((record["start_1"], record["end_2"], record["break_minutes"], record["note"]),
-                         (420, 1020, 15, "Baustelle"))
+        self.assertEqual((record["worked_minutes"], record["start_1"], record["note"]),
+                         (525, None, "Baustelle"))
 
 
 if __name__ == "__main__":

@@ -118,18 +118,30 @@ def import_timesheet(db, path, employee_id, overwrite=False):
         raise ValueError("Die zwölf Monatsblätter wurden nicht gefunden.")
     records = []
     for month, sheet in enumerate(month_sheets, 1):
+        direct_hours = str(sheet["D3"].value or "").replace("\n", " ").strip().lower() == "arbeitszeit"
         for day_number in range(1, monthrange(year, month)[1] + 1):
             row = day_number + 3
             values = [sheet.cell(row, column).value for column in (4, 5, 6, 7, 8, 10, 15)]
             if not any(value not in (None, "") and not (isinstance(value, str) and value.startswith("=")) for value in values):
                 continue
-            start_1, end_1, start_2, end_2 = (_minutes(value) for value in values[:4])
-            pause = _minutes(values[4]) or 0
+            if direct_hours:
+                start_1 = end_1 = start_2 = end_2 = None
+                pause = 0
+                effective_minutes = _minutes(values[0]) or 0
+            else:
+                start_1, end_1, start_2, end_2 = (_minutes(value) for value in values[:4])
+                pause = _minutes(values[4]) or 0
+                effective_minutes = 0
+                for start_value, end_value in ((start_1, end_1), (start_2, end_2)):
+                    if start_value is not None and end_value is not None:
+                        effective_minutes += (end_value - start_value) % 1440
+                effective_minutes = max(0, effective_minutes - pause)
             code = "" if values[5] in (None, "") else str(values[5]).strip().upper()
             note = "" if values[6] in (None, "") else str(values[6]).strip()
             records.append({"employee_id": employee_id, "day": date(year, month, day_number).isoformat(),
                             "start_1": start_1, "end_1": end_1, "start_2": start_2, "end_2": end_2,
-                            "break_minutes": pause, "code": code, "note": note})
+                            "break_minutes": pause, "worked_minutes": effective_minutes,
+                            "code": code, "note": note})
     workbook.close()
     if not records:
         raise ValueError("In der Excel-Datei wurden keine erfassten Arbeitstage gefunden.")

@@ -1,10 +1,10 @@
 # Testprotokoll
 
-Stand: 30.09.2026, Version 0.7.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
+Stand: 05.10.2026, Version 0.8.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
 
 ## Automatisierte Tests
 
-`python -m unittest discover -s tests -v`: **41 Tests**. Die fachlichen, Dokument-, Mahnbrief-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
+`python -m unittest discover -s tests -v`: **45 Tests**. Die fachlichen, Dokument-, Mahnbrief-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
 
 | Bereich | Geprüfte Fälle |
 |---|---|
@@ -12,7 +12,7 @@ Stand: 30.09.2026, Version 0.7.0. Geprüft unter Windows 11 x64 (10.0.26200), Py
 | Zahlen und Salden | Exakte Rappen und Hundertstelstunden, Schweizer Zahleneingaben, keine stille Rundung, negative Zeitguthaben, Überzeitkorrekturen und kumulative Absenzen. |
 | Debitoren | Offen/teilbezahlt/überfällig/bezahlt, Fälligkeit am Stichtag, Teilzahlungen, eindeutige Rechnungsnummern, Ablehnung von Überzahlung und unzulässiger Rechnungsreduktion. |
 | Perioden | Drei Jahre mit Übertrag, nachträgliche Änderung im ersten Jahr, kumulative Krankheit/Unfall, Persistenz nach Neustart, Überschneidungen, Grenzen des Buchungsdatums, Schutz vorhandener Startsalden. |
-| Zeiterfassung | Eindeutiger Datensatz pro Person/Tag, zwei Arbeitsblöcke, Zusatzpause, Codes und Bemerkung; Jahresfilter und Persistenz. Verlustfreier XLSM-Export mit identischer Paketstruktur und identischem VBA-Hash, korrekte Zielzellen sowie Entfernung vorbestehender Personendaten. |
+| Zeiterfassung | Direkte Tagesarbeitszeit, Regelzeit Montag–Donnerstag 8.75 h und Freitag 8.25 h, Bereichserfassung mit kürzerem Freitag, Codes und Bemerkung; Jahresfilter und Persistenz. Alte Uhrzeitblöcke werden beim Upgrade oder Import korrekt in effektive Minuten umgerechnet. Verlustfreier XLSM-Export mit identischer Paket- und Formelanzahl, identischem VBA-Hash, vereinfachten sichtbaren Spalten und Entfernung vorbestehender Personendaten. |
 | Sicherungen | SQLite-Sicherung und Wiederherstellung, automatische Sicherheitssicherung, Integritätsprüfung und gültige Fremdschlüssel nach Wiederherstellung. |
 | Lohnausweis | Richtige Brutto-/Abzugs-/Nettosumme, separate Quellensteuer und Spesen, Ganzfrankenbeträge, ein Ausweis pro Person/Jahr, Jahresgrenzen, Erhalt gespeicherter Personalangaben bei späteren Stammdatenänderungen. |
 | PDF-Struktur | Vollständige Widget-/Feldbaum-Zuordnung der Quelle, alle Eingabefelder, Checkboxen und fünf Aussteller-Unterfelder; sichtbare Einbettung in die fertige Seite, keine verbleibenden Widgets, entfernte Vorlagenwerte, Ablehnung unbekannter Felder. |

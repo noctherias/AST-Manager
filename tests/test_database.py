@@ -126,21 +126,21 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(self.db.salaries()[0]["fields"]["11"], "46000")
 
     def test_daily_time_records_are_unique_and_persisted(self):
-        data = {"employee_id": self.person, "day": "2026-01-05", "start_1": 450, "end_1": 720,
-                "start_2": 780, "end_2": 1035, "break_minutes": 15, "code": "H", "note": "Test"}
+        data = {"employee_id": self.person, "day": "2026-01-05", "worked_minutes": 525,
+                "code": "H", "note": "Test"}
         key = self.db.save_time_record(data)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["id"], key)
         with self.assertRaises(ValueError):
             self.db.save_time_record(data)
         with self.assertRaises(ValueError):
-            self.db.save_time_record({**data, "day": "2026-01-06", "start_1": None})
+            self.db.save_time_record({**data, "day": "2026-01-06", "worked_minutes": -1})
         self.db.close()
         self.db = Database(self.path)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["note"], "Test")
 
     def test_bulk_time_records_skip_or_overwrite_existing_days(self):
-        base = {"employee_id": self.person, "start_1": 450, "end_1": 720,
-                "start_2": 780, "end_2": 1020, "break_minutes": 0, "code": "", "note": "Serie"}
+        base = {"employee_id": self.person, "worked_minutes": 525,
+                "code": "", "note": "Serie"}
         records = [{**base, "day": f"2026-01-0{day}"} for day in (5, 6, 7)]
         first = self.db.save_time_records(records)
         self.assertEqual(first, {"created": 3, "updated": 0, "skipped": 0})
@@ -149,6 +149,33 @@ class DatabaseTests(unittest.TestCase):
         third = self.db.save_time_records([{**records[0], "note": "Neu"}], overwrite=True)
         self.assertEqual(third["updated"], 1)
         self.assertEqual(self.db.time_records(self.person, 2026)[2]["note"], "Neu")
+
+    def test_old_clock_record_is_converted_to_effective_minutes(self):
+        key = self.db.save_time_record({"employee_id": self.person, "day": "2026-01-08",
+                                        "start_1": 420, "end_1": 720, "start_2": 780,
+                                        "end_2": 1020, "break_minutes": 15, "code": "", "note": "Alt"})
+        record = next(row for row in self.db.time_records(self.person, 2026) if row["id"] == key)
+        self.assertEqual(record["worked_minutes"], 525)
+
+    def test_version_6_database_migrates_old_clock_records(self):
+        self.db.save_time_record({"employee_id": self.person, "day": "2026-01-09",
+                                  "start_1": 420, "end_1": 720, "start_2": 780,
+                                  "end_2": 990, "break_minutes": 15, "code": "", "note": "Altbestand"})
+        with self.db.conn:
+            self.db.conn.execute("ALTER TABLE time_records RENAME TO time_records_v7")
+            self.db.conn.execute("""CREATE TABLE time_records(
+                id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+                day TEXT NOT NULL, start_1 INTEGER, end_1 INTEGER, start_2 INTEGER, end_2 INTEGER,
+                break_minutes INTEGER NOT NULL DEFAULT 0, code TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+                UNIQUE(employee_id,day))""")
+            self.db.conn.execute("""INSERT INTO time_records(id,employee_id,day,start_1,end_1,start_2,end_2,break_minutes,code,note)
+                SELECT id,employee_id,day,start_1,end_1,start_2,end_2,break_minutes,code,note FROM time_records_v7""")
+            self.db.conn.execute("DROP TABLE time_records_v7")
+            self.db.conn.execute("PRAGMA user_version=6")
+        self.db.close()
+        self.db = Database(self.path)
+        record = next(row for row in self.db.time_records(self.person, 2026) if row["note"] == "Altbestand")
+        self.assertEqual(record["worked_minutes"], 495)
 
 
 if __name__ == "__main__": unittest.main()

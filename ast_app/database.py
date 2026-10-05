@@ -7,7 +7,7 @@ from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
 
-from .domain import KINDS, iso, invoice_state, period_balance, salary_totals
+from .domain import KINDS, iso, invoice_state, period_balance, salary_totals, worked_minutes
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS time_records(
  id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
  day TEXT NOT NULL, start_1 INTEGER, end_1 INTEGER, start_2 INTEGER, end_2 INTEGER,
  break_minutes INTEGER NOT NULL DEFAULT 0 CHECK(break_minutes>=0 AND break_minutes<=1440),
+ worked_minutes INTEGER NOT NULL DEFAULT 0 CHECK(worked_minutes>=0 AND worked_minutes<=1440),
  code TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
  UNIQUE(employee_id,day));
 CREATE TABLE IF NOT EXISTS invoices(
@@ -60,7 +61,7 @@ CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
 CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
 """
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class Database:
@@ -83,6 +84,12 @@ class Database:
         employee_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(employees)")}
         if "birth_date" not in employee_columns:
             self.conn.execute("ALTER TABLE employees ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''")
+        time_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(time_records)")}
+        if "worked_minutes" not in time_columns:
+            self.conn.execute("ALTER TABLE time_records ADD COLUMN worked_minutes INTEGER NOT NULL DEFAULT 0")
+            for record in self.rows("SELECT * FROM time_records"):
+                self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
+                                  (worked_minutes({**record, "worked_minutes": None}), record["id"]))
         invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
         if "reminder_level" not in invoice_columns:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
@@ -283,11 +290,13 @@ class Database:
         return self.rows(sql + " ORDER BY day DESC,id DESC", args)
 
     def save_time_record(self, data, key=None):
-        fields = ("employee_id", "day", "start_1", "end_1", "start_2", "end_2", "break_minutes", "code", "note")
+        fields = ("employee_id", "day", "start_1", "end_1", "start_2", "end_2", "break_minutes",
+                  "worked_minutes", "code", "note")
         d = {name: data.get(name) for name in fields}
         d["day"] = iso(d["day"])
         d["code"] = str(d.get("code") or "").strip().upper()
         d["note"] = str(d.get("note") or "").strip()
+        d["break_minutes"] = int(d.get("break_minutes") or 0)
         valid_codes = {"", "F", "G", "K", "KR", "KU", "KA", "U", "UH", "H", "B", "E1", "E2", "E3", "E4", "E5"}
         if d["code"] not in valid_codes:
             raise ValueError("Bitte einen gültigen Abwesenheits- oder Arbeitscode auswählen.")
@@ -310,8 +319,16 @@ class Database:
                 duration += (d["end_2"] - d["start_2"]) % 1440
             if duration <= d["break_minutes"]:
                 raise ValueError("Die zusätzliche Pause muss kürzer als die Arbeitszeit sein.")
-        elif not d["code"]:
-            raise ValueError("Bitte Arbeitszeiten oder einen Code erfassen.")
+        if d["worked_minutes"] is None:
+            d["worked_minutes"] = worked_minutes(d)
+        try:
+            d["worked_minutes"] = int(d["worked_minutes"])
+        except (TypeError, ValueError):
+            raise ValueError("Bitte eine gültige Arbeitszeit eingeben.") from None
+        if not 0 <= d["worked_minutes"] <= 1440:
+            raise ValueError("Die Arbeitszeit muss zwischen 0 und 24 Stunden liegen.")
+        if d["worked_minutes"] == 0 and not d["code"]:
+            raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
         return self._save("time_records", d, key)
 
     def save_time_records(self, records, overwrite=False):
@@ -392,5 +409,11 @@ class Database:
             self.backup(safety)
             incoming.backup(self.conn)
             self.conn.executescript(SCHEMA)
+            time_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(time_records)")}
+            if "worked_minutes" not in time_columns:
+                self.conn.execute("ALTER TABLE time_records ADD COLUMN worked_minutes INTEGER NOT NULL DEFAULT 0")
+                for record in self.rows("SELECT * FROM time_records"):
+                    self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
+                                      (worked_minutes({**record, "worked_minutes": None}), record["id"]))
             self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         return safety

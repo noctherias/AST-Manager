@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtCore import Qt, QLocale, QCoreApplication, QEvent
+from PySide6.QtCore import Qt, QLocale, QCoreApplication, QEvent, QDate
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
@@ -16,7 +16,8 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
 from ast_app.database import Database
 from ast_app.demo import seed_demo
 from ast_app.window import MainWindow
-from ast_app.dialogs import EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog, SalaryDialog, PaymentDialog, TimeRecordDialog, ManualReminderDialog
+from ast_app.dialogs import (EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog,
+                             SalaryDialog, PaymentDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog)
 from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
@@ -203,7 +204,7 @@ class UiTests(unittest.TestCase):
     def test_simple_daily_time_dialog(self):
         employee = self.db.employees()[0]
         dialog = TimeRecordDialog(None, self.db, employee)
-        dialog.fields["day"].setDate(dialog.fields["day"].date().addDays(-10))
+        dialog.fields["day"].setDate(QDate(2026, 1, 5))
         dialog.fields["note"].setText("Baustelle")
         dialog.show(); APP.processEvents()
         if os.environ.get("AST_QA_DIR"):
@@ -211,8 +212,18 @@ class UiTests(unittest.TestCase):
         dialog.submit()
         self.assertEqual(dialog.result(), QDialog.DialogCode.Accepted)
         saved = next(row for row in self.db.time_records(employee["id"]) if row["note"] == "Baustelle")
-        self.assertEqual(saved["start_1"], 450)
-        self.assertEqual(saved["start_2"], 780)
+        self.assertEqual(saved["worked_minutes"], 525)
+        self.assertIsNone(saved["start_1"])
+
+    def test_bulk_time_dialog_uses_shorter_friday(self):
+        employee = self.db.employees()[0]
+        dialog = BulkTimeDialog(None, self.db, employee, 2026)
+        dialog.fields["start_day"].setDate(QDate(2026, 1, 5))
+        dialog.fields["end_day"].setDate(QDate(2026, 1, 9))
+        dialog.submit()
+        records = {row["day"]: row["worked_minutes"] for row in self.db.time_records(employee["id"], 2026)}
+        self.assertEqual([records[f"2026-01-0{day}"] for day in range(5, 9)], [525, 525, 525, 525])
+        self.assertEqual(records["2026-01-09"], 495)
 
     def test_manual_reminder_dialog_builds_standalone_claim(self):
         dialog = ManualReminderDialog(None, self.db)

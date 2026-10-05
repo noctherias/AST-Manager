@@ -77,6 +77,29 @@ def display_date(value: str | None) -> str:
     return date.fromisoformat(value).strftime("%d.%m.%Y") if value else "–"
 
 
+def scheduled_work_minutes(value: str | date) -> int:
+    """Regular AST working time: Mon–Thu 8:45, Fri 8:15."""
+    workday = date.fromisoformat(value) if isinstance(value, str) else value
+    if workday.weekday() < 4:
+        return 8 * 60 + 45
+    if workday.weekday() == 4:
+        return 8 * 60 + 15
+    return 0
+
+
+def worked_minutes(record: dict) -> int:
+    """Return direct working minutes, with compatibility for old clock records."""
+    direct = record.get("worked_minutes")
+    if direct is not None:
+        return max(0, int(direct))
+    total = 0
+    for start, end in ((record.get("start_1"), record.get("end_1")),
+                       (record.get("start_2"), record.get("end_2"))):
+        if start is not None and end is not None:
+            total += (int(end) - int(start)) % 1440
+    return max(0, total - int(record.get("break_minutes") or 0))
+
+
 def invoice_state(amount: int, paid: int, due: str, today=None) -> str:
     if paid >= amount:
         return "Bezahlt"

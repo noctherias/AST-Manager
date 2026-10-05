@@ -1,8 +1,8 @@
 """Fill the supplied macro workbook without rebuilding its OOXML package.
 
-Only the intended input cells are changed. VBA, controls, drawings, printer
-settings, formulas, validation and the remaining ZIP members stay byte-for-byte
-identical.
+Only the intended input cells and the direct-hours presentation/formulas are
+changed. VBA, controls, drawings, printer settings, validation and the
+remaining ZIP members stay byte-for-byte identical.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 from .documents import resource_path
+from .domain import worked_minutes
 
 
 MONTH_SHEETS = {month: f"xl/worksheets/sheet{month + 5}.xml" for month in range(1, 13)}
@@ -74,6 +75,48 @@ def _replace_cell_style(xml: str, reference: str, style_id: int) -> str:
     else:
         cell_xml = cell_xml.replace("<c", f'<c s="{style_id}"', 1)
     return xml[:match.start()] + cell_xml + xml[match.end():]
+
+
+def _replace_formula(xml: str, reference: str, formula_text: str) -> str:
+    """Replace only a formula's text and retain shared-formula metadata/style."""
+    match = _cell_pattern(reference).search(xml)
+    if not match:
+        raise ValueError(f"Excel-Vorlage: Zelle {reference} wurde nicht gefunden.")
+    cell_xml = match.group(0)
+    formula = re.search(r'(<f(?:\s[^>]*)?>).*?(</f>)', cell_xml, re.DOTALL)
+    if not formula:
+        raise ValueError(f"Excel-Vorlage: Formel in {reference} wurde nicht gefunden.")
+    replacement = formula.group(1) + escape(formula_text, quote=False) + formula.group(2)
+    cell_xml = cell_xml[:formula.start()] + replacement + cell_xml[formula.end():]
+    return xml[:match.start()] + cell_xml + xml[match.end():]
+
+
+def _simplify_time_columns(xml: str) -> str:
+    """Expose one direct-hours column and hide the obsolete clock columns."""
+    xml = _replace_cell(xml, "D3", "Arbeitszeit", "string")
+
+    def adjust(match):
+        tag = match.group(0)
+        minimum = int(re.search(r'\bmin="(\d+)"', tag).group(1))
+        maximum = int(re.search(r'\bmax="(\d+)"', tag).group(1))
+        if 5 <= minimum and maximum <= 9:
+            if ' hidden=' in tag:
+                tag = re.sub(r'\bhidden="[^"]*"', 'hidden="1"', tag)
+            else:
+                tag = tag[:-2] + ' hidden="1"/>'
+        if minimum == maximum == 4:
+            tag = re.sub(r'\bwidth="[^"]*"', 'width="12"', tag)
+        if minimum == maximum == 10:
+            tag = re.sub(r'\bwidth="[^"]*"', 'width="7"', tag)
+        return tag
+
+    return re.sub(r'<col\b[^>]*/>', adjust, xml)
+
+
+def _use_direct_hours_formula(xml: str) -> str:
+    # K4 is a standalone formula; K5 is the shared master for K5:K34.
+    xml = _replace_formula(xml, "K4", 'IF(A4="",0,IF(D4="",0,D4))')
+    return _replace_formula(xml, "K5", 'IF(A5="",0,IF(D5="",0,D5))')
 
 
 def _convert_scheduled_hours_formula(xml: str, reference: str) -> str:
@@ -282,6 +325,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     by_day = {date.fromisoformat(r["day"]): r for r in records if date.fromisoformat(r["day"]).year == year}
     for month, xml_name in MONTH_SHEETS.items():
         xml = members[xml_name].decode("utf-8")
+        xml = _simplify_time_columns(xml)
+        xml = _use_direct_hours_formula(xml)
         if company:
             xml = _replace_cell(xml, "C1", company, "string")
         # L4, M4 and N4 are masters of their shared formulas down to row 34.
@@ -295,9 +340,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             record = by_day.get(date(year, month, day_number)) if day_number <= 28 or _valid_day(year, month, day_number) else None
             if not record:
                 continue
-            for column, key in (("D", "start_1"), ("E", "end_1"), ("F", "start_2"), ("G", "end_2")):
-                xml = _replace_cell(xml, f"{column}{row}", _time_serial(record.get(key)))
-            xml = _replace_cell(xml, f"H{row}", _time_serial(record.get("break_minutes") or None))
+            xml = _replace_cell(xml, f"D{row}", _time_serial(worked_minutes(record)))
             xml = _replace_cell(xml, f"J{row}", record.get("code", ""), "string")
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
         xml = styles.apply(xml, _monthly_time_cells())

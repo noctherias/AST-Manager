@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStack
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
-from .domain import TIME_CODES, chf, number, display_date
+from .domain import TIME_CODES, chf, number, display_date, scheduled_work_minutes, worked_minutes
 from .timesheet_excel import export_timesheet
 from .excel_import import import_timesheet
 from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS, PLACEHOLDER_INFO,
@@ -469,9 +469,9 @@ class TimeWorkspace(Page):
         row.addWidget(button("Excel importieren", self.import_excel))
         row.addWidget(self.export_btn)
         self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
-                                   ("Arbeitstage", "Tage mit Kommt-/Geht-Zeit"),
+                                   ("Arbeitstage", "Tage mit eingetragener Arbeitszeit"),
                                    ("Abwesenheiten", "Tage mit einem Code")])
-        self.table = Table(["Datum", "Wochentag", "Arbeitsblock 1", "Arbeitsblock 2", "Pause", "Art", "Total", "Bemerkung"])
+        self.table = Table(["Datum", "Wochentag", "Arbeitszeit", "Sollzeit", "Abweichung", "Art", "Bemerkung"])
         self.layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(self.layout, "Wähle einen Tag aus oder erfasse einen neuen.")
         self.edit_btn = button("Tag bearbeiten", self.edit_entry)
@@ -487,20 +487,14 @@ class TimeWorkspace(Page):
         self.selection()
 
     @staticmethod
-    def _clock(minutes):
-        return "–" if minutes is None else f"{minutes // 60:02d}:{minutes % 60:02d}"
-
-    @staticmethod
-    def _worked(record):
-        total = 0
-        for start, end in ((record["start_1"], record["end_1"]), (record["start_2"], record["end_2"])):
-            if start is not None and end is not None:
-                total += (end - start) % 1440
-        return max(0, total - record["break_minutes"])
-
-    @staticmethod
     def _duration(minutes):
-        return f"{minutes // 60}:{minutes % 60:02d} h" if minutes else "–"
+        return f"{minutes // 60}:{minutes % 60:02d} h" if minutes is not None else "–"
+
+    @staticmethod
+    def _difference(minutes):
+        sign = "+" if minutes >= 0 else "−"
+        value = abs(minutes)
+        return f"{sign}{value // 60}:{value % 60:02d} h"
 
     def show_person(self, key):
         self.employee = self.db.employee(key)
@@ -530,16 +524,16 @@ class TimeWorkspace(Page):
         weekdays = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
         for record in self.current_records:
             day_value = date.fromisoformat(record["day"])
-            worked = self._worked(record)
+            worked = worked_minutes(record)
+            scheduled = scheduled_work_minutes(day_value)
             total += worked
-            workdays += int(record["start_1"] is not None)
+            workdays += int(worked > 0)
             absences += int(bool(record["code"]))
-            block1 = f"{self._clock(record['start_1'])} – {self._clock(record['end_1'])}" if record["start_1"] is not None else "–"
-            block2 = f"{self._clock(record['start_2'])} – {self._clock(record['end_2'])}" if record["start_2"] is not None else "–"
-            rows.append([display_date(record["day"]), weekdays[day_value.weekday()], block1, block2,
-                         f"{record['break_minutes']} min" if record["break_minutes"] else "–",
-                         TIME_CODES.get(record["code"], record["code"]), self._duration(worked), record["note"]])
-        self.table.populate(rows, [record["id"] for record in self.current_records], [6])
+            difference = "–" if record["code"] and not worked else self._difference(worked - scheduled)
+            rows.append([display_date(record["day"]), weekdays[day_value.weekday()], self._duration(worked),
+                         self._duration(scheduled), difference,
+                         TIME_CODES.get(record["code"], record["code"]), record["note"]])
+        self.table.populate(rows, [record["id"] for record in self.current_records], [2])
         self.cards[0].set(self._duration(total))
         self.cards[1].set(str(workdays))
         self.cards[2].set(str(absences))
