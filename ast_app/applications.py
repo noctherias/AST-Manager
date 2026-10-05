@@ -12,11 +12,12 @@ import re
 import shutil
 import ssl
 
-from PySide6.QtCore import Qt, QUrl, QTimer, QObject, QThread, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Qt, QUrl, QTimer, QObject, QThread, Signal, Slot, QSize
+from PySide6.QtGui import QDesktopServices, QColor
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QDialogButtonBox,
                                QCheckBox, QPlainTextEdit, QListWidget, QListWidgetItem, QFileDialog,
-                               QMessageBox, QHeaderView, QLineEdit)
+                               QMessageBox, QHeaderView, QLineEdit, QFrame, QWidget, QScrollArea,
+                               QGridLayout)
 
 from .widgets import Page, Table, button, combo, label, line, guarded, confirm
 from .secrets import protect_secret, unprotect_secret
@@ -32,6 +33,8 @@ STATUSES = {
     "trial": "Schnupperlehre", "offer": "Zusage", "rejected": "Absage", "hired": "Angestellt",
 }
 FILE_CATEGORIES = {"application": "Bewerbung", "cv": "Lebenslauf", "certificates": "Zeugnisse", "other": "Sonstiges"}
+SUITABILITY = {"": "Noch nicht beurteilt", "unsuitable": "Nicht geeignet", "possible": "Eventuell", "suitable": "Geeignet"}
+SUITABILITY_COLORS = {"": "#edf2f5", "unsuitable": "#fce3e3", "possible": "#fff3cd", "suitable": "#dff3e8"}
 DEFAULT_FTP_HOST = "lp2qfs.ftp.infomaniak.com"
 DEFAULT_FTP_USER = "lp2qfs_admin"
 DEFAULT_FTP_ROOT = "/sites/ast-elektro.ch/uploads"
@@ -85,6 +88,8 @@ def _save_payload(db, payload, load_file):
               "vocational_baccalaureate": str(payload.get("vocational_baccalaureate", "")).casefold() in ("1", "true", "ja", "yes"),
               "trial_dates": trial_dates_text(payload.get("trial_dates", [])),
               "message": payload.get("message", ""), "notes": existing["notes"] if existing else "",
+              "suitability": existing["suitability"] if existing else "",
+              "server_deleted": existing["server_deleted"] if existing else 0,
               "submitted_at": payload.get("submitted_at", "")}
     applicant_id = db.save_applicant(values, existing["id"] if existing else None)
     current_sources = {row["source_ref"] for row in db.applicant_files(applicant_id)}
@@ -196,6 +201,46 @@ def sync_ftp(db, host, user, password, remote_root=DEFAULT_FTP_ROOT, ftp_factory
             ftp.close()
 
 
+def delete_remote_application(host, user, password, source_id, remote_root=DEFAULT_FTP_ROOT,
+                              ftp_factory=ftplib.FTP_TLS):
+    """Delete exactly one verified website application folder through FTPS."""
+    source_id = str(source_id or "").strip()
+    remote_root = "/" + str(remote_root).strip().strip("/")
+    if posixpath.normpath(remote_root) != remote_root or not remote_root.startswith("/sites/"):
+        raise ValueError("Der FTP-Uploadpfad muss ein gültiger Ordner unter /sites sein.")
+    if not source_id or source_id.startswith("manual-") or posixpath.basename(source_id) != source_id or source_id in (".", ".."):
+        raise ValueError("Für diese Bewerbung existiert kein löschbarer Serverordner.")
+    remote_folder = posixpath.normpath(posixpath.join(remote_root, source_id))
+    if posixpath.dirname(remote_folder) != remote_root:
+        raise ValueError("Der Bewerbungsordner liegt ausserhalb des erlaubten Uploadpfads.")
+    ftp = ftp_factory(context=ssl.create_default_context(), timeout=30)
+    try:
+        ftp.connect(str(host).strip(), 21)
+        ftp.auth(); ftp.login(str(user).strip(), password); ftp.prot_p()
+        manifest_data = io.BytesIO()
+        ftp.retrbinary("RETR " + remote_folder + "/application.json", manifest_data.write)
+        try:
+            payload = json.loads(manifest_data.getvalue().decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ValueError("Der Serverordner enthält keine gültige Bewerbungsdatei.") from exc
+        if str(payload.get("id", "")).strip() != source_id:
+            raise ValueError("Der Serverordner gehört nicht eindeutig zu dieser Bewerbung.")
+        ftp.cwd(remote_folder)
+        names = [posixpath.basename(str(name).rstrip("/")) for name in ftp.nlst()]
+        for name in names:
+            if name not in ("", ".", ".."):
+                ftp.delete(remote_folder + "/" + name)
+        ftp.cwd(remote_root)
+        ftp.rmd(remote_folder)
+    except FTP_ERRORS as exc:
+        raise ValueError(f"Die Serverdateien konnten nicht gelöscht werden: {exc}") from exc
+    finally:
+        try:
+            ftp.quit()
+        except Exception:
+            ftp.close()
+
+
 class FtpSettingsDialog(QDialog):
     def __init__(self, parent, db):
         super().__init__(parent)
@@ -260,6 +305,25 @@ class FtpSyncWorker(QObject):
         finally:
             if db:
                 db.close()
+
+
+class FtpDeleteWorker(QObject):
+    finished = Signal()
+    failed = Signal(str)
+
+    def __init__(self, connection, source_id):
+        super().__init__()
+        self.connection = connection
+        self.source_id = source_id
+
+    @Slot()
+    def run(self):
+        try:
+            delete_remote_application(*self.connection, self.source_id)
+            self.finished.emit()
+        except Exception as exc:
+            logging.exception("Application FTP deletion failed")
+            self.failed.emit(str(exc))
 
 
 class ApplicantDialog(QDialog):
@@ -387,6 +451,188 @@ class ApplicantDialog(QDialog):
         self.accept()
 
 
+def _display(value, fallback="Nicht angegeben"):
+    text = str(value or "").strip()
+    return text or fallback
+
+
+def _info_card(title, value):
+    card = QFrame(); card.setObjectName("appInfoCard")
+    box = QVBoxLayout(card); box.setContentsMargins(18, 15, 18, 15); box.setSpacing(7)
+    caption = label(title, "appInfoCaption")
+    content = label(_display(value), "appInfoValue")
+    content.setWordWrap(True); content.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    box.addWidget(caption); box.addWidget(content); box.addStretch()
+    return card
+
+
+class ApplicantStatusDialog(QDialog):
+    """Read-only applicant dashboard; only the explicit suitability tag can change."""
+    def __init__(self, parent, db, row):
+        super().__init__(parent)
+        self.db, self.row = db, row
+        self.delete_thread = self.delete_worker = None
+        self.setWindowTitle(f"Bewerberstatus · {row['first_name']} {row['last_name']}")
+        self.resize(980, 790)
+        outer = QVBoxLayout(self); outer.setContentsMargins(22, 20, 22, 18); outer.setSpacing(14)
+
+        self.hero = QFrame(); hero = QVBoxLayout(self.hero); hero.setContentsMargins(24, 20, 24, 20); hero.setSpacing(10)
+        top = QHBoxLayout()
+        title_box = QVBoxLayout(); title_box.setSpacing(3)
+        self.name = label(f"{row['first_name']} {row['last_name']}", "applicantName")
+        self.subtitle = label(f"{CATEGORIES[row['category']]} · Eingang {row['submitted_at'][:10]}", "applicantSubtitle")
+        title_box.addWidget(self.name); title_box.addWidget(self.subtitle)
+        top.addLayout(title_box, 1)
+        self.badge = label("", "applicantBadge"); self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        top.addWidget(self.badge)
+        hero.addLayout(top)
+        hero.addWidget(label("Interne Beurteilung", "appInfoCaption"))
+        review = QHBoxLayout(); review.setSpacing(10)
+        self.review_buttons = {}
+        for key, text, object_name in (("unsuitable", "Nicht geeignet", "reviewRed"),
+                                       ("possible", "Eventuell", "reviewYellow"),
+                                       ("suitable", "Geeignet", "reviewGreen")):
+            control = button(text, lambda value=key: self.set_suitability(value))
+            control.setObjectName(object_name); control.setCheckable(True)
+            self.review_buttons[key] = control; review.addWidget(control)
+        hero.addLayout(review)
+        outer.addWidget(self.hero)
+
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setObjectName("applicantScroll")
+        content = QWidget(); content.setObjectName("applicantContent")
+        body = QVBoxLayout(content); body.setContentsMargins(2, 2, 2, 2); body.setSpacing(14)
+
+        cards = QGridLayout(); cards.setSpacing(12)
+        address = " ".join(filter(None, [row.get("address", ""), row.get("postcode", ""), row.get("city", "")]))
+        contact = "\n".join(filter(None, [row.get("email", ""), row.get("phone", "")]))
+        details = ("Gewünscht" if row.get("vocational_baccalaureate") else "Nicht gewählt")
+        if row["category"] == "trial":
+            details = _display(row.get("trial_dates"), "Keine Schnupperdaten angegeben")
+        cards.addWidget(_info_card("Kontakt", contact), 0, 0)
+        cards.addWidget(_info_card("Adresse", address), 0, 1)
+        cards.addWidget(_info_card("Bewerbungsart", CATEGORIES[row["category"]]), 0, 2)
+        cards.addWidget(_info_card("Schnupperdaten" if row["category"] == "trial" else "Berufsmatura", details), 1, 0, 1, 2)
+        cards.addWidget(_info_card("Bearbeitungsstand", STATUSES[row["status"]]), 1, 2)
+        body.addLayout(cards)
+
+        body.addWidget(label("Nachricht der Bewerberin / des Bewerbers", "sectionTitle"))
+        message = QFrame(); message.setObjectName("appMessageCard")
+        message_box = QVBoxLayout(message); message_box.setContentsMargins(18, 16, 18, 16)
+        message_text = label(_display(row.get("message"), "Keine Nachricht übermittelt."), "appMessage")
+        message_text.setWordWrap(True); message_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        message_box.addWidget(message_text); body.addWidget(message)
+
+        body.addWidget(label("Bewerbungsunterlagen", "sectionTitle"))
+        self.files = QListWidget(); self.files.setObjectName("appDocuments"); self.files.setMinimumHeight(170)
+        self.files.itemDoubleClicked.connect(lambda *_: self.open_file())
+        for record in self.db.applicant_files(row["id"]):
+            path = Path(record["local_path"])
+            size = f"{path.stat().st_size / 1024:.0f} KB" if path.is_file() else "lokale Kopie fehlt"
+            item = QListWidgetItem(f"{FILE_CATEGORIES.get(record['category'], 'Dokument')}\n{record['original_name']} · {size}")
+            item.setData(Qt.ItemDataRole.UserRole, str(path)); item.setToolTip(str(path))
+            item.setSizeHint(QSize(0, 58))
+            self.files.addItem(item)
+        if not self.files.count():
+            item = QListWidgetItem("Keine Unterlagen vorhanden"); item.setFlags(Qt.ItemFlag.NoItemFlags); self.files.addItem(item)
+        body.addWidget(self.files)
+        file_actions = QHBoxLayout()
+        file_actions.addWidget(button("Dokument öffnen", self.open_file, True))
+        file_actions.addWidget(button("Kopie speichern", self.save_copy)); file_actions.addStretch()
+        body.addLayout(file_actions)
+
+        body.addWidget(label("Interne Notiz", "sectionTitle"))
+        body.addWidget(_info_card("Nur zur Ansicht", _display(row.get("notes"), "Keine interne Notiz vorhanden.")))
+        self.server_note = label("", "muted"); self.server_note.setWordWrap(True); body.addWidget(self.server_note)
+        scroll.setWidget(content); outer.addWidget(scroll, 1)
+
+        close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close.button(QDialogButtonBox.StandardButton.Close).setText("Schliessen")
+        close.rejected.connect(self.reject); outer.addWidget(close)
+        self.refresh_status()
+
+    def selected_path(self):
+        item = self.files.currentItem()
+        return Path(item.data(Qt.ItemDataRole.UserRole)) if item and item.data(Qt.ItemDataRole.UserRole) else None
+
+    def open_file(self):
+        path = self.selected_path()
+        if path and path.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def save_copy(self):
+        source = self.selected_path()
+        if not source or not source.is_file():
+            return
+        target, _ = QFileDialog.getSaveFileName(self, "Dokument speichern", source.name)
+        if target:
+            shutil.copy2(source, target)
+
+    def refresh_status(self):
+        value = self.row.get("suitability", "")
+        self.hero.setObjectName({"unsuitable": "applicantHeroRed", "possible": "applicantHeroYellow",
+                                 "suitable": "applicantHeroGreen"}.get(value, "applicantHeroNeutral"))
+        self.badge.setText(SUITABILITY[value])
+        for key, control in self.review_buttons.items():
+            control.setChecked(key == value)
+        self.hero.style().unpolish(self.hero); self.hero.style().polish(self.hero)
+        if self.row.get("server_deleted"):
+            self.server_note.setText("Serverstatus: Die Originaldateien wurden nach der Beurteilung «Nicht geeignet» gelöscht. Die lokale Dossierkopie bleibt erhalten.")
+        else:
+            self.server_note.setText("Serverstatus: Die Originaldateien bleiben auf dem Bewerbungsserver gespeichert.")
+
+    @guarded
+    def set_suitability(self, value):
+        if value == self.row.get("suitability"):
+            return
+        if value != "unsuitable" or self.row.get("server_deleted") or str(self.row.get("source_id", "")).startswith("manual-"):
+            self.db.set_applicant_suitability(self.row["id"], value)
+            self.row = self.db.applicant(self.row["id"]); self.refresh_status()
+            return
+        if not confirm(self, "Serverdateien endgültig löschen",
+                       "Soll diese Bewerbung als «Nicht geeignet» markiert werden?\n\n"
+                       "Alle Originaldateien dieses Bewerbers werden dabei unwiderruflich vom Webserver gelöscht. "
+                       "Die bereits eingelesene lokale Dossierkopie bleibt im AST-Programm erhalten."):
+            self.refresh_status(); return
+        settings = self.db.settings(); encrypted = settings.get("applications_ftp_password", "")
+        if not encrypted:
+            raise ValueError("Der Serverzugang ist nicht eingerichtet. Die Beurteilung wurde nicht geändert.")
+        password = unprotect_secret(encrypted)
+        connection = (settings.get("applications_ftp_host", DEFAULT_FTP_HOST),
+                      settings.get("applications_ftp_user", DEFAULT_FTP_USER), password,
+                      settings.get("applications_ftp_root", DEFAULT_FTP_ROOT))
+        for control in self.review_buttons.values(): control.setEnabled(False)
+        self.server_note.setText("Serverdateien werden sicher gelöscht …")
+        thread = QThread(self); worker = FtpDeleteWorker(connection, self.row["source_id"])
+        worker.moveToThread(thread); thread.started.connect(worker.run)
+        worker.finished.connect(self._delete_finished); worker.failed.connect(self._delete_failed)
+        worker.finished.connect(thread.quit); worker.failed.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater); worker.failed.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater); thread.finished.connect(self._delete_cleanup)
+        self.delete_thread, self.delete_worker = thread, worker; thread.start()
+
+    @Slot()
+    def _delete_finished(self):
+        self.db.set_applicant_suitability(self.row["id"], "unsuitable", True)
+        self.row = self.db.applicant(self.row["id"]); self.refresh_status()
+        QMessageBox.information(self, "Bewerbung beurteilt", "Die Bewerbung wurde rot markiert und die Originaldateien wurden vom Server gelöscht.")
+
+    @Slot(str)
+    def _delete_failed(self, message):
+        for control in self.review_buttons.values(): control.setEnabled(True)
+        self.refresh_status()
+        QMessageBox.warning(self, "Serverdateien nicht gelöscht", message + "\n\nDie Beurteilung wurde nicht geändert.")
+
+    def _delete_cleanup(self):
+        self.delete_thread = self.delete_worker = None
+        for control in self.review_buttons.values(): control.setEnabled(True)
+
+    def closeEvent(self, event):
+        if self.delete_thread and self.delete_thread.isRunning():
+            QMessageBox.information(self, "Löschen läuft", "Bitte warte, bis die Serverdateien vollständig gelöscht wurden.")
+            event.ignore(); return
+        super().closeEvent(event)
+
+
 class ApplicationsPage(Page):
     def __init__(self, db):
         super().__init__("Bewerbungen", "Jede Bewerbung als eigenes Dossier mit Status, Kontaktdaten und Unterlagen verwalten.")
@@ -399,12 +645,12 @@ class ApplicationsPage(Page):
         filters = QHBoxLayout()
         self.search = line(placeholder="Name, Ort, E-Mail oder Telefon suchen …")
         self.category = combo([("Alle Bewerbungsarten", ""), *[(title, key) for key, title in CATEGORIES.items()]])
-        self.status = combo([("Alle Status", ""), *[(title, key) for key, title in STATUSES.items()]])
+        self.status = combo([("Alle Beurteilungen", ""), *[(title, key) for key, title in SUITABILITY.items() if key]])
         filters.addWidget(self.search, 1); filters.addWidget(self.category); filters.addWidget(self.status)
         self.layout.addLayout(filters)
         self.server_status = label("Serverabgleich wird vorbereitet …", "muted")
         self.layout.addWidget(self.server_status)
-        self.table = Table(["Eingang", "Name", "Bewerbung für", "Status", "Ort", "Kontakt", "Dokumente"])
+        self.table = Table(["Eingang", "Name", "Bewerbung für", "Beurteilung", "Ort", "Kontakt", "Dokumente"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.layout.addWidget(self.table, 1)
         actions = QHBoxLayout()
@@ -431,17 +677,22 @@ class ApplicationsPage(Page):
 
     def filter_rows(self, *_):
         query = self.search.text().strip().casefold()
-        category = self.category.currentData(); status = self.status.currentData()
+        category = self.category.currentData(); suitability = self.status.currentData()
         self.rows = [row for row in getattr(self, "all_rows", [])
                      if (not category or row["category"] == category)
-                     and (not status or row["status"] == status)
+                     and (not suitability or row.get("suitability", "") == suitability)
                      and (not query or query in " ".join(str(row.get(key, "")) for key in
                                                          ("first_name", "last_name", "city", "email", "phone")).casefold())]
         self.table.populate([[row["submitted_at"][:10], f"{row['first_name']} {row['last_name']}",
-                              CATEGORIES[row["category"]], STATUSES[row["status"]], row["city"],
+                              CATEGORIES[row["category"]], SUITABILITY[row.get("suitability", "")], row["city"],
                               " · ".join(filter(None, [row["email"], row["phone"]])),
                               len(self.db.applicant_files(row["id"]))] for row in self.rows],
                             [row["id"] for row in self.rows], [6])
+        for index, row in enumerate(self.rows):
+            colour = QColor(SUITABILITY_COLORS[row.get("suitability", "")])
+            for column in range(self.table.columnCount()):
+                if self.table.item(index, column):
+                    self.table.item(index, column).setBackground(colour)
         self.selection()
 
     def selected(self):
@@ -451,7 +702,7 @@ class ApplicationsPage(Page):
     def selection(self):
         row = self.selected(); enabled = bool(row)
         self.open_button.setEnabled(enabled); self.delete_button.setEnabled(enabled)
-        self.hint.setText(f"{row['first_name']} {row['last_name']} · {STATUSES[row['status']]}" if row else "Bitte eine Bewerbung auswählen.")
+        self.hint.setText(f"{row['first_name']} {row['last_name']} · {SUITABILITY[row.get('suitability', '')]}" if row else "Bitte eine Bewerbung auswählen.")
 
     def new(self):
         if ApplicantDialog(self, self.db).exec():
@@ -459,7 +710,8 @@ class ApplicationsPage(Page):
 
     def open(self, *_):
         row = self.selected()
-        if row and ApplicantDialog(self, self.db, row).exec():
+        if row:
+            ApplicantStatusDialog(self, self.db, self.db.applicant(row["id"])).exec()
             self.refresh()
 
     def configure_server(self):

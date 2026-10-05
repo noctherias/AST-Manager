@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS applicants(
  postcode TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
  phone TEXT NOT NULL DEFAULT '', vocational_baccalaureate INTEGER NOT NULL DEFAULT 0 CHECK(vocational_baccalaureate IN (0,1)),
  trial_dates TEXT NOT NULL DEFAULT '', message TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+ suitability TEXT NOT NULL DEFAULT '' CHECK(suitability IN ('','unsuitable','possible','suitable')),
+ server_deleted INTEGER NOT NULL DEFAULT 0 CHECK(server_deleted IN (0,1)),
  submitted_at TEXT NOT NULL, updated TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS applicant_files(
  id INTEGER PRIMARY KEY, applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
@@ -83,7 +85,7 @@ CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submi
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 class Database:
@@ -120,6 +122,10 @@ class Database:
         applicant_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(applicants)")}
         if "trial_dates" not in applicant_columns:
             self.conn.execute("ALTER TABLE applicants ADD COLUMN trial_dates TEXT NOT NULL DEFAULT ''")
+        if "suitability" not in applicant_columns:
+            self.conn.execute("ALTER TABLE applicants ADD COLUMN suitability TEXT NOT NULL DEFAULT ''")
+        if "server_deleted" not in applicant_columns:
+            self.conn.execute("ALTER TABLE applicants ADD COLUMN server_deleted INTEGER NOT NULL DEFAULT 0")
         self.conn.execute("""UPDATE settings SET value='/sites/ast-elektro.ch/uploads'
                              WHERE key='applications_ftp_root' AND value='/sites/private_applications'""")
         invoice_sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='invoices'").fetchone()[0]
@@ -480,9 +486,21 @@ class Database:
             raise ValueError("Vorname und Nachname sind erforderlich.")
         values.update({"category": category, "status": status,
                        "vocational_baccalaureate": 1 if data.get("vocational_baccalaureate") else 0,
+                       "suitability": str(data.get("suitability", "")).strip(),
+                       "server_deleted": 1 if data.get("server_deleted") else 0,
                        "submitted_at": submitted_at,
                        "updated": datetime.now().isoformat(timespec="seconds")})
+        if values["suitability"] not in ("", "unsuitable", "possible", "suitable"):
+            raise ValueError("Bitte eine gültige Beurteilung auswählen.")
         return self._save("applicants", values, key)
+
+    def set_applicant_suitability(self, key, suitability, server_deleted=None):
+        if suitability not in ("unsuitable", "possible", "suitable") or not self.applicant(key):
+            raise ValueError("Bitte eine gültige Bewerbung und Beurteilung auswählen.")
+        values = {"suitability": suitability, "updated": datetime.now().isoformat(timespec="seconds")}
+        if server_deleted is not None:
+            values["server_deleted"] = 1 if server_deleted else 0
+        self._save("applicants", values, key)
 
     def applicant_files(self, applicant_id):
         return self.rows("SELECT * FROM applicant_files WHERE applicant_id=? ORDER BY category,original_name",

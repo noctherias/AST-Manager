@@ -1,10 +1,10 @@
 # Testprotokoll
 
-Stand: 05.10.2026, Version 0.13.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
+Stand: 05.10.2026, Version 0.14.0. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
 
 ## Automatisierte Tests
 
-`python -m unittest discover -s tests -v`: **56 Tests**. Die fachlichen, Dokument-, Mahnbrief-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
+`python -m unittest discover -s tests -v`: **58 Tests**. Die fachlichen, Dokument-, Mahnbrief-, Import-, Export-, Datenbank-, Update- und UI-Tests liefen lokal erfolgreich.
 
 | Bereich | Geprüfte Fälle |
 |---|---|
@@ -19,8 +19,8 @@ Stand: 05.10.2026, Version 0.13.0. Geprüft unter Windows 11 x64 (10.0.26200), P
 | Berichte/CSV | Mehrseitiger PDF-Bericht, Unicode-CSV, Schutz vor Formelinterpretation beim späteren Öffnen in Tabellenprogrammen. |
 | Updates | Fest eingebauter öffentlicher Update-Kanal, Versionsvergleich, stabile Releases, sichere Weiterleitungsziele, Hash-/Grössenprüfung, Abbruchbereinigung, Offline-/Zugriffsfehler, Datenbanksicherung vor Installation, Startparameter und erneute Integritätsprüfung. |
 | Zeugnisse | Beobachtungsbasierte Multiple-Choice-Fragen, automatische Dimensions- und Gesamtbewertung, Pflichtangaben zu Funktion und Tätigkeiten, getrennte Verhaltensbewertung, zusätzliche Lernendenfragen und automatisch erzeugte, nicht manuell verfasste Text- und PDF-Ausgabe für Arbeits-, Zwischen- und Lehrzeugnisse. |
-| Bewerbungen | Direkter FTPS-Import aus personengeordneten Upload-Ordnern, automatische Abfrage beim Start und alle fünf Minuten, Schnupperdaten, Rückgabe aus dem Hintergrund-Thread in den Qt-Hauptthread, Windows-verschlüsseltes Passwort, Kategorie- und Statuszuordnung, lokale Dokumentkopie, Schutz gegen Pfadwechsel, idempotenter Neuimport und manuelle Dossiers. Das echte Webformular und ein temporäres Serverdossier wurden geprüft. |
-| Oberfläche | Acht Arbeitsbereiche navigiert, Filter, Auswahlaktionen, reale Qt-Klicks zum Speichern von Kunden, Rechnung, Teilzahlung und Arbeitstag; Zeugnisse lassen sich nach Bestätigung löschen; Lohnausweis speichern/wiederöffnen, integrierte PDF-Vorschau; Teamverwaltung unter Einstellungen und Erhalt der Firmendaten beim Schliessen. Tabellenzeilen und -spalten lassen sich verschieben und ausblenden; der Zustand bleibt erhalten. Das gebündelte Firmenlogo wird als dezentes, klickdurchlässiges Wasserzeichen im Arbeitsbereich dargestellt. Die explizite helle Palette wurde mit Bildausgaben der Seiten und Dialoge geprüft. |
+| Bewerbungen | Direkter FTPS-Import aus personengeordneten Upload-Ordnern, automatische Abfrage beim Start und alle fünf Minuten, Schnupperdaten, Rückgabe aus dem Hintergrund-Thread in den Qt-Hauptthread, Windows-verschlüsseltes Passwort, lokale Dokumentkopie, Schutz gegen Pfadwechsel und idempotenter Neuimport. Die Dossieransicht enthält keine Eingabefelder. Beurteilungen bleiben beim Neuimport erhalten. Eine rote Beurteilung wird erst nach Manifestprüfung und erfolgreicher, auf den Bewerberordner begrenzter Serverlöschung gespeichert; gelbe und grüne Beurteilungen löschen nichts. Zusätzlich wurde der vollständige Löschablauf mit einem eigens angelegten temporären Ordner auf dem echten FTPS-Server geprüft. |
+| Oberfläche | Acht Arbeitsbereiche navigiert, Filter, Auswahlaktionen, reale Qt-Klicks zum Speichern von Kunden, Rechnung, Teilzahlung und Arbeitstag; Zeugnisse lassen sich nach Bestätigung löschen; Lohnausweis speichern/wiederöffnen, integrierte PDF-Vorschau; Teamverwaltung unter Einstellungen und Erhalt der Firmendaten beim Schliessen. Tabellenzeilen und -spalten lassen sich verschieben und ausblenden; der Zustand bleibt erhalten. Die farbige Bewerber-Statusseite und die explizite helle Palette wurden mit Bildausgaben geprüft. Das gebündelte Firmenlogo ist standardmässig ausgeblendet und lässt sich unter Darstellung dauerhaft aktivieren. |
 
 Die Qt-Tests laufen mit dem Offscreen-Plugin. Für die Bildkontrolle wurden die Windows-Schriften explizit geladen. Es wurden zusätzlich alle Hauptseiten, der Lohnausweisdialog und der scrollbare Zeugnis-Fragenkatalog als Bilder geprüft. Mahnbrief, Lohnausweis und Zeugnis wurden mit Poppler gerendert und visuell auf Text, Feldpositionen, Summen und Seitenränder kontrolliert. Die echte FTPS-Verbindung, der private Serverordner und der Abruf mit der produktiven AST-Datenbank wurden separat erfolgreich geprüft.
 

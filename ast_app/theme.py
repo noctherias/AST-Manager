@@ -92,4 +92,25 @@ QMenu::item { padding: 9px 22px; }
 QMenu::item:selected { background: #d8eee6; }
 QProgressBar { border: 1px solid #d5dfe6; border-radius: 6px; text-align: center; min-height: 24px; }
 QProgressBar::chunk { background: #85c7b9; }
+QFrame#applicantHeroNeutral, QFrame#applicantHeroRed, QFrame#applicantHeroYellow, QFrame#applicantHeroGreen {
+    border-radius: 16px; border: 1px solid #d5e0e6;
+}
+QFrame#applicantHeroNeutral { background: #eef3f6; }
+QFrame#applicantHeroRed { background: #fce3e3; border-color: #e9a9ac; }
+QFrame#applicantHeroYellow { background: #fff3cd; border-color: #ead486; }
+QFrame#applicantHeroGreen { background: #dff3e8; border-color: #9ed2b5; }
+QLabel#applicantName { font-size: 22pt; font-weight: 700; color: #153443; }
+QLabel#applicantSubtitle { color: #536b79; font-size: 10pt; }
+QLabel#applicantBadge { background: rgba(255,255,255,185); border: 1px solid rgba(76,101,111,70); border-radius: 14px; padding: 8px 14px; font-weight: 700; }
+QPushButton#reviewRed:checked { background: #bd3c40; border-color: #bd3c40; color: white; }
+QPushButton#reviewYellow:checked { background: #d59c19; border-color: #d59c19; color: white; }
+QPushButton#reviewGreen:checked { background: #087a61; border-color: #087a61; color: white; }
+QFrame#appInfoCard, QFrame#appMessageCard { background: white; border: 1px solid #dce5ea; border-radius: 12px; }
+QLabel#appInfoCaption { color: #607786; font-size: 9pt; font-weight: 650; }
+QLabel#appInfoValue { color: #183342; font-size: 11pt; font-weight: 600; }
+QLabel#appMessage { color: #294957; font-size: 10pt; }
+QScrollArea#applicantScroll, QWidget#applicantContent { background: #f4f7f9; }
+QListWidget#appDocuments { background: white; border: 1px solid #dce5ea; border-radius: 12px; padding: 7px; outline: none; }
+QListWidget#appDocuments::item { background: #f8fafb; border: 1px solid #e3eaee; border-radius: 9px; padding: 10px 14px; margin: 4px; }
+QListWidget#appDocuments::item:selected { background: #dff1eb; border-color: #95cbb9; color: #153c33; }
 """

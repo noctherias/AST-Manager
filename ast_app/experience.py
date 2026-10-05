@@ -5,7 +5,7 @@ from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStackedWidget,
                               QMenu, QButtonGroup, QDialog, QHeaderView, QMessageBox, QFileDialog,
-                              QTabWidget, QPlainTextEdit)
+                              QTabWidget, QPlainTextEdit, QCheckBox)
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
@@ -703,16 +703,33 @@ class Team(QWidget):
 
 
 class Settings(SettingsPage):
-    def __init__(self, db, controller):
+    def __init__(self, db, controller, watermark_callback=None):
         super().__init__(db)
+        self.watermark_callback = watermark_callback
         self.title_label.setText("Einstellungen")
-        self.subtitle_label.setText("Team, Firma, Kunden, Datensicherung und Programm-Updates zentral verwalten.")
+        self.subtitle_label.setText("Team, Firma, Darstellung, Datensicherung und Programm-Updates zentral verwalten.")
         self.tabs.setTabText(0, "Team")
         company = self.tabs.widget(2)
         self.tabs.setTabText(2, "Meine Firma")
         self.tabs.setCurrentIndex(0)
         self.update_settings = UpdateSettings(db, controller)
         self.tabs.addTab(self.update_settings, "Updates")
+        appearance = QWidget()
+        appearance_layout = QVBoxLayout(appearance)
+        appearance_layout.setContentsMargins(24, 24, 24, 24)
+        appearance_layout.setSpacing(14)
+        appearance_layout.addWidget(label("Darstellung", "sectionTitle"))
+        explanation = label(
+            "Passe die Oberfläche an deinen Arbeitsplatz an. Die Einstellung wird dauerhaft gespeichert.",
+            "muted")
+        explanation.setWordWrap(True)
+        appearance_layout.addWidget(explanation)
+        self.background_logo = QCheckBox("AST-Logo dezent im Hintergrund anzeigen")
+        self.background_logo.setToolTip("Blendet das transparente Firmenlogo hinter den Arbeitsbereichen ein.")
+        self.background_logo.toggled.connect(self._watermark_toggled)
+        appearance_layout.addWidget(self.background_logo)
+        appearance_layout.addStretch()
+        self.tabs.addTab(appearance, "Darstellung")
         self.company_status = label("Firmendaten werden beim Verlassen eines Feldes gespeichert.", "muted")
         company.layout().insertWidget(0, self.company_status)
         self.refresh()
@@ -728,6 +745,15 @@ class Settings(SettingsPage):
     def refresh(self):
         super().refresh()
         self.update_settings.refresh()
+        enabled = self.db.settings().get("background_logo_enabled", "0") == "1"
+        self.background_logo.blockSignals(True)
+        self.background_logo.setChecked(enabled)
+        self.background_logo.blockSignals(False)
+
+    def _watermark_toggled(self, enabled):
+        self.db.save_settings({"background_logo_enabled": "1" if enabled else "0"})
+        if self.watermark_callback:
+            self.watermark_callback(enabled, save=False)
 
     def open_team(self, employee_id=None, create=False):
         self.tabs.setCurrentIndex(0)

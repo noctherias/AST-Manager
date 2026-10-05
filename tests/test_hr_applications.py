@@ -5,7 +5,7 @@ import unittest
 
 from pypdf import PdfReader
 
-from ast_app.applications import DEFAULT_FTP_ROOT, sync_manifests, sync_ftp
+from ast_app.applications import DEFAULT_FTP_ROOT, delete_remote_application, sync_manifests, sync_ftp
 from ast_app.database import Database
 from ast_app.references import generate_reference_text, reference_pdf, question_groups
 
@@ -71,6 +71,10 @@ class HrApplicationTests(unittest.TestCase):
         again = sync_manifests(self.db, import_root)
         self.assertEqual(again, {"created": 0, "updated": 1, "files": 0})
 
+        self.db.set_applicant_suitability(applicant["id"], "possible")
+        sync_manifests(self.db, import_root)
+        self.assertEqual(self.db.applicant(applicant["id"])["suitability"], "possible")
+
     def test_ftps_manifest_and_document_import(self):
         payload = {"id": "ftp-20261005-1", "submitted_at": "2026-10-05T12:00:00",
                    "application_for": "Elektroinstallateur EFZ", "first_name": "Lia", "last_name": "Test",
@@ -98,6 +102,42 @@ class HrApplicationTests(unittest.TestCase):
         self.assertEqual((applicant["first_name"], applicant["category"]), ("Lia", "installer"))
         self.assertEqual(applicant["trial_dates"], "10.11.2026")
         self.assertTrue(Path(self.db.applicant_files(applicant["id"])[0]["local_path"]).is_file())
+
+    def test_verified_remote_application_folder_is_deleted(self):
+        source_id = "Lia_Test_20261005"
+        payload = {"id": source_id}
+
+        class FakeFtp:
+            instance = None
+
+            def __init__(self, **kwargs):
+                self.deleted = []
+                self.removed = []
+                FakeFtp.instance = self
+            def connect(self, host, port): pass
+            def auth(self): pass
+            def login(self, user, password): pass
+            def prot_p(self): pass
+            def retrbinary(self, command, callback): callback(json.dumps(payload).encode())
+            def cwd(self, value): self.cwd_value = value
+            def nlst(self): return ["application.json", "Lebenslauf.pdf"]
+            def delete(self, path): self.deleted.append(path)
+            def rmd(self, path): self.removed.append(path)
+            def quit(self): pass
+            def close(self): pass
+
+        delete_remote_application("ftp.example.test", "user", "secret", source_id,
+                                  ftp_factory=FakeFtp)
+        folder = f"{DEFAULT_FTP_ROOT}/{source_id}"
+        self.assertEqual(FakeFtp.instance.deleted,
+                         [f"{folder}/application.json", f"{folder}/Lebenslauf.pdf"])
+        self.assertEqual(FakeFtp.instance.removed, [folder])
+        with self.assertRaises(ValueError):
+            delete_remote_application("ftp.example.test", "user", "secret", "../fremd",
+                                      ftp_factory=FakeFtp)
+        with self.assertRaises(ValueError):
+            delete_remote_application("ftp.example.test", "user", "secret", source_id, "/",
+                                      ftp_factory=FakeFtp)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from unittest.mock import patch
 from PySide6.QtCore import Qt, QLocale, QCoreApplication, QEvent, QDate
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
+from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QLineEdit
 
 from ast_app.database import Database
 from ast_app.demo import seed_demo
@@ -24,7 +24,7 @@ from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
 from ast_app.widgets import Table, confirm
 from ast_app.references import ReferenceDialog
-from ast_app.applications import ApplicationsPage
+from ast_app.applications import ApplicationsPage, ApplicantStatusDialog
 
 APP = QApplication.instance() or QApplication([])
 if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
@@ -67,6 +67,7 @@ class UiTests(unittest.TestCase):
         window.show()
         APP.processEvents()
         self.assertFalse(window.watermark._logo.isNull())
+        self.assertFalse(window.watermark.isVisible())
         self.assertEqual(window.watermark.geometry(), window.stack.geometry())
         self.assertTrue(window.watermark.testAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents))
@@ -84,6 +85,14 @@ class UiTests(unittest.TestCase):
         self.assertGreater(window.pages[7].table.rowCount(), 0)
         self.assertTrue(window.pages[7].sync_timer.isActive())
         self.assertEqual(window.pages[7].sync_timer.interval(), 5 * 60 * 1000)
+        settings = window.pages[4]
+        settings.background_logo.setChecked(True)
+        APP.processEvents()
+        self.assertTrue(window.watermark.isVisible())
+        self.assertEqual(self.db.settings()["background_logo_enabled"], "1")
+        settings.background_logo.setChecked(False)
+        APP.processEvents()
+        self.assertFalse(window.watermark.isVisible())
         reminders = window.pages[5]
         reminders.tabs.setCurrentIndex(1)
         reminders.template_editors[1].clear()
@@ -112,6 +121,20 @@ class UiTests(unittest.TestCase):
         self.assertEqual(page.table.rowCount(), 0)
         page.search.clear()
         self.assertEqual(page.table.rowCount(), 4)
+
+    def test_applicant_status_is_read_only_and_saves_review_tag(self):
+        applicant = self.db.applicants()[0]
+        dialog = ApplicantStatusDialog(None, self.db, applicant)
+        dialog.show()
+        APP.processEvents()
+        self.assertEqual(dialog.findChildren(QLineEdit), [])
+        self.assertEqual(set(dialog.review_buttons), {"unsuitable", "possible", "suitable"})
+        dialog.set_suitability("possible")
+        self.assertEqual(self.db.applicant(applicant["id"])["suitability"], "possible")
+        self.assertEqual(dialog.badge.text(), "Eventuell")
+        if os.environ.get("AST_QA_DIR"):
+            folder = Path(os.environ["AST_QA_DIR"]); folder.mkdir(parents=True, exist_ok=True)
+            dialog.grab().save(str(folder / "bewerber-status.png"))
 
     def test_real_form_save_click_and_reopen(self):
         d = CustomerDialog(None, self.db)

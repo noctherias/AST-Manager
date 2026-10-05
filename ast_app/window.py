@@ -112,9 +112,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.sidebar)
         self.stack = QStackedWidget()
         layout.addWidget(self.stack, 1)
+        self.watermark = BackgroundWatermark(self.root)
+        self.watermark.setVisible(self.db.settings().get("background_logo_enabled", "0") == "1")
         self.updates = UpdateController(self, db, demo)
         self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db),
-                      Settings(db, self.updates), Reminders(db, self), ReferencesPage(db),
+                      Settings(db, self.updates, self.set_watermark_enabled), Reminders(db, self), ReferencesPage(db),
                       ApplicationsPage(db)]
         for page in self.pages:
             scroll = QScrollArea()
@@ -124,7 +126,6 @@ class MainWindow(QMainWindow):
         for page_index, page in enumerate(self.pages):
             for table_index, table in enumerate(page.findChildren(Table)):
                 table.bind_layout(db, f"page_{page_index}_{table_index}")
-        self.watermark = BackgroundWatermark(self.root)
         self.stack.currentChanged.connect(self._position_watermark)
         QTimer.singleShot(0, self._position_watermark)
         self.statusBar().showMessage(("DEMO · Fiktive Beispieldaten · " if demo else "") + "Bereit · Änderungen werden beim Speichern übernommen")
@@ -137,6 +138,12 @@ class MainWindow(QMainWindow):
     def _position_watermark(self, *_):
         self.watermark.setGeometry(self.stack.geometry())
         self.watermark.raise_()
+
+    def set_watermark_enabled(self, enabled, save=True):
+        self.watermark.setVisible(bool(enabled))
+        if save:
+            self.db.save_settings({"background_logo_enabled": "1" if enabled else "0"})
+        self._position_watermark()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
