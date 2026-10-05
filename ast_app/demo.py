@@ -19,9 +19,9 @@ def seed_demo(db):
                                           ("1002", "Werkraum Architektur", "Bahnhofstrasse 21", "4600", "Olten"),
                                           ("1003", "Gemeinde Musterwil", "Dorfplatz 1", "4800", "Musterwil")]]
     people = []
-    for index, (first, last, kind) in enumerate([("Lena", "Keller", "employee"), ("Marco", "Steiner", "employee"), ("Nora", "Frei", "apprentice")]):
+    for index, (first, last, kind, salutation) in enumerate([("Lena", "Keller", "employee", "Frau"), ("Marco", "Steiner", "employee", "Herr"), ("Nora", "Frei", "apprentice", "Frau")]):
         key = db.save_employee({"code": f"AST-{index+1:03}", "first_name": first, "last_name": last,
-                               "kind": kind, "salutation": "", "ahv": "", "ahv_old": "", "address": "Musterstrasse 1",
+                               "kind": kind, "salutation": salutation, "ahv": "", "ahv_old": "", "address": "Musterstrasse 1",
                                "postcode": "4663", "city": "Aarburg", "hired": f"{year-1}-01-01", "job": "Lernende" if kind == "apprentice" else "Elektroinstallation",
                                "workload": 10000, "allowance": 21625, "active": 1})
         people.append(key)

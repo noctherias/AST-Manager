@@ -7,7 +7,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QTabWidget,
-                               QDialogButtonBox, QPlainTextEdit, QMessageBox, QHeaderView, QWidget)
+                               QDialogButtonBox, QPlainTextEdit, QMessageBox, QHeaderView, QWidget,
+                               QScrollArea)
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -26,20 +27,50 @@ REFERENCE_TYPES = {
     "interim": "Zwischenzeugnis",
     "apprentice": "Lehrzeugnis",
 }
-RATING_CHOICES = [
-    ("5 · ausgezeichnet", 5), ("4 · sehr gut", 4), ("3 · gut", 3),
-    ("2 · genügend", 2), ("1 · verbesserungsbedürftig", 1),
+ANSWER_CHOICES = [("Bitte auswählen …", None), ("Immer", 5), ("Meistens", 4),
+                  ("Häufig", 3), ("Teilweise", 2), ("Selten", 1)]
+COMMON_GROUPS = [
+    ("knowledge", "Fachkenntnisse", ["Wendet die nötigen Fachkenntnisse sicher an.", "Findet auch bei anspruchsvollen Aufgaben fachlich passende Lösungen."]),
+    ("quality", "Arbeitsqualität", ["Arbeitet genau, sorgfältig und sauber.", "Die Arbeitsergebnisse sind mängelfrei und vollständig."]),
+    ("quantity", "Arbeitsmenge und Termine", ["Erledigt die erwartete Arbeitsmenge.", "Hält Termine auch bei hoher Belastung ein."]),
+    ("independence", "Selbständigkeit", ["Plant und erledigt Aufgaben selbständig.", "Erkennt Probleme und entwickelt zweckmässige Lösungen."]),
+    ("reliability", "Zuverlässigkeit", ["Hält Abmachungen und Vorgaben zuverlässig ein.", "Übernimmt Verantwortung für die eigenen Arbeitsergebnisse."]),
+    ("initiative", "Einsatz und Initiative", ["Erkennt anstehende Arbeiten und handelt von sich aus.", "Zeigt auch in anspruchsvollen Situationen hohen Einsatz."]),
+    ("learning", "Auffassung und Entwicklung", ["Erfasst neue Inhalte rasch.", "Setzt Rückmeldungen und neue Kenntnisse in der Praxis um."]),
+    ("superiors", "Verhalten gegenüber Vorgesetzten", ["Verhält sich gegenüber Vorgesetzten respektvoll und korrekt."]),
+    ("team", "Verhalten im Team", ["Arbeitet konstruktiv und hilfsbereit mit dem Team zusammen."]),
+    ("customers", "Verhalten gegenüber Kundschaft", ["Tritt gegenüber Kundinnen und Kunden freundlich und professionell auf."]),
 ]
-COMMON_QUESTIONS = [
-    ("knowledge", "Fachkenntnisse"), ("quality", "Arbeitsqualität"),
-    ("quantity", "Arbeitstempo und Belastbarkeit"), ("independence", "Selbständigkeit"),
-    ("reliability", "Zuverlässigkeit"), ("initiative", "Einsatz und Initiative"),
-    ("learning", "Auffassung und Lernbereitschaft"), ("conduct", "Verhalten im Team und gegenüber Kunden"),
+APPRENTICE_GROUPS = [
+    ("school", "Berufsschule und Praxis", ["Überträgt das Berufsschulwissen sicher in die praktische Arbeit.", "Verknüpft Theorie und Praxis nachvollziehbar."]),
+    ("development", "Entwicklung während der Lehre", ["Hat sich während der Lehrzeit fachlich kontinuierlich weiterentwickelt.", "Hat an Selbständigkeit und Verantwortung gewonnen."]),
 ]
-APPRENTICE_QUESTIONS = [
-    ("school", "Umsetzung des Berufsschulwissens"),
-    ("development", "Entwicklung während der Lehrzeit"),
-]
+PERFORMANCE_KEYS = ("knowledge", "quality", "quantity", "independence", "reliability", "initiative", "learning")
+CONDUCT_KEYS = ("superiors", "team", "customers")
+
+
+def question_groups(reference_type):
+    return COMMON_GROUPS + (APPRENTICE_GROUPS if reference_type == "apprentice" else [])
+
+
+def _score_dimensions(ratings, reference_type):
+    scores = {}
+    for key, title, questions in question_groups(reference_type):
+        answers = []
+        for index, _ in enumerate(questions, 1):
+            value = ratings.get(f"{key}_{index}")
+            if value is None and key in ratings:  # compatibility with certificates made in 0.11.0
+                value = ratings[key]
+            if value is None and key in CONDUCT_KEYS and "conduct" in ratings:
+                value = ratings["conduct"]
+            if value is None:
+                raise ValueError(f"Bitte alle Fragen im Bereich «{title}» beantworten.")
+            value = int(value)
+            if value not in range(1, 6):
+                raise ValueError(f"Die Antwort im Bereich «{title}» ist ungültig.")
+            answers.append(value)
+        scores[key] = int(sum(answers) / len(answers) + 0.5)
+    return scores
 
 
 def _person_words(employee):
@@ -56,11 +87,16 @@ def generate_reference_text(employee, reference_type, issue_date, end_date, reas
     """Create a complete, editable certificate from the selected assessments."""
     if reference_type not in REFERENCE_TYPES:
         raise ValueError("Unbekannte Zeugnisart.")
+    scores = _score_dimensions(ratings, reference_type)
     title, pronoun, possessive, role_word, apprentice_word = _person_words(employee)
     subject = pronoun[:1].upper() + pronoun[1:]
     name = f"{employee['first_name']} {employee['last_name']}"
     person = f"{title} {name}".strip()
-    job = employee.get("job") or ("Elektroinstallateur/in" if reference_type != "apprentice" else "Elektroinstallateur/in EFZ")
+    if not employee.get("job"):
+        raise ValueError("Bitte zuerst die Funktion der Person unter Einstellungen erfassen.")
+    if not title:
+        raise ValueError("Bitte zuerst die Anrede der Person unter Einstellungen erfassen.")
+    job = employee["job"]
     hired = display_date(employee.get("hired"))
     until = display_date(end_date) if end_date else "heute"
     birth = f", geboren am {display_date(employee['birth_date'])}," if employee.get("birth_date") else ""
@@ -74,6 +110,8 @@ def generate_reference_text(employee, reference_type, issue_date, end_date, reas
         opening = f"{person}{birth} ist seit dem {hired} als {job} in unserem Unternehmen tätig."
 
     task_items = [part.strip(" •-\t") for part in str(tasks).replace(";", "\n").splitlines() if part.strip(" •-\t")]
+    if not task_items:
+        raise ValueError("Bitte die wichtigsten Funktionen und Tätigkeiten sachlich erfassen.")
     task_text = ""
     if task_items:
         task_text = "Zu den wesentlichen Aufgaben gehören insbesondere " + ", ".join(task_items[:-1])
@@ -98,27 +136,22 @@ def generate_reference_text(employee, reference_type, issue_date, end_date, reas
         "initiative": ["Einsatz und Eigeninitiative müssen deutlich gesteigert werden.", f"{subject} zeigt den erforderlichen Einsatz.", f"{subject} zeigt guten Einsatz und angemessene Eigeninitiative.", f"{subject} zeigt stets grossen Einsatz und viel Eigeninitiative.", f"{subject} überzeugt jederzeit durch ausserordentlichen Einsatz, Verantwortungsbewusstsein und Initiative."],
         "learning": ["Neue Inhalte werden trotz Unterstützung noch nicht ausreichend aufgenommen.", "Neue Inhalte werden mit Unterstützung aufgenommen und umgesetzt.", "Neue Inhalte werden rasch verstanden und gut umgesetzt.", "Neue Inhalte werden sehr rasch verstanden, verknüpft und sicher umgesetzt.", "Die aussergewöhnlich schnelle Auffassungsgabe ermöglicht jederzeit eine ausgezeichnete Umsetzung selbst komplexer Inhalte."],
         "school": ["Das Berufsschulwissen kann noch nicht ausreichend in die Praxis übertragen werden.", "Das Berufsschulwissen wird mit Unterstützung praktisch angewendet.", "Das Berufsschulwissen wird gut und sicher in die Praxis übertragen.", "Das Berufsschulwissen wird sehr sicher und vernetzt in der Praxis eingesetzt.", "Theorie und Praxis werden jederzeit auf ausserordentlich hohem Niveau miteinander verbunden."],
-        "development": ["Die erforderliche Entwicklung ist bisher noch nicht erreicht.", "Während der Lehrzeit ist eine erkennbare Entwicklung festzustellen.", f"Während der Lehrzeit hat sich {person} gut und kontinuierlich entwickelt.", f"Während der Lehrzeit hat sich {person} sehr erfreulich und zielgerichtet entwickelt.", "Die Entwicklung während der gesamten Lehrzeit war ausserordentlich positiv und vorbildlich."],
+        "development": ["Die erforderliche Entwicklung wurde noch nicht erreicht.", "Während der Lehrzeit war eine teilweise Entwicklung erkennbar.", f"Während der Lehrzeit hat sich {person} gut und kontinuierlich entwickelt.", f"Während der Lehrzeit hat sich {person} sehr erfreulich und zielgerichtet entwickelt.", "Die Entwicklung während der gesamten Lehrzeit war ausserordentlich positiv und vorbildlich."],
+        "superiors": ["Das Verhalten gegenüber Vorgesetzten war wiederholt nicht korrekt.", "Das Verhalten gegenüber Vorgesetzten war teilweise korrekt.", "Das Verhalten gegenüber Vorgesetzten war korrekt.", "Das Verhalten gegenüber Vorgesetzten war stets einwandfrei.", "Das Verhalten gegenüber Vorgesetzten war jederzeit vorbildlich."],
+        "team": ["Die Zusammenarbeit im Team führte wiederholt zu Schwierigkeiten.", "Die Zusammenarbeit im Team war teilweise zufriedenstellend.", "Die Zusammenarbeit im Team war gut.", "Die Zusammenarbeit im Team war stets sehr gut und hilfsbereit.", "Die Zusammenarbeit im Team war jederzeit vorbildlich, konstruktiv und sehr geschätzt."],
+        "customers": ["Das Verhalten gegenüber der Kundschaft gab wiederholt Anlass zu Beanstandungen.", "Das Verhalten gegenüber der Kundschaft war teilweise angemessen.", "Das Verhalten gegenüber der Kundschaft war freundlich und korrekt.", "Das Verhalten gegenüber der Kundschaft war stets freundlich, sicher und professionell.", "Das Verhalten gegenüber der Kundschaft war jederzeit ausgesprochen professionell und vorbildlich."],
     }
-    assessment = [phrases[key][max(1, min(5, int(ratings[key]))) - 1]
-                  for key, _ in COMMON_QUESTIONS + (APPRENTICE_QUESTIONS if reference_type == "apprentice" else [])
-                  if key != "conduct"]
-    overall = int(round(sum(int(value) for value in ratings.values()) / len(ratings)))
+    assessed_keys = list(PERFORMANCE_KEYS) + (["school", "development"] if reference_type == "apprentice" else [])
+    assessment = [phrases[key][scores[key] - 1] for key in assessed_keys]
+    overall = int(sum(scores[key] for key in PERFORMANCE_KEYS) / len(PERFORMANCE_KEYS) + 0.5)
     performance = {
-        5: f"{person} erfüllt die übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit.",
-        4: f"{person} erfüllt die übertragenen Aufgaben stets zu unserer vollen Zufriedenheit.",
-        3: f"{person} erfüllt die übertragenen Aufgaben zu unserer vollen Zufriedenheit.",
-        2: f"{person} erfüllt die übertragenen Aufgaben im Grossen und Ganzen zu unserer Zufriedenheit.",
-        1: f"{person} bemüht sich, die übertragenen Aufgaben zu unserer Zufriedenheit zu erfüllen.",
+        5: f"Die Gesamtleistung von {person} ist ausgezeichnet und übertrifft die Anforderungen deutlich.",
+        4: f"Die Gesamtleistung von {person} ist sehr gut und übertrifft die Anforderungen in mehreren Bereichen.",
+        3: f"Die Gesamtleistung von {person} ist gut und erfüllt die Anforderungen.",
+        2: f"Die Gesamtleistung von {person} erfüllt die grundlegenden Anforderungen teilweise.",
+        1: f"Die Gesamtleistung von {person} erfüllt die Anforderungen noch nicht.",
     }[overall]
-    conduct = int(ratings.get("conduct", 3))
-    conduct_text = {
-        5: "Das Verhalten gegenüber Vorgesetzten, Mitarbeitenden und Kundschaft ist jederzeit vorbildlich.",
-        4: "Das Verhalten gegenüber Vorgesetzten, Mitarbeitenden und Kundschaft ist stets einwandfrei und sehr geschätzt.",
-        3: "Das Verhalten gegenüber Vorgesetzten, Mitarbeitenden und Kundschaft ist einwandfrei.",
-        2: "Das Verhalten gegenüber Vorgesetzten, Mitarbeitenden und Kundschaft ist insgesamt korrekt.",
-        1: "Das Verhalten gegenüber Vorgesetzten, Mitarbeitenden und Kundschaft gab wiederholt Anlass zu Beanstandungen.",
-    }[conduct]
+    conduct_text = " ".join(phrases[key][scores[key] - 1] for key in CONDUCT_KEYS)
 
     if reference_type == "interim":
         cause = reason.strip() or "auf Wunsch"
@@ -234,23 +267,53 @@ class ReferenceDialog(QDialog):
         self.tabs.addTab(first_widget, "Grundlagen")
 
         ratings_widget = QWidget()
-        ratings_form = QFormLayout(ratings_widget)
-        ratings_form.addRow(label("Wähle pro Punkt die treffendste Beurteilung. Der Text kann danach vollständig angepasst werden.", "muted"))
+        ratings_layout = QVBoxLayout(ratings_widget)
+        ratings_hint = label("Beantworte jede Aussage nach dem tatsächlich beobachteten Verhalten. AST leitet daraus die Beurteilung ab und formuliert das vollständige Zeugnis.", "muted")
+        ratings_hint.setWordWrap(True)
+        ratings_layout.addWidget(ratings_hint)
+        common_widget = QWidget(); common_layout = QVBoxLayout(common_widget)
         saved_ratings = self.row.get("ratings", {})
         self.ratings = {}
-        for key, question in COMMON_QUESTIONS + APPRENTICE_QUESTIONS:
-            field = combo(RATING_CHOICES, saved_ratings.get(key, 3))
-            ratings_form.addRow(question, field)
-            self.ratings[key] = field
-        self.tabs.addTab(ratings_widget, "Beurteilung")
+        for key, title, questions in COMMON_GROUPS:
+            common_layout.addWidget(label(title, "sectionTitle"))
+            for index, question in enumerate(questions, 1):
+                legacy = saved_ratings.get("conduct") if key in CONDUCT_KEYS else None
+                value = saved_ratings.get(f"{key}_{index}", saved_ratings.get(key, legacy))
+                field = combo(ANSWER_CHOICES, value)
+                field.setMinimumWidth(170); field.setMaximumWidth(210)
+                row_layout = QHBoxLayout()
+                question_label = label(question); question_label.setWordWrap(True)
+                row_layout.addWidget(question_label, 1); row_layout.addWidget(field)
+                common_layout.addLayout(row_layout)
+                self.ratings[f"{key}_{index}"] = field
+        ratings_layout.addWidget(common_widget)
+        self.apprentice_box = QWidget(); apprentice_layout = QVBoxLayout(self.apprentice_box)
+        apprentice_layout.addWidget(label("Zusätzliche Fragen für Lehrzeugnisse", "sectionTitle"))
+        for key, title, questions in APPRENTICE_GROUPS:
+            apprentice_layout.addWidget(label(title, "sectionTitle"))
+            for index, question in enumerate(questions, 1):
+                value = saved_ratings.get(f"{key}_{index}", saved_ratings.get(key))
+                field = combo(ANSWER_CHOICES, value)
+                field.setMinimumWidth(170); field.setMaximumWidth(210)
+                row_layout = QHBoxLayout()
+                question_label = label(question); question_label.setWordWrap(True)
+                row_layout.addWidget(question_label, 1); row_layout.addWidget(field)
+                apprentice_layout.addLayout(row_layout)
+                self.ratings[f"{key}_{index}"] = field
+        ratings_layout.addWidget(self.apprentice_box)
+        ratings_layout.addStretch()
+        ratings_scroll = QScrollArea(); ratings_scroll.setWidgetResizable(True); ratings_scroll.setWidget(ratings_widget)
+        self.tabs.addTab(ratings_scroll, "Beurteilung")
 
         text_widget = QWidget()
         text_layout = QVBoxLayout(text_widget)
-        text_layout.addWidget(label("Automatisch erstellter Text · vor dem Speichern frei bearbeitbar", "muted"))
+        text_note = label("Automatisch aus den Antworten erstellt. Ändere Antworten über «Zurück»; der Zeugnistext selbst wird nicht manuell verfasst.", "muted")
+        text_note.setWordWrap(True)
+        text_layout.addWidget(text_note)
         self.text = QPlainTextEdit(self.row.get("text", ""))
+        self.text.setReadOnly(True)
         self.text.setMinimumHeight(420)
         text_layout.addWidget(self.text, 1)
-        text_layout.addWidget(button("Text aus Antworten neu erstellen", self.generate))
         self.tabs.addTab(text_widget, "Text prüfen")
 
         buttons = QDialogButtonBox()
@@ -264,16 +327,22 @@ class ReferenceDialog(QDialog):
         buttons.rejected.connect(self.reject); buttons.accepted.connect(self.submit)
         layout.addWidget(buttons)
         self.person.currentIndexChanged.connect(self._person_changed)
+        self.kind.currentIndexChanged.connect(self._kind_changed)
         self.set_step(0)
         self._person_changed()
+        self._kind_changed()
 
     def _person_changed(self):
         employee = self.db.employee(self.person.currentData())
         if employee and employee["kind"] == "apprentice" and not self.row:
             self.kind.setCurrentIndex(self.kind.findData("apprentice"))
 
-    def active_questions(self):
-        return COMMON_QUESTIONS + (APPRENTICE_QUESTIONS if self.kind.currentData() == "apprentice" else [])
+    def _kind_changed(self):
+        self.apprentice_box.setVisible(self.kind.currentData() == "apprentice")
+
+    def active_question_ids(self):
+        return [f"{key}_{index}" for key, _, questions in question_groups(self.kind.currentData())
+                for index, _ in enumerate(questions, 1)]
 
     def set_step(self, index):
         index = max(0, min(2, index))
@@ -285,16 +354,17 @@ class ReferenceDialog(QDialog):
     def next_step(self):
         if not self.person.currentData():
             raise ValueError("Bitte zuerst eine Person auswählen.")
+        if self.tabs.currentIndex() == 0 and not self.tasks.toPlainText().strip():
+            raise ValueError("Bitte die wichtigsten Funktionen und Tätigkeiten erfassen.")
         if self.tabs.currentIndex() == 1:
             self.generate()
         self.set_step(self.tabs.currentIndex() + 1)
 
     def values(self):
-        questions = self.active_questions()
         return {"employee_id": self.person.currentData(), "reference_type": self.kind.currentData(),
                 "issue_date": day_value(self.issue), "end_date": day_value(self.end),
                 "reason": self.reason.text(), "tasks": self.tasks.toPlainText(),
-                "ratings": {key: self.ratings[key].currentData() for key, _ in questions},
+                "ratings": {key: self.ratings[key].currentData() for key in self.active_question_ids()},
                 "text": self.text.toPlainText()}
 
     @guarded
@@ -307,8 +377,7 @@ class ReferenceDialog(QDialog):
 
     @guarded
     def submit(self):
-        if not self.text.toPlainText().strip():
-            self.generate()
+        self.generate()
         self.saved_id = self.db.save_reference(self.values(), self.row.get("id"))
         self.accept()
 

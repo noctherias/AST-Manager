@@ -5,9 +5,9 @@ import unittest
 
 from pypdf import PdfReader
 
-from ast_app.applications import sync_manifests
+from ast_app.applications import sync_manifests, sync_ftp
 from ast_app.database import Database
-from ast_app.references import generate_reference_text, reference_pdf
+from ast_app.references import generate_reference_text, reference_pdf, question_groups
 
 
 class HrApplicationTests(unittest.TestCase):
@@ -27,18 +27,20 @@ class HrApplicationTests(unittest.TestCase):
 
     def test_reference_generation_persistence_and_pdf(self):
         employee = self.db.employee(self.employee_id)
-        ratings = {key: 4 for key in ("knowledge", "quality", "quantity", "independence",
-                                      "reliability", "initiative", "learning", "conduct")}
+        ratings = {f"{key}_{index}": 4 for key, _, questions in question_groups("interim")
+                   for index, _ in enumerate(questions, 1)}
         text = generate_reference_text(employee, "interim", "2026-10-05", "2026-10-05", "auf Wunsch",
                                        "Servicearbeiten\nInstallationen", ratings)
         self.assertIn("Anna Muster", text)
-        self.assertIn("stets zu unserer vollen Zufriedenheit", text)
+        self.assertIn("Gesamtleistung", text)
+        self.assertIn("sehr gut", text)
+        self.assertIn("gegenüber Vorgesetzten", text)
         key = self.db.save_reference({"employee_id": self.employee_id, "reference_type": "interim",
                                       "issue_date": "2026-10-05", "end_date": "2026-10-05",
                                       "reason": "auf Wunsch", "tasks": "Servicearbeiten\nInstallationen",
                                       "ratings": ratings, "text": text})
         row = self.db.reference(key)
-        self.assertEqual(row["ratings"]["quality"], 4)
+        self.assertEqual(row["ratings"]["quality_1"], 4)
         path = self.root / "zeugnis.pdf"
         reference_pdf(path, row, employee, {"company": "AST Elektro Tüscher AG", "city": "Aarburg"})
         pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
@@ -66,6 +68,31 @@ class HrApplicationTests(unittest.TestCase):
         self.assertTrue(Path(records[0]["local_path"]).is_file())
         again = sync_manifests(self.db, import_root)
         self.assertEqual(again, {"created": 0, "updated": 1, "files": 0})
+
+    def test_ftps_manifest_and_document_import(self):
+        payload = {"id": "ftp-20261005-1", "submitted_at": "2026-10-05T12:00:00",
+                   "application_for": "Elektroinstallateur EFZ", "first_name": "Lia", "last_name": "Test",
+                   "files": [{"category": "application", "original_name": "Bewerbung.pdf",
+                              "stored_path": "../ast-elektro.ch/uploads/upload_1.pdf"}]}
+
+        class FakeFtp:
+            def __init__(self, **kwargs): self.cwd_value = ""
+            def connect(self, host, port): self.host = host
+            def auth(self): pass
+            def login(self, user, password): self.user = user
+            def prot_p(self): pass
+            def cwd(self, value): self.cwd_value = value
+            def nlst(self): return ["ftp-20261005-1.json"]
+            def retrbinary(self, command, callback):
+                callback(json.dumps(payload).encode() if command.endswith(".json") else b"%PDF-1.4\n%%EOF")
+            def quit(self): pass
+            def close(self): pass
+
+        result = sync_ftp(self.db, "ftp.example.test", "user", "secret", ftp_factory=FakeFtp)
+        self.assertEqual(result, {"created": 1, "updated": 0, "files": 1})
+        applicant = self.db.applicants()[0]
+        self.assertEqual((applicant["first_name"], applicant["category"]), ("Lia", "installer"))
+        self.assertTrue(Path(self.db.applicant_files(applicant["id"])[0]["local_path"]).is_file())
 
 
 if __name__ == "__main__":

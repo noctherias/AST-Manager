@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
         self.updates.stopped = True
         if self.updates.job: self.updates.job.cancel.set()
         self.updates.timer.stop()
+        self.pages[7].stop_sync()
 
     def closeEvent(self, event):
         self.prepare_shutdown()

@@ -23,6 +23,7 @@ from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
 from ast_app.widgets import Table
+from ast_app.references import ReferenceDialog
 
 APP = QApplication.instance() or QApplication([])
 if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
@@ -80,6 +81,8 @@ class UiTests(unittest.TestCase):
         self.assertGreater(window.pages[5].table.rowCount(), 0)
         self.assertGreater(window.pages[6].table.rowCount(), 0)
         self.assertGreater(window.pages[7].table.rowCount(), 0)
+        self.assertTrue(window.pages[7].sync_timer.isActive())
+        self.assertEqual(window.pages[7].sync_timer.interval(), 5 * 60 * 1000)
         reminders = window.pages[5]
         reminders.tabs.setCurrentIndex(1)
         reminders.template_editors[1].clear()
@@ -208,6 +211,19 @@ class UiTests(unittest.TestCase):
         self.assertTrue(restored.isRowHidden(0))
         self.assertEqual(restored.horizontalHeader().visualIndex(last), 0)
         restored._reset_columns(); restored._reset_rows()
+
+    def test_reference_is_generated_only_from_answered_questions(self):
+        dialog = ReferenceDialog(None, self.db)
+        self.assertTrue(dialog.text.isReadOnly())
+        dialog.tasks.setPlainText("Elektroinstallationen\nServicearbeiten")
+        active = dialog.active_question_ids()
+        self.assertTrue(active)
+        self.assertTrue(all(dialog.ratings[key].currentData() is None for key in active))
+        for key in active:
+            dialog.ratings[key].setCurrentIndex(dialog.ratings[key].findData(4))
+        dialog.generate()
+        self.assertIn("Gesamtleistung", dialog.text.toPlainText())
+        self.assertIn("Verhalten gegenüber Vorgesetzten", dialog.text.toPlainText())
 
     def test_time_and_salary_dialogs(self):
         e = self.db.employees()[0]

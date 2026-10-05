@@ -6,9 +6,15 @@ Usage after explicit approval:
 from __future__ import annotations
 
 import argparse
+import base64
 from datetime import datetime
+import ftplib
+import io
+import os
 from pathlib import Path
 import shutil
+import ssl
+import xml.etree.ElementTree as ET
 
 
 CALLS = {
@@ -85,11 +91,71 @@ def patch_text(text: str) -> str:
     return text.replace(send, SEND_REPLACEMENT, 1)
 
 
+def filezilla_profile(name):
+    path = Path(os.environ["APPDATA"]) / "FileZilla" / "sitemanager.xml"
+    root = ET.parse(path).getroot()
+    server = next((item for item in root.findall(".//Server")
+                   if (item.findtext("Name") or "").strip() == name), None)
+    if server is None:
+        raise ValueError(f"FileZilla-Profil nicht gefunden: {name}")
+    password = server.find("Pass")
+    raw = password.text or ""
+    if password.get("encoding") == "base64":
+        raw = base64.b64decode(raw).decode("utf-8")
+    return server.findtext("Host").strip(), int(server.findtext("Port") or 21), server.findtext("User").strip(), raw
+
+
+def deploy_ftp(profile, remote, check=False):
+    host, port, user, password = filezilla_profile(profile)
+    ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=30)
+    ftp.connect(host, port); ftp.auth(); ftp.login(user, password); ftp.prot_p()
+    try:
+        original = io.BytesIO(); ftp.retrbinary("RETR " + remote, original.write)
+        raw = original.getvalue(); text = raw.decode("utf-8-sig")
+        if check:
+            if not all(marker in text for marker in ("private_applications", "$application_files", "JSON_PRETTY_PRINT")):
+                raise SystemExit("Website-Integration ist noch nicht vollständig aktiv.")
+            print("Website-Integration ist über FTPS aktiv.")
+            return
+        patched = patch_text(text)
+        if patched == text:
+            print("Website-Integration war bereits über FTPS aktiv.")
+            return
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        backup = remote + ".backup-" + stamp
+        ftp.storbinary("STOR " + backup, io.BytesIO(raw))
+        try:
+            ftp.cwd("/sites")
+            try:
+                ftp.mkd("private_applications")
+            except ftplib.error_perm as exc:
+                if not str(exc).startswith("550"):
+                    raise
+            ftp.storbinary("STOR " + remote, io.BytesIO(patched.encode("utf-8")))
+        except Exception:
+            ftp.storbinary("STOR " + remote, io.BytesIO(raw))
+            raise
+        print(f"Über FTPS aktiviert. Sicherung: {backup}")
+        print("Privater Importordner: /sites/private_applications")
+    finally:
+        try:
+            ftp.quit()
+        except Exception:
+            ftp.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mailer", type=Path)
+    parser.add_argument("mailer", type=Path, nargs="?")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--filezilla-profile")
+    parser.add_argument("--remote", default="/sites/ast-elektro.ch/mailer.php")
     args = parser.parse_args()
+    if args.filezilla_profile:
+        deploy_ftp(args.filezilla_profile, args.remote, args.check)
+        return
+    if args.mailer is None:
+        parser.error("mailer oder --filezilla-profile ist erforderlich")
     source = args.mailer
     text = source.read_text(encoding="utf-8")
     if args.check:
