@@ -1,6 +1,6 @@
 # Testprotokoll
 
-Stand: 05.10.2026, Version 0.14.2. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
+Stand: 05.10.2026, Version 0.14.3. Geprüft unter Windows 11 x64 (10.0.26200), Python 3.12.14, PySide6 6.11.2, pypdf 6.10.0, ReportLab 4.4.9 und PyInstaller 6.22.3.
 
 ## Automatisierte Tests
 

@@ -1,2 +1,2 @@
 """AST Verwaltung - native desktop MVP."""
-__version__ = "0.14.2"
+__version__ = "0.14.3"

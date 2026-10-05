@@ -36,6 +36,7 @@ STATUSES = {
 FILE_CATEGORIES = {"application": "Bewerbung", "cv": "Lebenslauf", "certificates": "Zeugnisse", "other": "Sonstiges"}
 SUITABILITY = {"": "Noch nicht beurteilt", "unsuitable": "Nicht geeignet", "possible": "Eventuell", "suitable": "Geeignet"}
 SUITABILITY_COLORS = {"": "#edf2f5", "unsuitable": "#fce3e3", "possible": "#fff3cd", "suitable": "#dff3e8"}
+SUITABILITY_SELECTION_COLORS = {"": "#dce8ed", "unsuitable": "#f2bfc2", "possible": "#f3dda0", "suitable": "#bfe2ce"}
 DEFAULT_FTP_HOST = "lp2qfs.ftp.infomaniak.com"
 DEFAULT_FTP_USER = "lp2qfs_admin"
 DEFAULT_FTP_ROOT = "/sites/ast-elektro.ch/uploads"
@@ -735,6 +736,9 @@ class ApplicationsPage(Page):
     def selection(self):
         row = self.selected(); enabled = bool(row)
         self.open_button.setEnabled(enabled); self.delete_button.setEnabled(enabled)
+        selected_colour = SUITABILITY_SELECTION_COLORS[row.get("suitability", "") if row else ""]
+        self.table.setStyleSheet(
+            f"QTableWidget::item:selected {{ background: {selected_colour}; color: #183342; }}")
         self.hint.setText(f"{row['first_name']} {row['last_name']} · {SUITABILITY[row.get('suitability', '')]} · jetzt beurteilen oder Notiz erfassen" if row else "Bewerbung auswählen, um Beurteilung und interne Notizen zu öffnen.")
 
     def new(self):

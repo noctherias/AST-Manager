@@ -137,9 +137,16 @@ class UiTests(unittest.TestCase):
         QTest.mouseClick(dialog.save_notes_button, Qt.MouseButton.LeftButton)
         self.assertEqual(self.db.applicant(applicant["id"])["notes"],
                          "Telefonisch am 5. Oktober kontaktiert.")
+        self.db.set_applicant_suitability(applicant["id"], "unsuitable", True)
+        page = ApplicationsPage(self.db); page.refresh(); page.table.selectRow(0)
+        APP.processEvents()
+        self.assertEqual(page.table.item(0, 0).background().color().name(), "#fce3e3")
+        self.assertIn("#f2bfc2", page.table.styleSheet())
         if os.environ.get("AST_QA_DIR"):
             folder = Path(os.environ["AST_QA_DIR"]); folder.mkdir(parents=True, exist_ok=True)
             dialog.grab().save(str(folder / "bewerber-status.png"))
+            page.resize(1060, 680); page.show(); APP.processEvents()
+            page.grab().save(str(folder / "bewerbungen-rot.png"))
 
     def test_real_form_save_click_and_reopen(self):
         d = CustomerDialog(None, self.db)
