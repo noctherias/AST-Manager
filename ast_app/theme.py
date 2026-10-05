@@ -106,6 +106,9 @@ QPushButton#reviewRed:checked { background: #bd3c40; border-color: #bd3c40; colo
 QPushButton#reviewYellow:checked { background: #d59c19; border-color: #d59c19; color: white; }
 QPushButton#reviewGreen:checked { background: #087a61; border-color: #087a61; color: white; }
 QFrame#appInfoCard, QFrame#appMessageCard { background: white; border: 1px solid #dce5ea; border-radius: 12px; }
+QFrame#appReviewCard { background: #ffffff; border: 2px solid #b9d8cf; border-radius: 13px; }
+QPlainTextEdit#appInternalNotes { background: #fbfdfd; border: 1px solid #b9cbd3; border-radius: 8px; padding: 9px; }
+QPlainTextEdit#appInternalNotes:focus { border: 2px solid #138a73; padding: 8px; }
 QLabel#appInfoCaption { color: #607786; font-size: 9pt; font-weight: 650; }
 QLabel#appInfoValue { color: #183342; font-size: 11pt; font-weight: 600; }
 QLabel#appMessage { color: #294957; font-size: 10pt; }

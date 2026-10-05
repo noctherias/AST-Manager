@@ -11,7 +11,7 @@ from unittest.mock import patch
 from PySide6.QtCore import Qt, QLocale, QCoreApplication, QEvent, QDate
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QLineEdit
+from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QLineEdit, QPlainTextEdit
 
 from ast_app.database import Database
 from ast_app.demo import seed_demo
@@ -128,10 +128,15 @@ class UiTests(unittest.TestCase):
         dialog.show()
         APP.processEvents()
         self.assertEqual(dialog.findChildren(QLineEdit), [])
+        self.assertEqual(dialog.findChildren(QPlainTextEdit), [dialog.notes])
         self.assertEqual(set(dialog.review_buttons), {"unsuitable", "possible", "suitable"})
         dialog.set_suitability("possible")
         self.assertEqual(self.db.applicant(applicant["id"])["suitability"], "possible")
         self.assertEqual(dialog.badge.text(), "Eventuell")
+        dialog.notes.setPlainText("Telefonisch am 5. Oktober kontaktiert.")
+        QTest.mouseClick(dialog.save_notes_button, Qt.MouseButton.LeftButton)
+        self.assertEqual(self.db.applicant(applicant["id"])["notes"],
+                         "Telefonisch am 5. Oktober kontaktiert.")
         if os.environ.get("AST_QA_DIR"):
             folder = Path(os.environ["AST_QA_DIR"]); folder.mkdir(parents=True, exist_ok=True)
             dialog.grab().save(str(folder / "bewerber-status.png"))

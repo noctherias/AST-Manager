@@ -502,6 +502,12 @@ class Database:
             values["server_deleted"] = 1 if server_deleted else 0
         self._save("applicants", values, key)
 
+    def set_applicant_notes(self, key, notes):
+        if not self.applicant(key):
+            raise ValueError("Die Bewerbung existiert nicht mehr.")
+        self._save("applicants", {"notes": str(notes or "").strip(),
+                                  "updated": datetime.now().isoformat(timespec="seconds")}, key)
+
     def applicant_files(self, applicant_id):
         return self.rows("SELECT * FROM applicant_files WHERE applicant_id=? ORDER BY category,original_name",
                          (applicant_id,))

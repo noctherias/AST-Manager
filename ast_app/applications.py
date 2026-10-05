@@ -11,6 +11,7 @@ import posixpath
 import re
 import shutil
 import ssl
+from urllib.parse import unquote, urlsplit
 
 from PySide6.QtCore import Qt, QUrl, QTimer, QObject, QThread, Signal, Slot, QSize
 from PySide6.QtGui import QDesktopServices, QColor
@@ -41,6 +42,17 @@ DEFAULT_FTP_ROOT = "/sites/ast-elektro.ch/uploads"
 MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
 FTP_ERRORS = ftplib.all_errors + (ssl.SSLError,)
+
+
+def normalize_ftp_root(value):
+    """Accept a server path or the complete FTP URL shown by FTP clients."""
+    raw = str(value or "").strip().replace("\\", "/")
+    if raw.casefold().startswith(("ftp://", "ftps://")):
+        raw = unquote(urlsplit(raw).path)
+    root = "/" + raw.strip("/")
+    if posixpath.normpath(root) != root or not root.startswith("/sites/"):
+        raise ValueError("Der FTP-Uploadpfad muss auf einen gültigen Ordner unter /sites verweisen.")
+    return root
 
 
 def category_from_web(value):
@@ -140,11 +152,9 @@ def sync_manifests(db, folder):
 
 def sync_ftp(db, host, user, password, remote_root=DEFAULT_FTP_ROOT, ftp_factory=ftplib.FTP_TLS):
     """Import website manifests and uploads through explicit TLS-protected FTP."""
-    host = str(host).strip(); user = str(user).strip(); remote_root = "/" + str(remote_root).strip().strip("/")
+    host = str(host).strip(); user = str(user).strip(); remote_root = normalize_ftp_root(remote_root)
     if not host or any(char in host for char in "/:@ ") or not user or not password:
         raise ValueError("Bitte den FTP-Serverzugang vollständig angeben.")
-    if posixpath.normpath(remote_root) != remote_root or not remote_root.startswith("/sites/"):
-        raise ValueError("Der FTP-Importpfad muss ein gültiger Ordner unter /sites sein.")
     ftp = ftp_factory(context=ssl.create_default_context(), timeout=30)
     created = updated = files_copied = 0
     try:
@@ -205,9 +215,7 @@ def delete_remote_application(host, user, password, source_id, remote_root=DEFAU
                               ftp_factory=ftplib.FTP_TLS):
     """Delete exactly one verified website application folder through FTPS."""
     source_id = str(source_id or "").strip()
-    remote_root = "/" + str(remote_root).strip().strip("/")
-    if posixpath.normpath(remote_root) != remote_root or not remote_root.startswith("/sites/"):
-        raise ValueError("Der FTP-Uploadpfad muss ein gültiger Ordner unter /sites sein.")
+    remote_root = normalize_ftp_root(remote_root)
     if not source_id or source_id.startswith("manual-") or posixpath.basename(source_id) != source_id or source_id in (".", ".."):
         raise ValueError("Für diese Bewerbung existiert kein löschbarer Serverordner.")
     remote_folder = posixpath.normpath(posixpath.join(remote_root, source_id))
@@ -278,7 +286,7 @@ class FtpSettingsDialog(QDialog):
             raise ValueError("Bitte alle Angaben zum Bewerbungsserver ausfüllen.")
         self.db.save_settings({"applications_ftp_host": self.host.text(),
                                "applications_ftp_user": self.user.text(),
-                               "applications_ftp_root": self.root.text(),
+                               "applications_ftp_root": normalize_ftp_root(self.root.text()),
                                "applications_ftp_password": protect_secret(self.password.text())})
         self.accept()
 
@@ -467,12 +475,12 @@ def _info_card(title, value):
 
 
 class ApplicantStatusDialog(QDialog):
-    """Read-only applicant dashboard; only the explicit suitability tag can change."""
+    """Read-only submitted data with an explicit internal review workspace."""
     def __init__(self, parent, db, row):
         super().__init__(parent)
         self.db, self.row = db, row
         self.delete_thread = self.delete_worker = None
-        self.setWindowTitle(f"Bewerberstatus · {row['first_name']} {row['last_name']}")
+        self.setWindowTitle(f"Beurteilung & Dossier · {row['first_name']} {row['last_name']}")
         self.resize(980, 790)
         outer = QVBoxLayout(self); outer.setContentsMargins(22, 20, 22, 18); outer.setSpacing(14)
 
@@ -486,7 +494,7 @@ class ApplicantStatusDialog(QDialog):
         self.badge = label("", "applicantBadge"); self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top.addWidget(self.badge)
         hero.addLayout(top)
-        hero.addWidget(label("Interne Beurteilung", "appInfoCaption"))
+        hero.addWidget(label("BEURTEILUNG AUSWÄHLEN", "appInfoCaption"))
         review = QHBoxLayout(); review.setSpacing(10)
         self.review_buttons = {}
         for key, text, object_name in (("unsuitable", "Nicht geeignet", "reviewRed"),
@@ -497,6 +505,23 @@ class ApplicantStatusDialog(QDialog):
             self.review_buttons[key] = control; review.addWidget(control)
         hero.addLayout(review)
         outer.addWidget(self.hero)
+
+        note_card = QFrame(); note_card.setObjectName("appReviewCard")
+        note_box = QVBoxLayout(note_card); note_box.setContentsMargins(18, 15, 18, 15); note_box.setSpacing(9)
+        note_heading = QHBoxLayout()
+        note_heading.addWidget(label("Interne Notiz", "sectionTitle")); note_heading.addStretch()
+        note_heading.addWidget(label("Nur intern · Bewerbungsdaten bleiben unverändert", "muted"))
+        note_box.addLayout(note_heading)
+        self.notes = QPlainTextEdit(row.get("notes", ""))
+        self.notes.setObjectName("appInternalNotes")
+        self.notes.setPlaceholderText("Zum Beispiel Eindruck, Rückfrage, nächster Schritt oder Gesprächsnotiz …")
+        self.notes.setMaximumHeight(92)
+        note_box.addWidget(self.notes)
+        note_actions = QHBoxLayout(); note_actions.addStretch()
+        self.save_notes_button = button("Notiz speichern", self.save_notes, True)
+        self.notes.textChanged.connect(lambda: self.save_notes_button.setText("Notiz speichern"))
+        note_actions.addWidget(self.save_notes_button); note_box.addLayout(note_actions)
+        outer.addWidget(note_card)
 
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setObjectName("applicantScroll")
         content = QWidget(); content.setObjectName("applicantContent")
@@ -540,8 +565,6 @@ class ApplicantStatusDialog(QDialog):
         file_actions.addWidget(button("Kopie speichern", self.save_copy)); file_actions.addStretch()
         body.addLayout(file_actions)
 
-        body.addWidget(label("Interne Notiz", "sectionTitle"))
-        body.addWidget(_info_card("Nur zur Ansicht", _display(row.get("notes"), "Keine interne Notiz vorhanden.")))
         self.server_note = label("", "muted"); self.server_note.setWordWrap(True); body.addWidget(self.server_note)
         scroll.setWidget(content); outer.addWidget(scroll, 1)
 
@@ -566,6 +589,15 @@ class ApplicantStatusDialog(QDialog):
         target, _ = QFileDialog.getSaveFileName(self, "Dokument speichern", source.name)
         if target:
             shutil.copy2(source, target)
+
+    @guarded
+    def save_notes(self):
+        self.db.set_applicant_notes(self.row["id"], self.notes.toPlainText())
+        self.row = self.db.applicant(self.row["id"])
+        self.notes.blockSignals(True)
+        self.notes.setPlainText(self.row.get("notes", ""))
+        self.notes.blockSignals(False)
+        self.save_notes_button.setText("Notiz gespeichert")
 
     def refresh_status(self):
         value = self.row.get("suitability", "")
@@ -635,7 +667,7 @@ class ApplicantStatusDialog(QDialog):
 
 class ApplicationsPage(Page):
     def __init__(self, db):
-        super().__init__("Bewerbungen", "Jede Bewerbung als eigenes Dossier mit Status, Kontaktdaten und Unterlagen verwalten.")
+        super().__init__("Bewerbungen", "Bewerbung auswählen und über «Beurteilung & Dossier» bewerten, notieren und prüfen.")
         self.db, self.rows = db, []
         self.sync_thread = self.sync_worker = None
         self.sync_manual = False
@@ -654,9 +686,9 @@ class ApplicationsPage(Page):
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.layout.addWidget(self.table, 1)
         actions = QHBoxLayout()
-        self.hint = label("Bitte eine Bewerbung auswählen.", "muted")
+        self.hint = label("Bewerbung auswählen, um Beurteilung und interne Notizen zu öffnen.", "muted")
         actions.addWidget(self.hint, 1)
-        self.open_button = button("Dossier öffnen", self.open, True)
+        self.open_button = button("Beurteilung && Dossier öffnen", self.open, True)
         self.delete_button = button("Löschen", self.remove)
         actions.addWidget(self.open_button); actions.addWidget(self.delete_button)
         self.layout.addLayout(actions)
@@ -702,7 +734,7 @@ class ApplicationsPage(Page):
     def selection(self):
         row = self.selected(); enabled = bool(row)
         self.open_button.setEnabled(enabled); self.delete_button.setEnabled(enabled)
-        self.hint.setText(f"{row['first_name']} {row['last_name']} · {SUITABILITY[row.get('suitability', '')]}" if row else "Bitte eine Bewerbung auswählen.")
+        self.hint.setText(f"{row['first_name']} {row['last_name']} · {SUITABILITY[row.get('suitability', '')]} · jetzt beurteilen oder Notiz erfassen" if row else "Bewerbung auswählen, um Beurteilung und interne Notizen zu öffnen.")
 
     def new(self):
         if ApplicantDialog(self, self.db).exec():

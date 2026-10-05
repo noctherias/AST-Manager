@@ -5,7 +5,8 @@ import unittest
 
 from pypdf import PdfReader
 
-from ast_app.applications import DEFAULT_FTP_ROOT, delete_remote_application, sync_manifests, sync_ftp
+from ast_app.applications import (DEFAULT_FTP_ROOT, delete_remote_application, normalize_ftp_root,
+                                  sync_manifests, sync_ftp)
 from ast_app.database import Database
 from ast_app.references import generate_reference_text, reference_pdf, question_groups
 
@@ -138,6 +139,12 @@ class HrApplicationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             delete_remote_application("ftp.example.test", "user", "secret", source_id, "/",
                                       ftp_factory=FakeFtp)
+
+    def test_full_ftp_url_is_normalized_to_remote_upload_path(self):
+        self.assertEqual(
+            normalize_ftp_root("ftp://lp2qfs_admin@lp2qfs.ftp.infomaniak.com/sites/ast-elektro.ch/uploads"),
+            DEFAULT_FTP_ROOT)
+        self.assertEqual(normalize_ftp_root(r"\sites\ast-elektro.ch\uploads"), DEFAULT_FTP_ROOT)
 
 
 if __name__ == "__main__":
