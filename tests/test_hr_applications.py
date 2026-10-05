@@ -5,7 +5,7 @@ import unittest
 
 from pypdf import PdfReader
 
-from ast_app.applications import sync_manifests, sync_ftp
+from ast_app.applications import DEFAULT_FTP_ROOT, sync_manifests, sync_ftp
 from ast_app.database import Database
 from ast_app.references import generate_reference_text, reference_pdf, question_groups
 
@@ -56,6 +56,7 @@ class HrApplicationTests(unittest.TestCase):
                    "application_for": "Lehrstelle Montage-Elektriker EFZ", "first_name": "Max",
                    "last_name": "Beispiel", "address": "Testweg 1", "postcode": "5000", "city": "Aarau",
                    "email": "max@example.invalid", "phone": "079 111 22 33", "vocational_baccalaureate": "ja",
+                   "trial_dates": ["2026-11-02", "2026-11-05"],
                    "message": "Guten Tag", "files": [{"category": "cv", "original_name": "Lebenslauf Max.pdf",
                                                         "stored_path": "files/upload_1.pdf"}]}
         (import_root / "web-20261005-1.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -63,6 +64,7 @@ class HrApplicationTests(unittest.TestCase):
         self.assertEqual(result, {"created": 1, "updated": 0, "files": 1})
         applicant = self.db.applicants()[0]
         self.assertEqual((applicant["category"], applicant["first_name"]), ("assembly", "Max"))
+        self.assertEqual(applicant["trial_dates"], "02.11.2026\n05.11.2026")
         records = self.db.applicant_files(applicant["id"])
         self.assertEqual(records[0]["original_name"], "Lebenslauf Max.pdf")
         self.assertTrue(Path(records[0]["local_path"]).is_file())
@@ -72,8 +74,9 @@ class HrApplicationTests(unittest.TestCase):
     def test_ftps_manifest_and_document_import(self):
         payload = {"id": "ftp-20261005-1", "submitted_at": "2026-10-05T12:00:00",
                    "application_for": "Elektroinstallateur EFZ", "first_name": "Lia", "last_name": "Test",
+                   "trial_dates": ["2026-11-10"],
                    "files": [{"category": "application", "original_name": "Bewerbung.pdf",
-                              "stored_path": "../ast-elektro.ch/uploads/upload_1.pdf"}]}
+                              "stored_path": "upload_1.pdf"}]}
 
         class FakeFtp:
             def __init__(self, **kwargs): self.cwd_value = ""
@@ -82,7 +85,8 @@ class HrApplicationTests(unittest.TestCase):
             def login(self, user, password): self.user = user
             def prot_p(self): pass
             def cwd(self, value): self.cwd_value = value
-            def nlst(self): return ["ftp-20261005-1.json"]
+            def nlst(self):
+                return ["Lia_Test_20261005"] if self.cwd_value == DEFAULT_FTP_ROOT else ["application.json", "upload_1.pdf"]
             def retrbinary(self, command, callback):
                 callback(json.dumps(payload).encode() if command.endswith(".json") else b"%PDF-1.4\n%%EOF")
             def quit(self): pass
@@ -92,6 +96,7 @@ class HrApplicationTests(unittest.TestCase):
         self.assertEqual(result, {"created": 1, "updated": 0, "files": 1})
         applicant = self.db.applicants()[0]
         self.assertEqual((applicant["first_name"], applicant["category"]), ("Lia", "installer"))
+        self.assertEqual(applicant["trial_dates"], "10.11.2026")
         self.assertTrue(Path(self.db.applicant_files(applicant["id"])[0]["local_path"]).is_file())
 
 

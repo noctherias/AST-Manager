@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS applicants(
  first_name TEXT NOT NULL, last_name TEXT NOT NULL, address TEXT NOT NULL DEFAULT '',
  postcode TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
  phone TEXT NOT NULL DEFAULT '', vocational_baccalaureate INTEGER NOT NULL DEFAULT 0 CHECK(vocational_baccalaureate IN (0,1)),
- message TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', submitted_at TEXT NOT NULL, updated TEXT NOT NULL);
+ trial_dates TEXT NOT NULL DEFAULT '', message TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+ submitted_at TEXT NOT NULL, updated TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS applicant_files(
  id INTEGER PRIMARY KEY, applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
  category TEXT NOT NULL DEFAULT 'other', original_name TEXT NOT NULL, local_path TEXT NOT NULL,
@@ -82,7 +83,7 @@ CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submi
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 class Database:
@@ -116,6 +117,11 @@ class Database:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
         if "reminder_date" not in invoice_columns:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_date TEXT NOT NULL DEFAULT ''")
+        applicant_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(applicants)")}
+        if "trial_dates" not in applicant_columns:
+            self.conn.execute("ALTER TABLE applicants ADD COLUMN trial_dates TEXT NOT NULL DEFAULT ''")
+        self.conn.execute("""UPDATE settings SET value='/sites/ast-elektro.ch/uploads'
+                             WHERE key='applications_ftp_root' AND value='/sites/private_applications'""")
         invoice_sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='invoices'").fetchone()[0]
         if "BETWEEN 0 AND 3" in invoice_sql:
             self.conn.commit()
@@ -467,7 +473,7 @@ class Database:
             raise ValueError("Das Eingangsdatum ist ungültig.") from None
         values = {field: str(data.get(field, "")).strip() for field in
                   ("source_id", "first_name", "last_name", "address", "postcode", "city",
-                   "email", "phone", "message", "notes")}
+                   "email", "phone", "trial_dates", "message", "notes")}
         if not values["source_id"]:
             values["source_id"] = f"manual-{uuid4().hex}"
         if not values["first_name"] or not values["last_name"]:

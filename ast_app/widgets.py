@@ -394,8 +394,10 @@ class FormDialog(QDialog):
         self.accept()
 
 
-def confirm(parent, text):
-    return QMessageBox.question(parent, "Bitte bestätigen", text,
+def confirm(parent, title, text=None):
+    if text is None:
+        text, title = title, "Bitte bestätigen"
+    return QMessageBox.question(parent, title, text,
                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                 QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
 

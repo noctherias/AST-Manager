@@ -22,7 +22,7 @@ from ast_app.dialogs import (EmployeeDialog, CustomerDialog, InvoiceDialog, Entr
 from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
-from ast_app.widgets import Table
+from ast_app.widgets import Table, confirm
 from ast_app.references import ReferenceDialog
 from ast_app.applications import ApplicationsPage
 
@@ -241,6 +241,22 @@ class UiTests(unittest.TestCase):
                 QTest.qWait(10)
         self.assertIsNone(page.sync_thread)
         self.assertIn("Automatischer Serverabgleich aktiv", page.server_status.text())
+
+    def test_confirmation_supports_separate_title_and_message(self):
+        with patch("ast_app.widgets.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes) as question:
+            self.assertTrue(confirm(None, "Zeugnis löschen", "Soll dieses Zeugnis wirklich gelöscht werden?"))
+        self.assertEqual(question.call_args.args[1:3], ("Zeugnis löschen", "Soll dieses Zeugnis wirklich gelöscht werden?"))
+
+    def test_selected_reference_can_be_deleted(self):
+        window = MainWindow(self.db, True)
+        page = window.pages[6]
+        page.refresh()
+        before = len(self.db.references())
+        self.assertGreater(before, 0)
+        page.table.selectRow(0)
+        with patch("ast_app.references.confirm", return_value=True):
+            page.remove()
+        self.assertEqual(len(self.db.references()), before - 1)
 
     def test_time_and_salary_dialogs(self):
         e = self.db.employees()[0]

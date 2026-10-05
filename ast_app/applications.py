@@ -34,8 +34,7 @@ STATUSES = {
 FILE_CATEGORIES = {"application": "Bewerbung", "cv": "Lebenslauf", "certificates": "Zeugnisse", "other": "Sonstiges"}
 DEFAULT_FTP_HOST = "lp2qfs.ftp.infomaniak.com"
 DEFAULT_FTP_USER = "lp2qfs_admin"
-DEFAULT_FTP_ROOT = "/sites/private_applications"
-ALLOWED_UPLOAD_ROOT = "/sites/ast-elektro.ch/uploads"
+DEFAULT_FTP_ROOT = "/sites/ast-elektro.ch/uploads"
 MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
 FTP_ERRORS = ftplib.all_errors + (ssl.SSLError,)
@@ -56,6 +55,22 @@ def safe_filename(value):
     return name or "Dokument"
 
 
+def trial_dates_text(value):
+    values = value if isinstance(value, list) else re.split(r"[,;\n]+", str(value or ""))
+    result = []
+    for item in values:
+        raw = str(item).strip()
+        if not raw:
+            continue
+        try:
+            raw = datetime.fromisoformat(raw).strftime("%d.%m.%Y")
+        except ValueError:
+            pass
+        if raw not in result:
+            result.append(raw)
+    return "\n".join(result)
+
+
 def _save_payload(db, payload, load_file):
     source_id = str(payload.get("id") or "").strip()
     if not source_id or len(source_id) > 180:
@@ -68,6 +83,7 @@ def _save_payload(db, payload, load_file):
               "city": payload.get("city", ""), "email": payload.get("email", ""),
               "phone": payload.get("phone", ""),
               "vocational_baccalaureate": str(payload.get("vocational_baccalaureate", "")).casefold() in ("1", "true", "ja", "yes"),
+              "trial_dates": trial_dates_text(payload.get("trial_dates", [])),
               "message": payload.get("message", ""), "notes": existing["notes"] if existing else "",
               "submitted_at": payload.get("submitted_at", "")}
     applicant_id = db.save_applicant(values, existing["id"] if existing else None)
@@ -98,9 +114,9 @@ def sync_manifests(db, folder):
     root = Path(folder)
     if not root.is_dir():
         raise ValueError("Der Bewerbungsordner ist nicht erreichbar. Bitte Netzwerkverbindung und Ordner prüfen.")
-    allowed_root = root.parent.resolve()
+    allowed_root = root.resolve()
     created = updated = files_copied = 0
-    for manifest_path in sorted(root.glob("*.json")):
+    for manifest_path in sorted(root.rglob("*.json")):
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
@@ -130,10 +146,27 @@ def sync_ftp(db, host, user, password, remote_root=DEFAULT_FTP_ROOT, ftp_factory
         ftp.connect(host, 21)
         ftp.auth(); ftp.login(user, password); ftp.prot_p()
         ftp.cwd(remote_root)
-        manifests = sorted(name for name in ftp.nlst() if posixpath.basename(name).lower().endswith(".json"))
-        for name in manifests:
+        manifests = []
+        for name in ftp.nlst():
+            base = posixpath.basename(str(name).rstrip("/"))
+            if base in ("", ".", ".."):
+                continue
+            remote = posixpath.normpath(posixpath.join(remote_root, base))
+            if base.lower().endswith(".json"):
+                manifests.append(remote)
+                continue
+            try:
+                ftp.cwd(remote)
+                manifests.extend(posixpath.normpath(posixpath.join(remote, posixpath.basename(child)))
+                                 for child in ftp.nlst()
+                                 if posixpath.basename(str(child)).lower().endswith(".json"))
+            except ftplib.error_perm:
+                pass
+            finally:
+                ftp.cwd(remote_root)
+        for name in sorted(set(manifests)):
             buffer = io.BytesIO()
-            ftp.retrbinary("RETR " + posixpath.basename(name), buffer.write)
+            ftp.retrbinary("RETR " + name, buffer.write)
             if buffer.tell() > MAX_MANIFEST_BYTES:
                 raise ValueError(f"Die Bewerbungsdatei {posixpath.basename(name)} ist zu gross.")
             try:
@@ -142,8 +175,8 @@ def sync_ftp(db, host, user, password, remote_root=DEFAULT_FTP_ROOT, ftp_factory
                 raise ValueError(f"Die Bewerbungsdatei {posixpath.basename(name)} ist ungültig.") from exc
 
             def load_remote(source_ref):
-                remote = posixpath.normpath(posixpath.join(remote_root, str(source_ref)))
-                if posixpath.commonpath((remote, ALLOWED_UPLOAD_ROOT)) != ALLOWED_UPLOAD_ROOT:
+                remote = posixpath.normpath(posixpath.join(posixpath.dirname(name), str(source_ref)))
+                if posixpath.commonpath((remote, remote_root)) != remote_root:
                     return None
                 document = io.BytesIO()
                 ftp.retrbinary("RETR " + remote, document.write)
@@ -255,7 +288,12 @@ class ApplicantDialog(QDialog):
             form.addRow(title, self.fields[key])
         self.matura = QCheckBox("Berufsmatura parallel zur Lehre gewünscht")
         self.matura.setChecked(bool(self.row.get("vocational_baccalaureate", 0)))
-        form.addRow("Zusatz", self.matura)
+        self.matura_label = label("Zusatz")
+        form.addRow(self.matura_label, self.matura)
+        self.trial_dates = QPlainTextEdit(self.row.get("trial_dates", "")); self.trial_dates.setMaximumHeight(72)
+        self.trial_dates.setPlaceholderText("Ein Datum pro Zeile")
+        self.trial_dates_label = label("Mögliche Schnuppertage")
+        form.addRow(self.trial_dates_label, self.trial_dates)
         self.message = QPlainTextEdit(self.row.get("message", "")); self.message.setMaximumHeight(95)
         self.notes = QPlainTextEdit(self.row.get("notes", "")); self.notes.setMaximumHeight(95)
         form.addRow("Nachricht", self.message); form.addRow("Interne Notizen", self.notes)
@@ -276,7 +314,14 @@ class ApplicantDialog(QDialog):
         buttons.button(QDialogButtonBox.StandardButton.Save).setObjectName("primary")
         buttons.accepted.connect(self.submit); buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self.fields["category"].currentIndexChanged.connect(self.update_category_fields)
+        self.update_category_fields()
         self.refresh_files()
+
+    def update_category_fields(self, *_):
+        is_trial = self.fields["category"].currentData() == "trial"
+        self.trial_dates_label.setVisible(is_trial); self.trial_dates.setVisible(is_trial)
+        self.matura_label.setVisible(not is_trial); self.matura.setVisible(not is_trial)
 
     def refresh_files(self):
         self.files.clear()
@@ -322,6 +367,7 @@ class ApplicantDialog(QDialog):
         values = {key: field.currentData() if key in ("category", "status") else field.text()
                   for key, field in self.fields.items()}
         values.update({"source_id": self.row.get("source_id", ""), "vocational_baccalaureate": self.matura.isChecked(),
+                       "trial_dates": self.trial_dates.toPlainText(),
                        "message": self.message.toPlainText(), "notes": self.notes.toPlainText(),
                        "submitted_at": self.row.get("submitted_at", "")})
         self.saved_id = self.db.save_applicant(values, self.row.get("id"))
