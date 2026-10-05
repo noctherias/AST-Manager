@@ -134,6 +134,8 @@ class DatabaseTests(unittest.TestCase):
             self.db.save_time_record(data)
         with self.assertRaises(ValueError):
             self.db.save_time_record({**data, "day": "2026-01-06", "worked_minutes": -1})
+        with self.assertRaises(ValueError):
+            self.db.save_time_record({**data, "day": "2026-01-06", "worked_minutes": 500})
         self.db.close()
         self.db = Database(self.path)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["note"], "Test")

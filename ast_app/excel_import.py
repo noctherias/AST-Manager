@@ -108,6 +108,17 @@ def _minutes(value):
         raise ValueError(f"Ungültige Uhrzeit: {value}") from exc
 
 
+def _decimal_work_minutes(value):
+    if value in (None, ""):
+        return 0
+    if isinstance(value, (int, float, Decimal)):
+        return round(float(value) * 60)
+    try:
+        return round(float(str(value).strip().replace(",", ".")) * 60)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Ungültige Arbeitszeit: {value}") from exc
+
+
 def import_timesheet(db, path, employee_id, overwrite=False):
     workbook = load_workbook(Path(path), read_only=True, data_only=False, keep_vba=True)
     if "Voreinstellungen" not in workbook.sheetnames:
@@ -118,7 +129,9 @@ def import_timesheet(db, path, employee_id, overwrite=False):
         raise ValueError("Die zwölf Monatsblätter wurden nicht gefunden.")
     records = []
     for month, sheet in enumerate(month_sheets, 1):
-        direct_hours = str(sheet["D3"].value or "").replace("\n", " ").strip().lower() == "arbeitszeit"
+        hours_header = str(sheet["D3"].value or "").replace("\n", " ").strip().lower()
+        direct_hours = hours_header in ("arbeitszeit", "arbeitszeit (h)")
+        decimal_hours = hours_header == "arbeitszeit (h)"
         for day_number in range(1, monthrange(year, month)[1] + 1):
             row = day_number + 3
             values = [sheet.cell(row, column).value for column in (4, 5, 6, 7, 8, 10, 15)]
@@ -127,7 +140,8 @@ def import_timesheet(db, path, employee_id, overwrite=False):
             if direct_hours:
                 start_1 = end_1 = start_2 = end_2 = None
                 pause = 0
-                effective_minutes = _minutes(values[0]) or 0
+                effective_minutes = (_decimal_work_minutes(values[0]) if decimal_hours
+                                     else (_minutes(values[0]) or 0))
             else:
                 start_1, end_1, start_2, end_2 = (_minutes(value) for value in values[:4])
                 pause = _minutes(values[4]) or 0

@@ -327,6 +327,8 @@ class Database:
             raise ValueError("Bitte eine gültige Arbeitszeit eingeben.") from None
         if not 0 <= d["worked_minutes"] <= 1440:
             raise ValueError("Die Arbeitszeit muss zwischen 0 und 24 Stunden liegen.")
+        if d["worked_minutes"] % 15:
+            raise ValueError("Bitte die Arbeitszeit in 0.25-Stunden-Schritten eingeben.")
         if d["worked_minutes"] == 0 and not d["code"]:
             raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
         return self._save("time_records", d, key)

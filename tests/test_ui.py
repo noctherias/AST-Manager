@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
 from ast_app.database import Database
 from ast_app.demo import seed_demo
 from ast_app.window import MainWindow
+from ast_app.experience import timesheet_filename
 from ast_app.dialogs import (EmployeeDialog, CustomerDialog, InvoiceDialog, EntryDialog, PeriodDialog,
                              SalaryDialog, PaymentDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog)
 from ast_app.theme import apply_theme
@@ -35,6 +36,11 @@ QLocale.setDefault(QLocale(QLocale.Language.German, QLocale.Country.Switzerland)
 
 
 class UiTests(unittest.TestCase):
+    def test_timesheet_export_filename_uses_year_last_and_first_name(self):
+        employee = {"last_name": "von Muster", "first_name": "Anna Maria"}
+        self.assertEqual(timesheet_filename(employee, 2027),
+                         "Stundennachweis_2027_von_Muster_Anna_Maria.xlsm")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.db = Database(Path(self.temp.name) / "ui.sqlite3")
@@ -83,6 +89,10 @@ class UiTests(unittest.TestCase):
         page.open_person()
         self.assertEqual(page.stack.currentIndex(), 1)
         self.assertIsNotNone(page.workspace.employee)
+        displayed_hours = {page.workspace.table.item(row, 2).text()
+                           for row in range(page.workspace.table.rowCount())}
+        self.assertIn("8.75 h", displayed_hours)
+        self.assertIn("8.25 h", displayed_hours)
         if os.environ.get("AST_QA_DIR"):
             page.grab().save(str(Path(os.environ["AST_QA_DIR"]) / "stundennachweis-detail.png"))
         window.navigate(1)

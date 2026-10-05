@@ -78,7 +78,7 @@ def display_date(value: str | None) -> str:
 
 
 def scheduled_work_minutes(value: str | date) -> int:
-    """Regular AST working time: Mon–Thu 8:45, Fri 8:15."""
+    """Regular AST working time: Mon–Thu 8.75 h, Fri 8.25 h."""
     workday = date.fromisoformat(value) if isinstance(value, str) else value
     if workday.weekday() < 4:
         return 8 * 60 + 45

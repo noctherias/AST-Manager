@@ -23,9 +23,9 @@ from .domain import worked_minutes
 
 MONTH_SHEETS = {month: f"xl/worksheets/sheet{month + 5}.xml" for month in range(1, 13)}
 INPUT_COLUMNS = ("D", "E", "F", "G", "H", "J", "O")
-TIME_FORMAT_ID = "185"       # [h]:mm;;
-SIGNED_TIME_FORMAT_ID = "183"  # [Blue]\+[h]:mm;[Red]\-[h]:mm;
-BALANCE_FORMAT_ID = "175"    # [Blue][h]:mm;[Red]\-[h]:mm;[Green][h]:mm
+TIME_FORMAT_ID = "176"       # #,##0.00 "h"; red negative values
+SIGNED_TIME_FORMAT_ID = "176"
+BALANCE_FORMAT_ID = "176"
 
 
 def _cell_pattern(reference: str):
@@ -93,7 +93,7 @@ def _replace_formula(xml: str, reference: str, formula_text: str) -> str:
 
 def _simplify_time_columns(xml: str) -> str:
     """Expose one direct-hours column and hide the obsolete clock columns."""
-    xml = _replace_cell(xml, "D3", "Arbeitszeit", "string")
+    xml = _replace_cell(xml, "D3", "Arbeitszeit (h)", "string")
 
     def adjust(match):
         tag = match.group(0)
@@ -117,20 +117,6 @@ def _use_direct_hours_formula(xml: str) -> str:
     # K4 is a standalone formula; K5 is the shared master for K5:K34.
     xml = _replace_formula(xml, "K4", 'IF(A4="",0,IF(D4="",0,D4))')
     return _replace_formula(xml, "K5", 'IF(A5="",0,IF(D5="",0,D5))')
-
-
-def _convert_scheduled_hours_formula(xml: str, reference: str) -> str:
-    """Convert decimal weekly-plan hours to Excel's day-based time unit."""
-    match = _cell_pattern(reference).search(xml)
-    if not match:
-        raise ValueError(f"Excel-Vorlage: Zelle {reference} wurde nicht gefunden.")
-    cell_xml = match.group(0)
-    formula = re.search(r'<f(?:\s[^>]*)?>(.*?)</f>', cell_xml, re.DOTALL)
-    if not formula:
-        raise ValueError(f"Excel-Vorlage: Sollzeitformel in {reference} wurde nicht gefunden.")
-    corrected = f"({formula.group(1)})/24"
-    cell_xml = cell_xml[:formula.start(1)] + corrected + cell_xml[formula.end(1):]
-    return xml[:match.start()] + cell_xml + xml[match.end():]
 
 
 def _ignore_unrecorded_day_formula(xml: str, reference: str) -> str:
@@ -255,10 +241,10 @@ def _scrub_shared_strings(xml: str, indexes: set[int]) -> str:
     return xml
 
 
-def _time_serial(minutes: int | None):
+def _decimal_hours(minutes: int | None):
     if minutes is None:
         return None
-    return format(int(minutes) / 1440, ".15g")
+    return format(int(minutes) / 60, ".15g")
 
 
 def _vba_hash(members: dict[str, bytes]) -> str | None:
@@ -320,6 +306,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     settings = re.sub(r'(<dataValidation\b[^>]*>.*?<formula1>).*?(</formula1>)',
                       lambda m: m.group(1) + '"' + escape(full_name, quote=False) + '"' + m.group(2),
                       settings, count=1, flags=re.DOTALL)
+    settings = styles.apply(settings, [(reference, TIME_FORMAT_ID) for reference in ("C7", "C8", "C9")])
     members["xl/worksheets/sheet1.xml"] = settings.encode("utf-8")
 
     by_day = {date.fromisoformat(r["day"]): r for r in records if date.fromisoformat(r["day"]).year == year}
@@ -330,7 +317,6 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         if company:
             xml = _replace_cell(xml, "C1", company, "string")
         # L4, M4 and N4 are masters of their shared formulas down to row 34.
-        xml = _convert_scheduled_hours_formula(xml, "N4")
         xml = _ignore_unrecorded_day_formula(xml, "L4")
         xml = _ignore_unrecorded_day_formula(xml, "M4")
         for day_number in range(1, 32):
@@ -340,7 +326,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             record = by_day.get(date(year, month, day_number)) if day_number <= 28 or _valid_day(year, month, day_number) else None
             if not record:
                 continue
-            xml = _replace_cell(xml, f"D{row}", _time_serial(worked_minutes(record)))
+            xml = _replace_cell(xml, f"D{row}", _decimal_hours(worked_minutes(record)))
             xml = _replace_cell(xml, f"J{row}", record.get("code", ""), "string")
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
         xml = styles.apply(xml, _monthly_time_cells())

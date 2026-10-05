@@ -1,5 +1,6 @@
 """Task-focused screens; the shared data and calculation services remain central."""
 import json
+import re
 from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStackedWidget,
@@ -14,6 +15,14 @@ from .excel_import import import_timesheet
 from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS, PLACEHOLDER_INFO,
                         reminder_text, reminder_pdf, validate_template)
 from .update_ui import UpdateSettings
+
+
+def timesheet_filename(employee, year):
+    """Stable Windows filename: Stundennachweis_Jahr_Nachname_Vorname.xlsm."""
+    def part(value):
+        value = re.sub(r'[<>:"/\\|?*]+', "", str(value).strip())
+        return re.sub(r"\s+", "_", value).strip("._") or "Unbekannt"
+    return f"Stundennachweis_{int(year)}_{part(employee.get('last_name'))}_{part(employee.get('first_name'))}.xlsm"
 
 
 def menu_button(title, entries):
@@ -488,13 +497,12 @@ class TimeWorkspace(Page):
 
     @staticmethod
     def _duration(minutes):
-        return f"{minutes // 60}:{minutes % 60:02d} h" if minutes is not None else "–"
+        return f"{minutes / 60:.2f} h" if minutes is not None else "–"
 
     @staticmethod
     def _difference(minutes):
         sign = "+" if minutes >= 0 else "−"
-        value = abs(minutes)
-        return f"{sign}{value // 60}:{value % 60:02d} h"
+        return f"{sign}{abs(minutes) / 60:.2f} h"
 
     def show_person(self, key):
         self.employee = self.db.employee(key)
@@ -578,7 +586,7 @@ class TimeWorkspace(Page):
         if not self.employee:
             return
         year = self.year.currentData()
-        path = save_path(self, "Stundennachweis als Excel-Datei", f"Stundennachweis-{self.employee['last_name']}-{year}.xlsm", "xlsm")
+        path = save_path(self, "Stundennachweis als Excel-Datei", timesheet_filename(self.employee, year), "xlsm")
         if path:
             result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
             QMessageBox.information(self, "Excel-Liste erstellt", "Die Originalvorlage wurde vollständig befüllt.\n\n" + str(result))

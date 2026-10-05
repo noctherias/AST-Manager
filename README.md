@@ -24,6 +24,8 @@ Erfassungsdialoge speichern erst mit **Speichern**. Abbrechen verwirft die Einga
 
 Die Arbeitszeit entspricht der bereits bereinigten Tageszeit: Montag bis Donnerstag 07:00–12:00 abzüglich 0.25 h Pause plus 13:00–17:00 ergibt 8.75 h; Freitag endet der Nachmittag um 16:30 und ergibt 8.25 h. Personen mit bestehenden Daten können in den Einstellungen auf inaktiv gesetzt werden.
 
+Alle Arbeitszeiten werden in Viertelstunden und als Dezimalstunden dargestellt: 15 Minuten = 0.25 h, 30 Minuten = 0.50 h und 45 Minuten = 0.75 h. Excel-Dateien erhalten automatisch den Namen `Stundennachweis_Jahr_Nachname_Vorname.xlsm`; Leerzeichen in Namen werden durch Unterstriche ersetzt.
+
 ## Übernommene Vorlagenlogik
 
 - Debitoren: bezahlte Beträge werden wie `SUM(G:G)` summiert. Teilzahlungen, Restbetrag, Fälligkeit und Status ergänzen die einfache Liste.
