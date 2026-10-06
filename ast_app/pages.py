@@ -648,7 +648,7 @@ class SettingsPage(Page):
             path_row = QHBoxLayout()
             field = line()
             field.setReadOnly(True)
-            field.setPlaceholderText(str(default_directory()) + " (Standard)")
+            field.setPlaceholderText(str(default_directory(key)) + " (Standard)")
             self.export_directory_fields[key] = field
             path_row.addWidget(field, 1)
             path_row.addWidget(button("Ordner wählen …", lambda value=key: self.choose_export_directory(value)))
@@ -679,7 +679,7 @@ class SettingsPage(Page):
     def choose_export_directory(self, export_key):
         field = self.export_directory_fields[export_key]
         path = QFileDialog.getExistingDirectory(
-            self, "Standardordner für diesen Export wählen", field.text() or str(default_directory()))
+            self, "Standardordner für diesen Export wählen", field.text() or str(default_directory(export_key)))
         if path:
             self.db.save_settings({setting_key(export_key): path})
             field.setText(path)

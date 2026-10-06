@@ -454,7 +454,12 @@ class ReferencesPage(Page):
             return
         employee = self.db.employee(row["employee_id"])
         filename = f"{REFERENCE_TYPES[row['reference_type']]}_{employee['last_name']}_{employee['first_name']}.pdf".replace(" ", "_")
-        path = save_path(self, "Zeugnis als PDF speichern", filename, "pdf", "references_pdf")
+        export_key = {
+            "work": "references_work_pdf",
+            "interim": "references_interim_pdf",
+            "apprentice": "references_apprentice_pdf",
+        }[row["reference_type"]]
+        path = save_path(self, "Zeugnis als PDF speichern", filename, "pdf", export_key)
         if path:
             self._make_pdf(path)
             QMessageBox.information(self, "Zeugnis gespeichert", path)
