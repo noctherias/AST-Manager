@@ -11,7 +11,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLineEdit, QComboBox,
     QDoubleSpinBox, QSpinBox, QDateEdit, QMessageBox, QDialog, QDialogButtonBox,
-    QFormLayout, QScrollArea, QCheckBox, QMenu)
+    QFormLayout, QScrollArea, QCheckBox, QMenu, QAbstractSpinBox, QCalendarWidget)
 
 from .domain import number
 
@@ -77,7 +77,13 @@ def numeric(value=0, suffix="", negative=False, integer=False):
     w.setSuffix(suffix)
     w.setGroupSeparatorShown(True)
     w.setMinimumHeight(35)
-    w.setAccelerated(True)
+    # Values are entered like normal text. The small stepper arrows caused
+    # accidental changes and were hard to understand for occasional users.
+    w.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+    w.setKeyboardTracking(False)
+    w.setAlignment(Qt.AlignmentFlag.AlignRight)
+    w.setToolTip("Zahl direkt mit der Tastatur eingeben. Dezimalwerte können mit Komma oder Punkt erfasst werden.")
+    w.setAccessibleDescription("Zahlenfeld zur direkten Eingabe ohne Pfeiltasten")
     return w
 
 
@@ -88,6 +94,13 @@ def day(value=None):
     w.setDateRange(QDate(1900, 1, 1), QDate(2200, 12, 31))
     w.setDate(QDate.fromString(value or date.today().isoformat(), "yyyy-MM-dd"))
     w.setMinimumHeight(35)
+    w.setKeyboardTracking(False)
+    w.setToolTip("Datum als TT.MM.JJJJ eingeben oder rechts den Kalender öffnen.")
+    w.setAccessibleDescription("Datum direkt eingeben oder im Kalender auswählen")
+    calendar = w.calendarWidget()
+    calendar.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
+    calendar.setGridVisible(True)
+    calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
     return w
 
 

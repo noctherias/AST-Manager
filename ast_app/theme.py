@@ -65,7 +65,14 @@ QPushButton#primary:disabled { color: #9aabb4; background: #edf1f4; border-color
 QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox, QDoubleSpinBox { background: white; color: #173443; border: 1px solid #bdcbd3; border-radius: 7px; padding: 7px 10px; selection-background-color: #c5e9df; selection-color: #173a34; min-height: 22px; }
 QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus { border: 2px solid #138a73; padding: 6px 9px; }
 QComboBox::drop-down { border: none; width: 24px; }
+QDateEdit { padding-right: 38px; }
+QDateEdit:focus { padding-right: 37px; }
+QDateEdit::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 32px; border-left: 1px solid #d5dfe6; background: #edf5f2; border-top-right-radius: 7px; border-bottom-right-radius: 7px; }
+QDateEdit::drop-down:hover { background: #d8eee6; }
 QComboBox QAbstractItemView { background: white; selection-background-color: #dcefe9; selection-color: #203444; border: 1px solid #d5dfe6; }
+QCalendarWidget QWidget { alternate-background-color: #edf5f2; }
+QCalendarWidget QToolButton { background: transparent; border: none; padding: 6px; }
+QCalendarWidget QAbstractItemView { background: white; selection-background-color: #138a73; selection-color: white; }
 QTableWidget { background: white; border: 1px solid #e0e7ec; border-radius: 9px; selection-background-color: #e2f2ed; selection-color: #163c32; outline: none; }
 QTableWidget::item { padding: 8px 12px; border-bottom: 1px solid #edf1f4; }
 QHeaderView::section { background: #edf2f5; color: #586f7f; border: none; border-bottom: 1px solid #dce5eb; padding: 13px 10px; font-size: 9pt; font-weight: 600; }

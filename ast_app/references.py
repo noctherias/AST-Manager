@@ -84,7 +84,7 @@ def _person_words(employee):
 
 
 def generate_reference_text(employee, reference_type, issue_date, end_date, reason, tasks, ratings):
-    """Create a complete, editable certificate from the selected assessments."""
+    """Create a truthful, benevolent certificate from the selected assessments."""
     if reference_type not in REFERENCE_TYPES:
         raise ValueError("Unbekannte Zeugnisart.")
     scores = _score_dimensions(ratings, reference_type)
@@ -123,23 +123,23 @@ def generate_reference_text(employee, reference_type, issue_date, end_date, reas
 
     phrases = {
         "knowledge": [
-            f"{person} verfügt noch nicht über die für die Funktion erforderlichen Fachkenntnisse.",
-            f"{person} verfügt über grundlegende Fachkenntnisse und setzt diese mit Unterstützung ein.",
+            f"{person} setzte sich im Rahmen der übertragenen Aufgaben mit den erforderlichen Fachthemen auseinander.",
+            f"{person} verfügt über grundlegende Fachkenntnisse und setzt diese unter Anleitung ein.",
             f"{person} verfügt über gute Fachkenntnisse und setzt diese sicher ein.",
             f"{person} verfügt über sehr gute und vielseitige Fachkenntnisse, die {pronoun} erfolgreich einsetzt.",
             f"{person} verfügt über ausserordentlich umfassende Fachkenntnisse und setzt diese jederzeit souverän ein.",
         ],
-        "quality": ["Die Qualität der Arbeit entspricht noch nicht den Anforderungen.", "Die Arbeitsergebnisse entsprechen den Anforderungen mehrheitlich.", "Die Arbeitsergebnisse sind sorgfältig und von guter Qualität.", "Die Arbeitsergebnisse sind stets sehr sorgfältig und von hoher Qualität.", "Die Arbeitsergebnisse sind jederzeit hervorragend, präzise und von höchster Qualität."],
-        "quantity": ["Arbeitstempo und Belastbarkeit müssen weiterentwickelt werden.", "Arbeitstempo und Belastbarkeit sind insgesamt genügend.", f"Auch bei höherer Belastung arbeitet {pronoun} effizient und zuverlässig.", f"Auch bei hoher Belastung arbeitet {pronoun} stets effizient und sicher.", f"Auch unter anspruchsvollsten Bedingungen arbeitet {pronoun} ausserordentlich effizient, belastbar und sicher."],
-        "independence": ["Aufgaben können noch nicht ausreichend selbständig ausgeführt werden.", "Aufgaben werden mit regelmässiger Unterstützung ausgeführt.", "Aufgaben werden selbständig und zweckmässig ausgeführt.", "Aufgaben werden stets selbständig, vorausschauend und lösungsorientiert ausgeführt.", "Aufgaben werden jederzeit ausserordentlich selbständig, vorausschauend und mit ausgezeichnetem Urteilsvermögen ausgeführt."],
-        "reliability": ["Abmachungen und Termine werden noch nicht zuverlässig eingehalten.", "Abmachungen und Termine werden mehrheitlich eingehalten.", "Abmachungen und Termine werden zuverlässig eingehalten.", "Abmachungen und Termine werden stets sehr zuverlässig eingehalten.", "Auf {person} ist jederzeit uneingeschränkt Verlass; Abmachungen und Termine werden vorbildlich eingehalten.".format(person=person)],
-        "initiative": ["Einsatz und Eigeninitiative müssen deutlich gesteigert werden.", f"{subject} zeigt den erforderlichen Einsatz.", f"{subject} zeigt guten Einsatz und angemessene Eigeninitiative.", f"{subject} zeigt stets grossen Einsatz und viel Eigeninitiative.", f"{subject} überzeugt jederzeit durch ausserordentlichen Einsatz, Verantwortungsbewusstsein und Initiative."],
-        "learning": ["Neue Inhalte werden trotz Unterstützung noch nicht ausreichend aufgenommen.", "Neue Inhalte werden mit Unterstützung aufgenommen und umgesetzt.", "Neue Inhalte werden rasch verstanden und gut umgesetzt.", "Neue Inhalte werden sehr rasch verstanden, verknüpft und sicher umgesetzt.", "Die aussergewöhnlich schnelle Auffassungsgabe ermöglicht jederzeit eine ausgezeichnete Umsetzung selbst komplexer Inhalte."],
-        "school": ["Das Berufsschulwissen kann noch nicht ausreichend in die Praxis übertragen werden.", "Das Berufsschulwissen wird mit Unterstützung praktisch angewendet.", "Das Berufsschulwissen wird gut und sicher in die Praxis übertragen.", "Das Berufsschulwissen wird sehr sicher und vernetzt in der Praxis eingesetzt.", "Theorie und Praxis werden jederzeit auf ausserordentlich hohem Niveau miteinander verbunden."],
-        "development": ["Die erforderliche Entwicklung wurde noch nicht erreicht.", "Während der Lehrzeit war eine teilweise Entwicklung erkennbar.", f"Während der Lehrzeit hat sich {person} gut und kontinuierlich entwickelt.", f"Während der Lehrzeit hat sich {person} sehr erfreulich und zielgerichtet entwickelt.", "Die Entwicklung während der gesamten Lehrzeit war ausserordentlich positiv und vorbildlich."],
-        "superiors": ["Das Verhalten gegenüber Vorgesetzten war wiederholt nicht korrekt.", "Das Verhalten gegenüber Vorgesetzten war teilweise korrekt.", "Das Verhalten gegenüber Vorgesetzten war korrekt.", "Das Verhalten gegenüber Vorgesetzten war stets einwandfrei.", "Das Verhalten gegenüber Vorgesetzten war jederzeit vorbildlich."],
-        "team": ["Die Zusammenarbeit im Team führte wiederholt zu Schwierigkeiten.", "Die Zusammenarbeit im Team war teilweise zufriedenstellend.", "Die Zusammenarbeit im Team war gut.", "Die Zusammenarbeit im Team war stets sehr gut und hilfsbereit.", "Die Zusammenarbeit im Team war jederzeit vorbildlich, konstruktiv und sehr geschätzt."],
-        "customers": ["Das Verhalten gegenüber der Kundschaft gab wiederholt Anlass zu Beanstandungen.", "Das Verhalten gegenüber der Kundschaft war teilweise angemessen.", "Das Verhalten gegenüber der Kundschaft war freundlich und korrekt.", "Das Verhalten gegenüber der Kundschaft war stets freundlich, sicher und professionell.", "Das Verhalten gegenüber der Kundschaft war jederzeit ausgesprochen professionell und vorbildlich."],
+        "quality": [f"{person} bearbeitete die übertragenen Aufgaben mit Aufmerksamkeit.", "Die Arbeitsergebnisse waren insgesamt zweckmässig.", "Die Arbeitsergebnisse sind sorgfältig und von guter Qualität.", "Die Arbeitsergebnisse sind stets sehr sorgfältig und von hoher Qualität.", "Die Arbeitsergebnisse sind jederzeit hervorragend, präzise und von höchster Qualität."],
+        "quantity": [f"{person} erledigte die übertragenen Aufgaben im vereinbarten Rahmen.", f"{person} bewältigte den üblichen Arbeitsanfall.", f"Auch bei höherer Belastung arbeitet {pronoun} effizient und zuverlässig.", f"Auch bei hoher Belastung arbeitet {pronoun} stets effizient und sicher.", f"Auch unter anspruchsvollsten Bedingungen arbeitet {pronoun} ausserordentlich effizient, belastbar und sicher."],
+        "independence": [f"{person} führte die übertragenen Aufgaben nach Anleitung aus.", "Aufgaben werden mit Unterstützung ausgeführt.", "Aufgaben werden selbständig und zweckmässig ausgeführt.", "Aufgaben werden stets selbständig, vorausschauend und lösungsorientiert ausgeführt.", "Aufgaben werden jederzeit ausserordentlich selbständig, vorausschauend und mit ausgezeichnetem Urteilsvermögen ausgeführt."],
+        "reliability": [f"{person} richtete die Arbeitsweise an den vereinbarten Vorgaben aus.", "Abmachungen und Termine werden im Wesentlichen eingehalten.", "Abmachungen und Termine werden zuverlässig eingehalten.", "Abmachungen und Termine werden stets sehr zuverlässig eingehalten.", "Auf {person} ist jederzeit uneingeschränkt Verlass; Abmachungen und Termine werden vorbildlich eingehalten.".format(person=person)],
+        "initiative": [f"{subject} widmet sich den übertragenen Aufgaben.", f"{subject} zeigt den erwarteten Einsatz.", f"{subject} zeigt guten Einsatz und angemessene Eigeninitiative.", f"{subject} zeigt stets grossen Einsatz und viel Eigeninitiative.", f"{subject} überzeugt jederzeit durch ausserordentlichen Einsatz, Verantwortungsbewusstsein und Initiative."],
+        "learning": [f"{person} setzte sich mit neuen Inhalten auseinander und nahm Hinweise auf.", "Neue Inhalte werden mit Unterstützung aufgenommen und umgesetzt.", "Neue Inhalte werden rasch verstanden und gut umgesetzt.", "Neue Inhalte werden sehr rasch verstanden, verknüpft und sicher umgesetzt.", "Die aussergewöhnlich schnelle Auffassungsgabe ermöglicht jederzeit eine ausgezeichnete Umsetzung selbst komplexer Inhalte."],
+        "school": [f"{person} bezog Inhalte aus der Berufsschule in die praktische Arbeit ein.", "Das Berufsschulwissen wird mit Unterstützung praktisch angewendet.", "Das Berufsschulwissen wird gut und sicher in die Praxis übertragen.", "Das Berufsschulwissen wird sehr sicher und vernetzt in der Praxis eingesetzt.", "Theorie und Praxis werden jederzeit auf ausserordentlich hohem Niveau miteinander verbunden."],
+        "development": [f"{person} sammelte während der Lehrzeit weitere fachliche und persönliche Erfahrungen.", f"Während der Lehrzeit entwickelte {person} die vorhandenen Kenntnisse weiter.", f"Während der Lehrzeit hat sich {person} gut und kontinuierlich entwickelt.", f"Während der Lehrzeit hat sich {person} sehr erfreulich und zielgerichtet entwickelt.", "Die Entwicklung während der gesamten Lehrzeit war ausserordentlich positiv und vorbildlich."],
+        "superiors": ["Das Verhalten gegenüber Vorgesetzten war sachlich.", "Das Verhalten gegenüber Vorgesetzten war korrekt.", "Das Verhalten gegenüber Vorgesetzten war korrekt und respektvoll.", "Das Verhalten gegenüber Vorgesetzten war stets einwandfrei.", "Das Verhalten gegenüber Vorgesetzten war jederzeit vorbildlich."],
+        "team": [f"{person} arbeitete im Rahmen der übertragenen Aufgaben mit dem Team zusammen.", "Die Zusammenarbeit im Team war korrekt.", "Die Zusammenarbeit im Team war gut.", "Die Zusammenarbeit im Team war stets sehr gut und hilfsbereit.", "Die Zusammenarbeit im Team war jederzeit vorbildlich, konstruktiv und sehr geschätzt."],
+        "customers": ["Das Auftreten gegenüber der Kundschaft war sachlich.", "Das Verhalten gegenüber der Kundschaft war korrekt.", "Das Verhalten gegenüber der Kundschaft war freundlich und korrekt.", "Das Verhalten gegenüber der Kundschaft war stets freundlich, sicher und professionell.", "Das Verhalten gegenüber der Kundschaft war jederzeit ausgesprochen professionell und vorbildlich."],
     }
     assessed_keys = list(PERFORMANCE_KEYS) + (["school", "development"] if reference_type == "apprentice" else [])
     assessment = [phrases[key][scores[key] - 1] for key in assessed_keys]
@@ -148,8 +148,8 @@ def generate_reference_text(employee, reference_type, issue_date, end_date, reas
         5: f"Die Gesamtleistung von {person} ist ausgezeichnet und übertrifft die Anforderungen deutlich.",
         4: f"Die Gesamtleistung von {person} ist sehr gut und übertrifft die Anforderungen in mehreren Bereichen.",
         3: f"Die Gesamtleistung von {person} ist gut und erfüllt die Anforderungen.",
-        2: f"Die Gesamtleistung von {person} erfüllt die grundlegenden Anforderungen teilweise.",
-        1: f"Die Gesamtleistung von {person} erfüllt die Anforderungen noch nicht.",
+        2: f"Die Gesamtleistung von {person} entsprach den grundlegenden Anforderungen.",
+        1: f"{person} erfüllte die übertragenen Aufgaben im Rahmen der Vorgaben.",
     }[overall]
     conduct_text = " ".join(phrases[key][scores[key] - 1] for key in CONDUCT_KEYS)
 
@@ -454,7 +454,7 @@ class ReferencesPage(Page):
             return
         employee = self.db.employee(row["employee_id"])
         filename = f"{REFERENCE_TYPES[row['reference_type']]}_{employee['last_name']}_{employee['first_name']}.pdf".replace(" ", "_")
-        path = save_path(self, "Zeugnis als PDF speichern", filename, "pdf")
+        path = save_path(self, "Zeugnis als PDF speichern", filename, "pdf", "references_pdf")
         if path:
             self._make_pdf(path)
             QMessageBox.information(self, "Zeugnis gespeichert", path)

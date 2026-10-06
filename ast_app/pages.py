@@ -19,13 +19,11 @@ from .dialogs import CustomerDialog, EmployeeDialog, InvoiceDialog, PaymentDialo
 from .documents import salary_pdf, csv_export, report_pdf, time_report
 from .backups import run_automatic_backups
 from .excel_import import import_debtors
+from .export_paths import EXPORT_DESTINATIONS, choose_export_file, default_directory, setting_key
 
 
-def save_path(parent, title, name, extension="pdf"):
-    path, _ = QFileDialog.getSaveFileName(parent, title, str(Path.home() / "Documents" / name), f"{extension.upper()} (*.{extension})")
-    if path and not path.lower().endswith("." + extension):
-        path += "." + extension
-    return path
+def save_path(parent, title, name, extension="pdf", export_key="debtors_pdf"):
+    return choose_export_file(parent, title, name, extension, export_key)
 
 
 class PdfPreview(QDialog):
@@ -278,14 +276,14 @@ class Receivables(Page):
 
     @guarded
     def export_csv(self):
-        path = save_path(self, "Debitoren exportieren", "Debitoren.csv", "csv")
+        path = save_path(self, "Debitoren exportieren", "Debitoren.csv", "csv", "debtors_csv")
         if path:
             csv_export(path, ["Rechnung", "Kunde", "Rechnungsdatum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Mahnstufe", "Status"], self.export_rows())
             QMessageBox.information(self, "Export gespeichert", path)
 
     @guarded
     def export_pdf(self):
-        path = save_path(self, "Debitoren als PDF", "Debitoren.pdf")
+        path = save_path(self, "Debitoren als PDF", "Debitoren.pdf", "pdf", "debtors_pdf")
         if path:
             report_pdf(path, "Debitoren", f"{self.year.currentText()} · {self.quarter.currentText()} · {self.status.currentText()} · Suche: {self.search.text() or '–'}",
                        ["Rechnung", "Kunde", "Datum", "Fällig", "Valuta", "Betrag CHF", "Bezahlt CHF", "Offen CHF", "Mahnstufe", "Status"], self.export_rows(),
@@ -444,7 +442,7 @@ class TimePage(Page):
     def export_csv(self):
         if not self.current_balance:
             return
-        path = save_path(self, "Stunden exportieren", "Stundennachweis.csv", "csv")
+        path = save_path(self, "Stunden exportieren", "Stundennachweis.csv", "csv", "timesheets_csv")
         if path:
             csv_export(path, ["Datum", "Kategorie", "Stunden", "Bemerkung"], [[display_date(e["day"]), KINDS[e["kind"]], number(e["hours"]), e["note"]] for e in self.current_entries])
             QMessageBox.information(self, "Export gespeichert", path)
@@ -453,7 +451,7 @@ class TimePage(Page):
     def export_pdf(self):
         if not self.current_balance:
             return
-        path = save_path(self, "Stundennachweis als PDF", "Stundennachweis.pdf")
+        path = save_path(self, "Stundennachweis als PDF", "Stundennachweis.pdf", "pdf", "timesheets_pdf")
         if path:
             time_report(path, self.db.employee(self.person.currentData()), self.current_balance, self.current_entries)
             PdfPreview(self, path).exec()
@@ -530,7 +528,8 @@ class SalaryPage(Page):
     def export(self):
         r = self.selected()
         if r:
-            path = save_path(self, "Lohnausweis speichern", f"Lohnausweis-{r['year']}-{r['employee_id']}.pdf")
+            path = save_path(self, "Lohnausweis speichern", f"Lohnausweis-{r['year']}-{r['employee_id']}.pdf",
+                             "pdf", "salary_pdf")
             if path:
                 salary_pdf(r["fields"], path)
                 PdfPreview(self, path).exec()
@@ -624,6 +623,45 @@ class SettingsPage(Page):
         dl.addStretch()
         self.tabs.addTab(data, "Daten && Sicherung")
 
+        exports = QWidget()
+        exports_layout = QVBoxLayout(exports)
+        exports_layout.setContentsMargins(22, 22, 22, 22)
+        exports_layout.setSpacing(12)
+        exports_layout.addWidget(label("Standardordner für Exporte", "sectionTitle"))
+        export_hint = label(
+            "Lege für jede Ausgabeart einen eigenen Ordner fest. Beim Export wird dieser Ordner "
+            "automatisch geöffnet; Dateiname und Ziel können danach weiterhin geändert werden.", "muted")
+        export_hint.setWordWrap(True)
+        exports_layout.addWidget(export_hint)
+        self.export_directory_fields = {}
+        for key, title, description in EXPORT_DESTINATIONS:
+            card = QFrame()
+            card.setObjectName("card")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(16, 12, 16, 12)
+            card_layout.setSpacing(7)
+            heading = QHBoxLayout()
+            heading.addWidget(label(title, "sectionTitle"))
+            heading.addStretch()
+            heading.addWidget(label(description, "muted"))
+            card_layout.addLayout(heading)
+            path_row = QHBoxLayout()
+            field = line()
+            field.setReadOnly(True)
+            field.setPlaceholderText(str(default_directory()) + " (Standard)")
+            self.export_directory_fields[key] = field
+            path_row.addWidget(field, 1)
+            path_row.addWidget(button("Ordner wählen …", lambda value=key: self.choose_export_directory(value)))
+            path_row.addWidget(button("Standard", lambda value=key: self.clear_export_directory(value)))
+            card_layout.addLayout(path_row)
+            exports_layout.addWidget(card)
+        exports_layout.addStretch()
+        export_scroll = QScrollArea()
+        export_scroll.setWidgetResizable(True)
+        export_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        export_scroll.setWidget(exports)
+        self.tabs.addTab(export_scroll, "Exportpfade")
+
     def refresh(self):
         people = self.db.employees()
         self.people.populate([[p["code"], p["first_name"] + " " + p["last_name"], "Lernende" if p["kind"] == "apprentice" else "Mitarbeiter", p["job"], number(p["workload"], " %"), "Aktiv" if p["active"] else "Inaktiv"] for p in people], [p["id"] for p in people])
@@ -634,6 +672,21 @@ class SettingsPage(Page):
         self._show_logo(settings.get("logo_path", ""))
         self.backup_directory.setText(settings.get("backup_directory", ""))
         self.backup_retention.setText(settings.get("backup_retention_days", "30"))
+        for key, field in self.export_directory_fields.items():
+            field.setText(settings.get(setting_key(key), ""))
+
+    @guarded
+    def choose_export_directory(self, export_key):
+        field = self.export_directory_fields[export_key]
+        path = QFileDialog.getExistingDirectory(
+            self, "Standardordner für diesen Export wählen", field.text() or str(default_directory()))
+        if path:
+            self.db.save_settings({setting_key(export_key): path})
+            field.setText(path)
+
+    def clear_export_directory(self, export_key):
+        self.db.save_settings({setting_key(export_key): ""})
+        self.export_directory_fields[export_key].clear()
 
     def new_person(self):
         if EmployeeDialog(self, self.db).exec(): self.refresh()
@@ -691,7 +744,8 @@ class SettingsPage(Page):
 
     @guarded
     def backup(self):
-        path = save_path(self, "Sicherung speichern", f"AST-Sicherung-{datetime.now():%Y%m%d-%H%M%S}.sqlite3", "sqlite3")
+        path = save_path(self, "Sicherung speichern", f"AST-Sicherung-{datetime.now():%Y%m%d-%H%M%S}.sqlite3",
+                         "sqlite3", "backup_manual")
         if path:
             self.db.backup(path)
             QMessageBox.information(self, "Sicherung erstellt", path)

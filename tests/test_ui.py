@@ -11,7 +11,8 @@ from unittest.mock import patch
 from PySide6.QtCore import Qt, QLocale, QCoreApplication, QEvent, QDate
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QLineEdit, QPlainTextEdit
+from PySide6.QtWidgets import (QApplication, QMessageBox, QDialog, QLineEdit, QPlainTextEdit,
+                               QAbstractSpinBox)
 
 from ast_app.database import Database
 from ast_app.demo import seed_demo
@@ -22,7 +23,8 @@ from ast_app.dialogs import (EmployeeDialog, CustomerDialog, InvoiceDialog, Entr
 from ast_app.theme import apply_theme
 from ast_app.documents import salary_pdf
 from ast_app.pages import PdfPreview
-from ast_app.widgets import Table, confirm
+from ast_app.widgets import Table, confirm, numeric, day
+from ast_app.export_paths import setting_key
 from ast_app.references import ReferenceDialog
 from ast_app.applications import ApplicationsPage, ApplicantStatusDialog
 
@@ -38,6 +40,17 @@ QLocale.setDefault(QLocale(QLocale.Language.German, QLocale.Country.Switzerland)
 
 
 class UiTests(unittest.TestCase):
+    def test_numbers_use_direct_entry_and_dates_offer_a_clear_calendar(self):
+        amount = numeric(8.75, " h")
+        self.assertEqual(amount.buttonSymbols(), QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.assertFalse(amount.keyboardTracking())
+        self.assertIn("Tastatur", amount.toolTip())
+        date_field = day("2026-10-06")
+        self.assertTrue(date_field.calendarPopup())
+        self.assertTrue(date_field.calendarWidget().isGridVisible())
+        self.assertEqual(date_field.calendarWidget().firstDayOfWeek(), Qt.DayOfWeek.Monday)
+        self.assertIn("TT.MM.JJJJ", date_field.toolTip())
+
     def test_timesheet_export_filename_uses_year_last_and_first_name(self):
         employee = {"last_name": "von Muster", "first_name": "Anna Maria"}
         self.assertEqual(timesheet_filename(employee, 2027),
@@ -78,6 +91,7 @@ class UiTests(unittest.TestCase):
             if os.environ.get("AST_QA_DIR"):
                 folder = Path(os.environ["AST_QA_DIR"])
                 folder.mkdir(parents=True, exist_ok=True)
+
                 window.grab().save(str(folder / f"page-{index}.png"))
         self.assertEqual(window.buttons[5].objectName(), "navSubButton")
         self.assertGreater(window.pages[5].table.rowCount(), 0)
@@ -121,6 +135,19 @@ class UiTests(unittest.TestCase):
         self.assertEqual(page.table.rowCount(), 0)
         page.search.clear()
         self.assertEqual(page.table.rowCount(), 4)
+
+    def test_every_export_destination_can_be_configured_separately(self):
+        window = MainWindow(self.db, True)
+        settings = window.pages[4]
+        self.assertIn("debtors_pdf", settings.export_directory_fields)
+        self.assertIn("applications_documents", settings.export_directory_fields)
+        folder = str(Path(self.temp.name) / "exports")
+        Path(folder).mkdir()
+        with patch("ast_app.pages.QFileDialog.getExistingDirectory", return_value=folder):
+            settings.choose_export_directory("salary_pdf")
+        self.assertEqual(self.db.settings()[setting_key("salary_pdf")], folder)
+        self.assertEqual(settings.export_directory_fields["salary_pdf"].text(), folder)
+        self.assertEqual(self.db.settings().get(setting_key("debtors_pdf"), ""), "")
 
     def test_applicant_status_is_read_only_and_saves_review_tag(self):
         applicant = self.db.applicants()[0]

@@ -49,6 +49,18 @@ class HrApplicationTests(unittest.TestCase):
         self.assertIn("Zwischenzeugnis", pdf_text)
         self.assertIn("Anna Muster", pdf_text)
 
+    def test_reserved_reference_wording_remains_benevolent(self):
+        employee = self.db.employee(self.employee_id)
+        ratings = {f"{key}_{index}": 1 for key, _, questions in question_groups("apprentice")
+                   for index, _ in enumerate(questions, 1)}
+        text = generate_reference_text(employee, "apprentice", "2026-10-05", "2026-10-05", "",
+                                       "Servicearbeiten\nInstallationen", ratings)
+        for negative_wording in ("noch nicht", "Schwierigkeiten", "Beanstandungen", "müssen",
+                                 "nicht korrekt", "nicht ausreichend", "trotz Unterstützung"):
+            self.assertNotIn(negative_wording, text)
+        self.assertIn("nach Anleitung", text)
+        self.assertIn("sachlich", text)
+
     def test_manifest_import_creates_one_dossier_and_copies_files(self):
         import_root = self.root / "private_applications"
         files = import_root / "files"

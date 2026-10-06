@@ -419,7 +419,8 @@ class Reminders(Page):
         if not settings.get("company", "").strip():
             raise ValueError("Bitte zuerst unter Einstellungen die Firmendaten erfassen.")
         path = save_path(self, "Mahnbrief speichern",
-                         f"{REMINDER_LEVELS[level].replace(' ', '-')}-{invoice['number']}.pdf")
+                         f"{REMINDER_LEVELS[level].replace(' ', '-')}-{invoice['number']}.pdf",
+                         "pdf", "reminders_pdf")
         if path:
             reminder_pdf(path, invoice, settings, level, reminder_text(settings, level))
             self.db.set_reminder(invoice["id"], level, date.today().isoformat())
@@ -436,7 +437,8 @@ class Reminders(Page):
             raise ValueError("Bitte zuerst unter Einstellungen die Firmendaten erfassen.")
         invoice, level = dialog.invoice, dialog.level
         path = save_path(self, "Manuellen Mahnbrief speichern",
-                         f"{REMINDER_LEVELS[level].replace(' ', '-')}-{invoice['number']}.pdf")
+                         f"{REMINDER_LEVELS[level].replace(' ', '-')}-{invoice['number']}.pdf",
+                         "pdf", "reminders_pdf")
         if path:
             reminder_pdf(path, invoice, settings, level, reminder_text(settings, level))
             PdfPreview(self, path).exec()
@@ -586,7 +588,8 @@ class TimeWorkspace(Page):
         if not self.employee:
             return
         year = self.year.currentData()
-        path = save_path(self, "Stundennachweis als Excel-Datei", timesheet_filename(self.employee, year), "xlsm")
+        path = save_path(self, "Stundennachweis als Excel-Datei", timesheet_filename(self.employee, year),
+                         "xlsm", "timesheets_excel")
         if path:
             result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
             QMessageBox.information(self, "Excel-Liste erstellt", "Die Originalvorlage wurde vollständig befüllt.\n\n" + str(result))

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, Q
 
 from .widgets import Page, Table, button, combo, label, line, guarded, confirm
 from .secrets import protect_secret, unprotect_secret
+from .export_paths import initial_path
 
 
 CATEGORIES = {
@@ -432,7 +433,8 @@ class ApplicantDialog(QDialog):
         source = self.selected_path()
         if not source or not source.is_file():
             return
-        target, _ = QFileDialog.getSaveFileName(self, "Dokument speichern", source.name)
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Dokument speichern", initial_path(self, source.name, "applications_documents"))
         if target:
             shutil.copy2(source, target)
 
@@ -588,7 +590,8 @@ class ApplicantStatusDialog(QDialog):
         source = self.selected_path()
         if not source or not source.is_file():
             return
-        target, _ = QFileDialog.getSaveFileName(self, "Dokument speichern", source.name)
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Dokument speichern", initial_path(self, source.name, "applications_documents"))
         if target:
             shutil.copy2(source, target)
 
