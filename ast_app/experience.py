@@ -15,6 +15,7 @@ from .excel_import import import_timesheet
 from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS, PLACEHOLDER_INFO,
                         reminder_text, reminder_pdf, validate_template)
 from .update_ui import UpdateSettings
+from .export_paths import employee_year_folders
 
 
 def timesheet_filename(employee, year):
@@ -588,8 +589,9 @@ class TimeWorkspace(Page):
         if not self.employee:
             return
         year = self.year.currentData()
+        folders = employee_year_folders(self.employee, year)
         path = save_path(self, "Stundennachweis als Excel-Datei", timesheet_filename(self.employee, year),
-                         "xlsm", "timesheets_excel")
+                         "xlsm", "timesheets_excel", folders)
         if path:
             result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
             QMessageBox.information(self, "Excel-Liste erstellt", "Die Originalvorlage wurde vollständig befüllt.\n\n" + str(result))

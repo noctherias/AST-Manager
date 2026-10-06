@@ -18,6 +18,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Keep
 
 from .documents import resource_path
 from .domain import display_date
+from .export_paths import employee_year_folders
 from .pages import save_path, PdfPreview
 from .widgets import Page, Table, button, combo, day, day_value, label, line, guarded, confirm
 
@@ -459,7 +460,8 @@ class ReferencesPage(Page):
             "interim": "references_interim_pdf",
             "apprentice": "references_apprentice_pdf",
         }[row["reference_type"]]
-        path = save_path(self, "Zeugnis als PDF speichern", filename, "pdf", export_key)
+        folders = employee_year_folders(employee, row["issue_date"][:4])
+        path = save_path(self, "Zeugnis als PDF speichern", filename, "pdf", export_key, folders)
         if path:
             self._make_pdf(path)
             QMessageBox.information(self, "Zeugnis gespeichert", path)

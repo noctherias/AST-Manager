@@ -19,11 +19,12 @@ from .dialogs import CustomerDialog, EmployeeDialog, InvoiceDialog, PaymentDialo
 from .documents import salary_pdf, csv_export, report_pdf, time_report
 from .backups import run_automatic_backups
 from .excel_import import import_debtors
-from .export_paths import EXPORT_DESTINATIONS, choose_export_file, default_directory, setting_key
+from .export_paths import (EXPORT_DESTINATIONS, choose_export_file, default_directory,
+                           employee_year_folders, setting_key)
 
 
-def save_path(parent, title, name, extension="pdf", export_key="debtors_pdf"):
-    return choose_export_file(parent, title, name, extension, export_key)
+def save_path(parent, title, name, extension="pdf", export_key="debtors_pdf", subfolders=()):
+    return choose_export_file(parent, title, name, extension, export_key, subfolders)
 
 
 class PdfPreview(QDialog):
@@ -442,7 +443,10 @@ class TimePage(Page):
     def export_csv(self):
         if not self.current_balance:
             return
-        path = save_path(self, "Stunden exportieren", "Stundennachweis.csv", "csv", "timesheets_csv")
+        employee = self.db.employee(self.person.currentData())
+        folders = employee_year_folders(employee, self.current_balance["start"][:4])
+        path = save_path(self, "Stunden exportieren", "Stundennachweis.csv", "csv",
+                         "timesheets_csv", folders)
         if path:
             csv_export(path, ["Datum", "Kategorie", "Stunden", "Bemerkung"], [[display_date(e["day"]), KINDS[e["kind"]], number(e["hours"]), e["note"]] for e in self.current_entries])
             QMessageBox.information(self, "Export gespeichert", path)
@@ -451,7 +455,10 @@ class TimePage(Page):
     def export_pdf(self):
         if not self.current_balance:
             return
-        path = save_path(self, "Stundennachweis als PDF", "Stundennachweis.pdf", "pdf", "timesheets_pdf")
+        employee = self.db.employee(self.person.currentData())
+        folders = employee_year_folders(employee, self.current_balance["start"][:4])
+        path = save_path(self, "Stundennachweis als PDF", "Stundennachweis.pdf", "pdf",
+                         "timesheets_pdf", folders)
         if path:
             time_report(path, self.db.employee(self.person.currentData()), self.current_balance, self.current_entries)
             PdfPreview(self, path).exec()
@@ -528,8 +535,10 @@ class SalaryPage(Page):
     def export(self):
         r = self.selected()
         if r:
+            employee = self.db.employee(r["employee_id"])
+            folders = employee_year_folders(employee, r["year"])
             path = save_path(self, "Lohnausweis speichern", f"Lohnausweis-{r['year']}-{r['employee_id']}.pdf",
-                             "pdf", "salary_pdf")
+                             "pdf", "salary_pdf", folders)
             if path:
                 salary_pdf(r["fields"], path)
                 PdfPreview(self, path).exec()

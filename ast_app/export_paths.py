@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog
@@ -61,16 +62,32 @@ def configured_directory(db, export_key: str) -> Path:
     return Path(value) if value else default_directory(export_key)
 
 
-def initial_path(parent, filename: str, export_key: str) -> str:
+def safe_folder_name(value) -> str:
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(value or "").strip())
+    name = re.sub(r"[\s_]+", "_", name).strip(" ._")
+    return name or "Unbekannt"
+
+
+def employee_year_folders(employee, year) -> tuple[str, str]:
+    employee_name = f"{employee.get('last_name', '')}_{employee.get('first_name', '')}"
+    return safe_folder_name(employee_name), safe_folder_name(year)
+
+
+def initial_path(parent, filename: str, export_key: str, subfolders=()) -> str:
     db = getattr(parent, "db", None)
-    return str(configured_directory(db, export_key) / filename)
+    folder = configured_directory(db, export_key)
+    if subfolders:
+        folder = folder.joinpath(*(safe_folder_name(part) for part in subfolders))
+        folder.mkdir(parents=True, exist_ok=True)
+    return str(folder / filename)
 
 
-def choose_export_file(parent, title: str, filename: str, extension: str, export_key: str) -> str:
+def choose_export_file(parent, title: str, filename: str, extension: str, export_key: str,
+                       subfolders=()) -> str:
     path, _ = QFileDialog.getSaveFileName(
         parent,
         title,
-        initial_path(parent, filename, export_key),
+        initial_path(parent, filename, export_key, subfolders),
         f"{extension.upper()} (*.{extension})",
     )
     if path and not path.lower().endswith("." + extension.lower()):

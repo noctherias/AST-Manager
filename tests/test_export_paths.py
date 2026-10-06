@@ -14,6 +14,11 @@ class Settings:
         return self.values
 
 
+class Parent:
+    def __init__(self, db):
+        self.db = db
+
+
 class ExportPathTests(unittest.TestCase):
     def test_every_export_uses_its_server_subfolder_by_default(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -35,6 +40,16 @@ class ExportPathTests(unittest.TestCase):
         expected = Path(r"D:\Alte Zeugnisse")
         db = Settings({export_paths.setting_key("references_pdf"): str(expected)})
         self.assertEqual(export_paths.configured_directory(db, "references_work_pdf"), expected)
+
+    def test_employee_and_year_folders_are_created_below_export_directory(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = Settings({export_paths.setting_key("salary_pdf"): folder})
+            employee = {"last_name": "Muster / Meier", "first_name": "Anna"}
+            subfolders = export_paths.employee_year_folders(employee, 2027)
+            result = Path(export_paths.initial_path(
+                Parent(db), "Lohnausweis.pdf", "salary_pdf", subfolders))
+            self.assertEqual(result, Path(folder) / "Muster_Meier_Anna" / "2027" / "Lohnausweis.pdf")
+            self.assertTrue(result.parent.is_dir())
 
 
 if __name__ == "__main__":
