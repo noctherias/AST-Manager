@@ -20,6 +20,11 @@ def number_format_id(styles, sheet, reference):
     return styles.find("x:cellXfs", NS)[style_id].get("numFmtId", "0")
 
 
+def fill_id(styles, sheet, reference):
+    style_id = int(cell(sheet, reference).get("s", "0"))
+    return styles.find("x:cellXfs", NS)[style_id].get("fillId", "0")
+
+
 class TimesheetExcelTests(unittest.TestCase):
     def test_original_package_and_macros_survive_exact_cell_export(self):
         template = Path("templates/Zeiterfassung_Vorlage.xlsm")
@@ -43,8 +48,9 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(source.read("xl/vbaProject.bin")).digest(),
                                  hashlib.sha256(exported.read("xl/vbaProject.bin")).digest())
                 for sheet_name in [f"xl/worksheets/sheet{number}.xml" for number in range(6, 18)]:
-                    self.assertEqual(source.read(sheet_name).count(b"<f") + 1,
-                                     exported.read(sheet_name).count(b"<f"))
+                    removed_formulas = (source.read(sheet_name).count(b"<f")
+                                        - exported.read(sheet_name).count(b"<f"))
+                    self.assertIn(removed_formulas, {23, 24})
                 january = ET.fromstring(exported.read("xl/worksheets/sheet6.xml"))
                 self.assertAlmostEqual(float(cell(january, "D8").find("x:v", NS).text), 8.75)
                 self.assertEqual(cell(january, "D3").find("x:is/x:t", NS).text, "Arbeitszeit (h)")
@@ -58,6 +64,16 @@ class TimesheetExcelTests(unittest.TestCase):
                     self.assertIsNotNone(cell(january, reference).find("x:f", NS))
                 self.assertEqual(cell(january, "K36").find("x:v", NS).text,
                                  "Überstunden geleistet (h)")
+                styles = ET.fromstring(exported.read("xl/styles.xml"))
+                self.assertIsNone(cell(january, "J36").find("x:f", NS))
+                self.assertIsNone(cell(january, "J37").find("x:f", NS))
+                self.assertIsNone(cell(january, "K40").find("x:f", NS))
+                self.assertIsNone(cell(january, "K40").find("x:v", NS))
+                self.assertIsNone(cell(january, "P40").find("x:v", NS))
+                expected_fills = {36: "14", 37: "17", 38: "13", 39: "20"}
+                for row, expected_fill in expected_fills.items():
+                    self.assertEqual(fill_id(styles, january, f"K{row}"), expected_fill)
+                    self.assertEqual(fill_id(styles, january, f"P{row}"), expected_fill)
                 hidden_ranges = [(int(item.get("min")), int(item.get("max")))
                                  for item in january.find("x:cols", NS) if item.get("hidden") == "1"]
                 self.assertTrue(all(any(first <= column <= last for first, last in hidden_ranges)
@@ -67,7 +83,6 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(cell(january, "K5").find("x:f", NS).text,
                                  'IF(A5="",0,IF(D5="",0,D5))')
                 september = ET.fromstring(exported.read("xl/worksheets/sheet14.xml"))
-                styles = ET.fromstring(exported.read("xl/styles.xml"))
                 self.assertAlmostEqual(float(cell(september, "D33").find("x:v", NS).text), 8.75)
                 for reference in ("D33", "E33", "F33", "G33", "H33", "K33", "L33", "N33"):
                     self.assertEqual(number_format_id(styles, september, reference), "176")
@@ -82,6 +97,11 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(cell(annual, "A37").find("x:is/x:t", NS).text,
                                  "Überstunden geleistet (h)")
                 self.assertEqual(cell(annual, "B37").find("x:f", NS).text, "Januar!P36")
+                self.assertIn("COUNTIF(Januar!J4:J34", cell(annual, "B43").find("x:f", NS).text)
+                for row, expected_fill in expected_fills.items():
+                    self.assertEqual(fill_id(styles, annual, f"A{row}"), expected_fill)
+                    self.assertEqual(fill_id(styles, annual, f"B{row}"), expected_fill)
+                    self.assertEqual(fill_id(styles, annual, f"AL{row}"), expected_fill)
                 row_42 = annual.find(".//x:row[@r='42']", NS)
                 self.assertEqual(row_42.get("hidden"), "1")
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))

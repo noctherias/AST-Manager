@@ -203,19 +203,22 @@ class _StyleNormalizer:
         if not self._match:
             raise ValueError("Excel-Vorlage: Zellformatvorlagen wurden nicht gefunden.")
         self._root = ET.fromstring(self._match.group(0))
-        self._original_count = len(self._root)
-        self._clones: dict[tuple[int, str], int] = {}
+        self._clones: dict[tuple[int, str, int | None], int] = {}
 
-    def style_for(self, old_style_id: int, number_format_id: str) -> int:
-        if old_style_id < 0 or old_style_id >= self._original_count:
+    def style_for(self, old_style_id: int, number_format_id: str, fill_id: int | None = None) -> int:
+        if old_style_id < 0 or old_style_id >= len(self._root):
             raise ValueError("Excel-Vorlage: Ungültige Zellformatvorlage.")
         old_style = self._root[old_style_id]
-        if old_style.get("numFmtId", "0") == number_format_id:
+        if (old_style.get("numFmtId", "0") == number_format_id
+                and (fill_id is None or old_style.get("fillId", "0") == str(fill_id))):
             return old_style_id
-        key = (old_style_id, number_format_id)
+        key = (old_style_id, number_format_id, fill_id)
         if key not in self._clones:
             clone = deepcopy(old_style)
             clone.set("numFmtId", number_format_id)
+            if fill_id is not None:
+                clone.set("fillId", str(fill_id))
+                clone.set("applyFill", "1")
             self._root.append(clone)
             self._clones[key] = len(self._root) - 1
         return self._clones[key]
@@ -224,6 +227,14 @@ class _StyleNormalizer:
         for reference, number_format_id in references:
             old_style_id = _cell_style(sheet_xml, reference)
             new_style_id = self.style_for(old_style_id, number_format_id)
+            if new_style_id != old_style_id:
+                sheet_xml = _replace_cell_style(sheet_xml, reference, new_style_id)
+        return sheet_xml
+
+    def apply_colored(self, sheet_xml: str, references: list[tuple[str, str, int]]) -> str:
+        for reference, number_format_id, fill_id in references:
+            old_style_id = _cell_style(sheet_xml, reference)
+            new_style_id = self.style_for(old_style_id, number_format_id, fill_id)
             if new_style_id != old_style_id:
                 sheet_xml = _replace_cell_style(sheet_xml, reference, new_style_id)
         return sheet_xml
@@ -341,6 +352,16 @@ def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
     return xml
 
 
+def _remove_legacy_monthly_summary(xml: str) -> str:
+    """Remove obsolete visible counters and detail labels from the monthly sheet."""
+    for row in range(36, 48):
+        xml = _replace_cell(xml, f"J{row}", None)
+    for row in range(40, 48):
+        xml = _replace_cell(xml, f"K{row}", None)
+        xml = _replace_cell(xml, f"P{row}", None)
+    return xml
+
+
 def _simplify_annual_summary(xml: str) -> str:
     labels = {
         37: "Überstunden geleistet (h)",
@@ -358,8 +379,12 @@ def _simplify_annual_summary(xml: str) -> str:
                                         f"{sheet_name}!P{source_row}", 0)
         xml = _replace_formula_cell(xml, f"{column}41",
                                     f"SUM({column}38:{column}40)", 0)
+        vacation_days = (f'COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B25)'
+                         f'+COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B26)*Voreinstellungen!C26')
+        xml = _replace_formula_cell(xml, f"{column}43", vacation_days, 0)
     for row in range(37, 42):
         xml = _replace_formula_cell(xml, f"AL{row}", f"SUM(B{row}:AK{row})", 0)
+    xml = _replace_formula_cell(xml, "AL43", "SUM(B43:AK43)", 0)
     return _hide_rows(xml, 42, 50)
 
 
@@ -427,6 +452,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     members["xl/worksheets/sheet1.xml"] = settings.encode("utf-8")
 
     by_day = {date.fromisoformat(r["day"]): r for r in records if date.fromisoformat(r["day"]).year == year}
+    # Existing template fill IDs: cyan, green, yellow and orange.
+    category_fills = ((36, 14), (37, 17), (38, 13), (39, 20))
     for month, xml_name in MONTH_SHEETS.items():
         xml = members[xml_name].decode("utf-8")
         xml = _simplify_time_columns(xml)
@@ -448,13 +475,33 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             xml = _replace_cell(xml, f"J{row}", record.get("code", ""), "string")
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
         xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
+        xml = _remove_legacy_monthly_summary(xml)
         xml = styles.apply(xml, _monthly_time_cells())
+        xml = styles.apply_colored(
+            xml,
+            [(f"{column}{row}", TIME_FORMAT_ID, fill_id)
+             for row, fill_id in category_fills for column in ("K", "P")],
+        )
+        xml = styles.apply_colored(
+            xml,
+            [(f"J{row}", "0", 0) for row in range(36, 48)]
+            + [(f"{column}{row}", "0", 0)
+               for row in range(40, 48) for column in ("K", "P")],
+        )
         members[xml_name] = xml.encode("utf-8")
 
     annual_name = "xl/worksheets/sheet18.xml"
     annual = members[annual_name].decode("utf-8")
     annual = _simplify_annual_summary(annual)
-    members[annual_name] = styles.apply(annual, _annual_time_cells()).encode("utf-8")
+    annual = styles.apply(annual, _annual_time_cells())
+    annual_summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI", "AL")
+    annual = styles.apply_colored(
+        annual,
+        [(f"A{row}", "0", fill_id) for row, fill_id in category_fills]
+        + [(f"{column}{row}", TIME_FORMAT_ID, fill_id)
+           for row, fill_id in category_fills for column in annual_summary_columns],
+    )
+    members[annual_name] = annual.encode("utf-8")
     members["xl/styles.xml"] = styles.finish().encode("utf-8")
     _remove_calc_chain(members)
 
