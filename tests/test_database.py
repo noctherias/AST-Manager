@@ -127,10 +127,10 @@ class DatabaseTests(unittest.TestCase):
 
     def test_daily_time_records_are_unique_and_persisted(self):
         data = {"employee_id": self.person, "day": "2026-01-05", "worked_minutes": 525,
-                "code": "H", "note": "Test"}
+                "code": "HO", "note": "Test"}
         key = self.db.save_time_record(data)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["id"], key)
-        self.assertEqual(self.db.time_records(self.person, 2026)[0]["code"], "H")
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["code"], "HO")
         with self.assertRaises(ValueError):
             self.db.save_time_record(data)
         with self.assertRaises(ValueError):
@@ -206,7 +206,20 @@ class DatabaseTests(unittest.TestCase):
             self.db.conn.execute("PRAGMA user_version=13")
         self.db.close()
         self.db = Database(self.path)
-        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "FT")
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "H")
+
+        homeoffice = self.db.save_time_record({
+            "employee_id": self.person, "day": "2026-02-03",
+            "worked_minutes": 525, "code": "HO", "note": "Homeoffice",
+        })
+        with self.db.conn:
+            self.db.conn.execute("UPDATE time_records SET code='FT' WHERE id=?", (key,))
+            self.db.conn.execute("UPDATE time_records SET code='H' WHERE id=?", (homeoffice,))
+            self.db.conn.execute("PRAGMA user_version=14")
+        self.db.close()
+        self.db = Database(self.path)
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "H")
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (homeoffice,))["code"], "HO")
 
 
 if __name__ == "__main__": unittest.main()

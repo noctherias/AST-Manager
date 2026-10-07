@@ -38,7 +38,7 @@ def seed_demo(db):
             workday -= timedelta(days=1)
             if workday.weekday() < 5:
                 recent_workdays.append(workday)
-        for workday, code, note in zip(reversed(recent_workdays), ("", "H", ""),
+        for workday, code, note in zip(reversed(recent_workdays), ("", "HO", ""),
                                        ("Baustelle Musterwil", "Planung im Homeoffice", "Servicearbeiten")):
             db.save_time_record({"employee_id": key, "day": workday.isoformat(),
                                  "worked_minutes": scheduled_work_minutes(workday),

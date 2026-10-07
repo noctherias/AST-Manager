@@ -78,7 +78,8 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(cell(january, "K39").find("x:v", NS).text,
                                  "Unfall · U (h)")
                 self.assertIn("F Ferien/Freizeit", cell(january, "K41").find("x:is/x:t", NS).text)
-                self.assertIn("FT Feiertag", cell(january, "K42").find("x:is/x:t", NS).text)
+                self.assertIn("H Feiertag", cell(january, "K42").find("x:is/x:t", NS).text)
+                self.assertIn("HO Homeoffice", cell(january, "K42").find("x:is/x:t", NS).text)
                 expected_colours = {
                     36: "FFDDF3E4", 37: "FFDCEEFF", 38: "FFFFF2CC",
                     39: "FFF7D6D6", 40: "FFFCE4D6",
@@ -101,7 +102,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertIn('J4="K"', cell(january, "K4").find("x:f", NS).text)
                 self.assertIn('MAX(0,L4-', cell(january, "K4").find("x:f", NS).text)
                 self.assertIn('J5="K"', cell(january, "K5").find("x:f", NS).text)
-                self.assertIn('J4="FT"', cell(january, "L4").find("x:f", NS).text)
+                self.assertIn('J4="H"', cell(january, "L4").find("x:f", NS).text)
                 self.assertAlmostEqual(float(cell(january, "F37").find("x:v", NS).text),
                                        monthly_target_minutes(2026, 1) / 60)
                 self.assertEqual(cell(january, "F40").find("x:f", NS).text,
@@ -118,9 +119,11 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertTrue(cell(september, "M34").find("x:f", NS).text.startswith("IF(AND(D34="))
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
                 self.assertEqual(fill_rgb(styles, annual, "B4"), "FFF4B6D7")
-                self.assertEqual(fill_rgb(styles, annual, "B6"), "FFE7EEF3")
-                self.assertEqual(fill_rgb(styles, annual, "B7"), "FFE7EEF3")
-                self.assertNotIn(fill_rgb(styles, annual, "B8"), {"FFF4B6D7", "FFE7EEF3"})
+                # 1 August 2026 is a Saturday: the holiday colour must win.
+                self.assertEqual(fill_rgb(styles, annual, "W4"), "FFF4B6D7")
+                self.assertEqual(fill_rgb(styles, annual, "B6"), "FFFFD59A")
+                self.assertEqual(fill_rgb(styles, annual, "B7"), "FFFFD59A")
+                self.assertNotIn(fill_rgb(styles, annual, "B8"), {"FFF4B6D7", "FFFFD59A"})
                 self.assertEqual(fill_rgb(styles, annual, "B9"), "FFDCEEFF")
                 self.assertEqual(number_format_id(styles, annual, "AA33"), "176")
                 self.assertEqual(number_format_id(styles, annual, "Z37"), "176")
@@ -149,7 +152,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
                 self.assertEqual(cell(settings, "C2").find("x:v", NS).text, "2026")
                 self.assertEqual(cell(settings, "C3").find("x:is/x:t", NS).text, "Max Muster")
-                expected_codes = ["F", "K", "U", "M", "FT", "H", "B"]
+                expected_codes = ["F", "K", "U", "M", "H", "HO", "B"]
                 self.assertEqual([cell(settings, f"B{row}").find("x:is/x:t", NS).text
                                   for row in range(20, 27)], expected_codes)
                 self.assertEqual(cell(settings, "A23").find("x:is/x:t", NS).text,

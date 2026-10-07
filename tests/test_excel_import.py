@@ -41,7 +41,7 @@ class ExcelImportTests(unittest.TestCase):
 
     def test_exported_timesheet_can_be_imported_for_another_person(self):
         source = [{"day": "2026-09-30", "worked_minutes": 525,
-                   "code": "H", "note": "Baustelle"}]
+                   "code": "HO", "note": "Baustelle"}]
         path = self.root / "zeiten.xlsm"
         export_timesheet(path, self.db.employee(self.employee), 2026, source, "AST AG")
         result = import_timesheet(self.db, path, self.employee)

@@ -11,8 +11,8 @@ TIME_CODES = {
     "K": "Krankheit",
     "U": "Unfall",
     "M": "Andere begründete Minderzeit",
-    "FT": "Feiertag / arbeitsfrei",
-    "H": "Homeoffice",
+    "H": "Feiertag / arbeitsfrei",
+    "HO": "Homeoffice",
     "B": "Bereitschaftsdienst",
 }
 ABSENCE_TIME_CODES = {"F", "K", "U", "M"}
@@ -24,7 +24,7 @@ LEGACY_TIME_CODES = {
     "UG": "U", "UT": "U", "A": "U", "AR": "U",
     "KAG": "M", "KAT": "M", "BM": "M", "KU": "M", "KA": "M",
     "E1": "M", "E2": "M", "E3": "M", "E4": "M", "E5": "M",
-    "FA": "FT", "T": "FT", "HO": "H", "BD": "B",
+    "FA": "H", "T": "H", "FT": "H", "BD": "B",
 }
 
 
@@ -144,7 +144,7 @@ def effective_work_minutes(record: dict) -> int:
     code = normalize_time_code(record.get("code"))
     if code in ABSENCE_TIME_CODES:
         return max(0, scheduled_work_minutes(record["day"]) - entered)
-    if code == "FT":
+    if code == "H":
         return 0
     return entered
 

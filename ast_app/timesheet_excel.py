@@ -226,11 +226,11 @@ def _widen_annual_hour_columns(xml: str) -> str:
 def _use_direct_hours_formula(xml: str) -> str:
     """Use one hours input with an unambiguous meaning for every reason."""
     for row in range(4, 35):
-        target = (f'IF(A{row}="",0,IF(J{row}="FT",0,'
+        target = (f'IF(A{row}="",0,IF(J{row}="H",0,'
                   f'IF(AND(C{row}<>"",J{row}=""),'
                   f'IFERROR(VLOOKUP(B{row},Feiertage,3,FALSE)*N{row},N{row}),N{row})))')
         actual = (f'IF(A{row}="",0,IF(OR(J{row}="F",J{row}="K",J{row}="U",J{row}="M"),'
-                  f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(J{row}="FT",0,IF(D{row}="",0,D{row}))))')
+                  f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(J{row}="H",0,IF(D{row}="",0,D{row}))))')
         xml = _replace_formula_cell(xml, f"L{row}", target, 0)
         xml = _replace_formula_cell(xml, f"K{row}", actual, 0)
     return xml
@@ -250,9 +250,9 @@ def _rewrite_reason_conditional_formatting(xml: str) -> str:
         2: ('$J4="K"', "FFFFF2CC"),
         3: ('$J4="U"', "FFF7D6D6"),
         4: ('$J4="M"', "FFFCE4D6"),
-        5: ('$J4="H"', "FFE4DFEC"),
+        5: ('$J4="HO"', "FFE4DFEC"),
         6: ('$J4="B"', "FFDDEBF7"),
-        7: ('OR($J4="FT",$C4<>"")', "FFF4B6D7"),
+        7: ('OR($J4="H",$C4<>"")', "FFF4B6D7"),
         8: ('FALSE', "FFFFFFFF"),
     }
     section_pattern = re.compile(
@@ -330,7 +330,7 @@ def _annual_calendar_cells(year: int, records_by_day: dict[date, dict],
             current_day = date(year, month, day_number)
             record = records_by_day.get(current_day)
             code = normalize_time_code(record.get("code")) if record else ""
-            if current_day in holidays or code == "FT":
+            if current_day in holidays or code == "H":
                 fill_id = fills["holiday"]
             elif code in reason_fills:
                 fill_id = reason_fills[code]
@@ -601,7 +601,7 @@ def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
         xml = _replace_formula_cell(xml, f"K{row}", f'"{title}"', title, "string")
         xml = _replace_formula_cell(xml, f"P{row}", formula, _decimal_hours(summary[key]))
     xml = _replace_cell(xml, "K41", "Kürzel: F Ferien/Freizeit · K Krankheit · U Unfall · M übrige Minderzeit", "string")
-    xml = _replace_cell(xml, "K42", "FT Feiertag · H Homeoffice · B Bereitschaft", "string")
+    xml = _replace_cell(xml, "K42", "H Feiertag · HO Homeoffice · B Bereitschaft", "string")
     return xml
 
 
@@ -757,8 +757,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         (21, "Krankheit", "K", "REST"),
         (22, "Unfall", "U", "REST"),
         (23, "Andere begründete Minderzeit", "M", "REST"),
-        (24, "Feiertag / arbeitsfrei", "FT", 0),
-        (25, "Homeoffice", "H", 1),
+        (24, "Feiertag / arbeitsfrei", "H", 0),
+        (25, "Homeoffice", "HO", 1),
         (26, "Bereitschaftsdienst", "B", "XTRA"),
     )
     for row in range(19, 34):
@@ -785,7 +785,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     fill_accident = styles.fill_id("FFF7D6D6")
     fill_other = styles.fill_id("FFFCE4D6")
     fill_holiday = styles.fill_id("FFF4B6D7")
-    fill_weekend = styles.fill_id("FFE7EEF3")
+    fill_weekend = styles.fill_id("FFFFD59A")
     fill_total = styles.fill_id("FFE9EEF2")
     fill_header = styles.fill_id("FFDCE6EB")
     positive_balance_dxf = styles.differential_font_color("FF008A67")
@@ -838,7 +838,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             current_day = date(year, month, day_number)
             record = by_day.get(current_day)
             target = 0 if current_day in holidays else scheduled_work_minutes(current_day)
-            if record and normalize_time_code(record.get("code")) == "FT":
+            if record and normalize_time_code(record.get("code")) == "H":
                 target = 0
             actual = effective_work_minutes(record) if record else 0
             difference = actual - target if record else 0
