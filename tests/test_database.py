@@ -130,7 +130,7 @@ class DatabaseTests(unittest.TestCase):
                 "code": "H", "note": "Test"}
         key = self.db.save_time_record(data)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["id"], key)
-        self.assertEqual(self.db.time_records(self.person, 2026)[0]["code"], "HO")
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["code"], "H")
         with self.assertRaises(ValueError):
             self.db.save_time_record(data)
         with self.assertRaises(ValueError):
@@ -193,13 +193,13 @@ class DatabaseTests(unittest.TestCase):
     def test_old_time_codes_are_migrated_to_clear_codes(self):
         key = self.db.save_time_record({"employee_id": self.person, "day": "2026-02-02",
                                         "worked_minutes": 0, "code": "U", "note": "Altbestand"})
-        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "FG")
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "U")
         with self.db.conn:
             self.db.conn.execute("UPDATE time_records SET code='KR' WHERE id=?", (key,))
             self.db.conn.execute("PRAGMA user_version=11")
         self.db.close()
         self.db = Database(self.path)
-        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "KT")
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "K")
 
 
 if __name__ == "__main__": unittest.main()

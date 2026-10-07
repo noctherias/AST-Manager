@@ -314,10 +314,11 @@ class TimeRecordDialog(FormDialog):
         initial = worked_minutes(r) if row else scheduled_work_minutes(date.today())
         self.hours = numeric(initial / 60, " h")
         self.hours.setRange(0, 24)
-        self.add("hours", "Arbeitszeit", self.hours)
+        self.add("hours", "Stunden", self.hours)
         self.add("note", "Bemerkung", line(r.get("note", ""), "z. B. Baustelle Zürich"))
-        hint = label("Regelzeit: Montag–Donnerstag 8.75 h, Freitag 8.25 h. "
-                     "Liegt die IST-Zeit darunter, wähle bitte den Grund aus. "
+        hint = label("Ohne Abwesenheitsgrund werden die tatsächlich gearbeiteten Stunden erfasst. "
+                     "Bei Ferien, Krankheit, Unfall oder anderer Minderzeit werden hier die Abwesenheitsstunden erfasst. "
+                     "Regelzeit: Montag–Donnerstag 8.75 h, Freitag 8.25 h. "
                      "Bei «Andere begründete Minderzeit» ist eine kurze Bemerkung erforderlich.", "muted")
         hint.setWordWrap(True)
         self.form.addRow("", hint)
@@ -336,7 +337,7 @@ class TimeRecordDialog(FormDialog):
         value = self.fields["day"].date()
         selected_day = date(value.year(), value.month(), value.day())
         code = self.fields["code"].currentData() or ""
-        minutes = scheduled_work_minutes(selected_day) if code in ("", "HO") else 0
+        minutes = scheduled_work_minutes(selected_day) if code in ("", "H") else 0
         self.hours.setValue(minutes / 60)
 
     @guarded
@@ -378,13 +379,13 @@ class BulkTimeDialog(FormDialog):
         self.form.addRow("", self.regular)
         self.hours = numeric(8.75, " h")
         self.hours.setRange(0, 24)
-        self.add("hours", "Arbeitszeit je Tag", self.hours)
+        self.add("hours", "Stunden je Tag", self.hours)
         self.add("note", "Bemerkung", line("", "gilt für alle ausgewählten Tage"))
         self.overwrite = QCheckBox("Bereits erfasste Tage überschreiben")
         self.form.addRow("", self.overwrite)
-        hint = label("Automatisch werden Montag–Donnerstag 8.75 h und Freitag 8.25 h eingesetzt. "
-                     "Bei einer geringeren IST-Zeit muss ein Grund gewählt werden. "
-                     "Für Teilabwesenheiten die Automatik ausschalten und die tatsächlich gearbeiteten Stunden eintragen.", "muted")
+        hint = label("Ohne Abwesenheitsgrund setzt die Automatik die Regelarbeitszeit ein. "
+                     "Bei Ferien, Krankheit, Unfall oder anderer Minderzeit die Automatik ausschalten "
+                     "und die Abwesenheitsstunden eintragen.", "muted")
         hint.setWordWrap(True)
         self.form.addRow("", hint)
         self.regular.toggled.connect(self._state)
@@ -410,7 +411,7 @@ class BulkTimeDialog(FormDialog):
         current = start
         while current <= end:
             if current.weekday() in selected:
-                minutes = (scheduled_work_minutes(current) if code in ("", "HO") else 0) \
+                minutes = (scheduled_work_minutes(current) if code in ("", "H") else 0) \
                     if self.regular.isChecked() else round(self.hours.value() * 60)
                 records.append({**common, "day": current.isoformat(), "worked_minutes": minutes})
             current += timedelta(days=1)

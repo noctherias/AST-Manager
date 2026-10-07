@@ -10,7 +10,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStack
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
-from .domain import (TIME_CODES, chf, number, display_date, scheduled_work_minutes, worked_minutes,
+from .domain import (TIME_CODES, chf, number, display_date, effective_work_minutes,
+                     scheduled_work_minutes, worked_minutes,
                      vacation_target)
 from .documents import report_pdf
 from .timesheet_excel import export_timesheet, monthly_summary
@@ -498,7 +499,7 @@ class TimeWorkspace(Page):
         self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
                                    ("Arbeitstage", "Tage mit eingetragener Arbeitszeit"),
                                    ("Abwesenheiten", "Tage mit einem Code")])
-        self.table = Table(["Datum", "Wochentag", "Arbeitszeit", "Sollzeit", "Abweichung", "Grund", "Bemerkung"])
+        self.table = Table(["Datum", "Wochentag", "Eingabe", "IST-Arbeit", "Sollzeit", "Abweichung", "Grund", "Bemerkung"])
         self.layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(self.layout, "Wähle einen Tag aus oder erfasse einen neuen.")
         self.edit_btn = button("Tag bearbeiten", self.edit_entry)
@@ -550,16 +551,17 @@ class TimeWorkspace(Page):
         weekdays = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
         for record in self.current_records:
             day_value = date.fromisoformat(record["day"])
-            worked = worked_minutes(record)
+            entered = worked_minutes(record)
+            worked = effective_work_minutes(record)
             scheduled = scheduled_work_minutes(day_value)
             total += worked
             workdays += int(worked > 0)
             absences += int(bool(record["code"]))
             difference = "–" if not scheduled and not worked else self._difference(worked - scheduled)
-            rows.append([display_date(record["day"]), weekdays[day_value.weekday()], self._duration(worked),
-                         self._duration(scheduled), difference,
+            rows.append([display_date(record["day"]), weekdays[day_value.weekday()], self._duration(entered),
+                         self._duration(worked), self._duration(scheduled), difference,
                          TIME_CODES.get(record["code"], record["code"]), record["note"]])
-        self.table.populate(rows, [record["id"] for record in self.current_records], [2])
+        self.table.populate(rows, [record["id"] for record in self.current_records], [2, 3])
         self.cards[0].set(self._duration(total))
         self.cards[1].set(str(workdays))
         self.cards[2].set(str(absences))
@@ -614,11 +616,12 @@ class TimeWorkspace(Page):
         rows = []
         for record in self.current_records:
             day_value = date.fromisoformat(record["day"])
-            worked = worked_minutes(record)
+            entered = worked_minutes(record)
+            worked = effective_work_minutes(record)
             scheduled = scheduled_work_minutes(day_value)
             rows.append([
                 display_date(record["day"]), weekdays[day_value.weekday()],
-                f"{worked / 60:.2f} h", f"{scheduled / 60:.2f} h",
+                f"{entered / 60:.2f} h", f"{worked / 60:.2f} h", f"{scheduled / 60:.2f} h",
                 self._difference(worked - scheduled),
                 TIME_CODES.get(record["code"], record["code"]), record["note"],
             ])
@@ -633,8 +636,8 @@ class TimeWorkspace(Page):
                    f"Ferien-Soll {vacation_target(self.employee, year) / 100:.2f} h")
         name = f"{self.employee['first_name']} {self.employee['last_name']}"
         result = report_pdf(path, "Stundennachweis · " + name, f"Kalenderjahr {year}",
-                            ["Datum", "Wochentag", "IST", "SOLL", "Abweichung", "Grund", "Bemerkung"],
-                            rows, summary, [65, 62, 48, 48, 58, 118, 340])
+                            ["Datum", "Wochentag", "Eingabe", "IST", "SOLL", "Abweichung", "Grund", "Bemerkung"],
+                            rows, summary, [60, 58, 46, 46, 46, 54, 108, 306])
         PdfPreview(self, result).exec()
 
     @guarded

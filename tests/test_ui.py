@@ -314,9 +314,10 @@ class UiTests(unittest.TestCase):
 
     def test_background_application_sync_returns_to_ui_thread(self):
         self.db.save_settings({"applications_ftp_password": "encrypted-test"})
-        page = ApplicationsPage(self.db)
-        page.show(); APP.processEvents()
         result = {"created": 0, "updated": 0, "files": 0}
+        with patch.object(ApplicationsPage, "_start_sync"):
+            page = ApplicationsPage(self.db)
+        page.show(); APP.processEvents()
         with patch("ast_app.applications.unprotect_secret", return_value="secret"), \
              patch("ast_app.applications.sync_ftp", return_value=result):
             page._start_sync(False)

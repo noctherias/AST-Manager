@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submi
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 class Database:
@@ -115,8 +115,8 @@ class Database:
             for record in self.rows("SELECT * FROM time_records"):
                 self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                   (worked_minutes({**record, "worked_minutes": None}), record["id"]))
-        if version < 12:
-            self._migrate_time_codes()
+        if version < 13:
+            self._migrate_time_codes(version < 12)
         invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
         if "reminder_level" not in invoice_columns:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
@@ -150,10 +150,16 @@ class Database:
         self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         self.conn.commit()
 
-    def _migrate_time_codes(self):
+    def _migrate_time_codes(self, original_codes=False):
         """Replace the old cryptic Excel codes without losing time records."""
+        original = {
+            "F": "T", "G": "F", "K": "K", "KR": "K", "A": "U", "AR": "U",
+            "KU": "M", "KA": "M", "U": "F", "UH": "F", "H": "H", "B": "B",
+            "E1": "M", "E2": "M", "E3": "M", "E4": "M", "E5": "M",
+        }
         for record in self.rows("SELECT id,code FROM time_records"):
-            code = normalize_time_code(record["code"])
+            raw = str(record["code"] or "").strip().upper()
+            code = original.get(raw, normalize_time_code(raw)) if original_codes else normalize_time_code(raw)
             if code != record["code"]:
                 self.conn.execute("UPDATE time_records SET code=? WHERE id=?", (code, record["id"]))
 
@@ -376,10 +382,12 @@ class Database:
         if d["worked_minutes"] == 0 and not d["code"]:
             raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
         scheduled = scheduled_work_minutes(d["day"])
-        shortfall_reasons = {"FG", "FT", "KG", "KT", "UG", "UT", "KO", "KAG", "KAT", "BM"}
-        if d["worked_minutes"] < scheduled and d["code"] != "FA" and d["code"] not in shortfall_reasons:
+        absence_reasons = {"F", "K", "U", "M"}
+        if d["code"] in absence_reasons and d["worked_minutes"] > scheduled:
+            raise ValueError("Die Abwesenheitszeit darf die Sollzeit dieses Tages nicht überschreiten.")
+        if d["worked_minutes"] < scheduled and d["code"] != "T" and d["code"] not in absence_reasons:
             raise ValueError("Bitte einen Grund für die geringere IST-Zeit auswählen.")
-        if d["code"] == "BM" and not d["note"]:
+        if d["code"] == "M" and not d["note"]:
             raise ValueError("Bitte die andere Minderzeit unter Bemerkung kurz begründen.")
         return self._save("time_records", d, key)
 

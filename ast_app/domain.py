@@ -7,26 +7,24 @@ from decimal import Decimal, InvalidOperation
 KINDS = {"vacation": "Ferien", "overtime": "Überzeit", "sick": "Krankheit", "accident": "Unfall"}
 TIME_CODES = {
     "": "Normaler Arbeitstag",
-    "FG": "Ferien / Freizeit · ganzer Tag",
-    "FT": "Ferien / Freizeit · teilweise",
-    "KO": "Freizeit / Kompensation",
-    "KG": "Krankheit · ganzer Tag",
-    "KT": "Krankheit · teilweise",
-    "UG": "Unfall · ganzer Tag",
-    "UT": "Unfall · teilweise",
-    "FA": "Feiertag / arbeitsfrei",
-    "HO": "Homeoffice",
-    "KAG": "Kurzarbeit · ganzer Tag",
-    "KAT": "Kurzarbeit · teilweise",
-    "BM": "Andere begründete Minderzeit",
-    "BD": "Bereitschaftsdienst",
+    "F": "Ferien / Freizeit",
+    "K": "Krankheit",
+    "U": "Unfall",
+    "M": "Andere begründete Minderzeit",
+    "T": "Feiertag / arbeitsfrei",
+    "H": "Homeoffice",
+    "B": "Bereitschaftsdienst",
 }
+ABSENCE_TIME_CODES = {"F", "K", "U", "M"}
 
 # Codes from exports and databases created before the simplified code system.
 LEGACY_TIME_CODES = {
-    "F": "FA", "G": "KO", "K": "KG", "KR": "KT", "A": "UG", "AR": "UT",
-    "KU": "KAG", "KA": "KAT", "U": "FG", "UH": "FT", "H": "HO", "B": "BD",
-    "E1": "BM", "E2": "BM", "E3": "BM", "E4": "BM", "E5": "BM",
+    "FG": "F", "FT": "F", "KO": "F", "G": "F", "UH": "F",
+    "KG": "K", "KT": "K", "KR": "K",
+    "UG": "U", "UT": "U", "A": "U", "AR": "U",
+    "KAG": "M", "KAT": "M", "BM": "M", "KU": "M", "KA": "M",
+    "E1": "M", "E2": "M", "E3": "M", "E4": "M", "E5": "M",
+    "FA": "T", "HO": "H", "BD": "B",
 }
 
 
@@ -123,7 +121,7 @@ def scheduled_work_minutes(value: str | date) -> int:
 
 
 def worked_minutes(record: dict) -> int:
-    """Return direct working minutes, with compatibility for old clock records."""
+    """Return the entered minutes, with compatibility for old clock records."""
     direct = record.get("worked_minutes")
     if direct is not None:
         return max(0, int(direct))
@@ -133,6 +131,22 @@ def worked_minutes(record: dict) -> int:
         if start is not None and end is not None:
             total += (int(end) - int(start)) % 1440
     return max(0, total - int(record.get("break_minutes") or 0))
+
+
+def effective_work_minutes(record: dict) -> int:
+    """Return actual work after interpreting absence entries.
+
+    The single hours field contains work hours on a normal/home-office day and
+    absence hours when the selected reason is vacation, sickness, accident or
+    another justified shortfall.
+    """
+    entered = worked_minutes(record)
+    code = normalize_time_code(record.get("code"))
+    if code in ABSENCE_TIME_CODES:
+        return max(0, scheduled_work_minutes(record["day"]) - entered)
+    if code == "T":
+        return 0
+    return entered
 
 
 def invoice_state(amount: int, paid: int, due: str, today=None) -> str:
