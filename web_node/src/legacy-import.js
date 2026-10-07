@@ -4,7 +4,7 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 const multer = require('multer');
 
-const DEFAULT_SETUP_TOKEN_HASH = 'abea5dc9aceaeb970a31dc2d2ec4d7a75a49b7b8ab2dc156b09d3440a13dbaa5';
+const DEFAULT_SETUP_TOKEN_HASH = 'f63cf130ce4d52ec7dd4c74ce64419de5e46dcb1085d2f18e53f448fd1321ed3';
 const REQUIRED_TABLES = [
   'users', 'app_settings', 'customers', 'employees', 'invoices',
   'invoice_payments', 'reminders', 'time_entries', 'certificates',

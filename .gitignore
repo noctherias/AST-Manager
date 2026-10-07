@@ -20,3 +20,4 @@ docs/zeiterfassung_inventory.json
 build-smoke/
 tmp/
 output/
+.server-inspect/
