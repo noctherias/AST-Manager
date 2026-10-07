@@ -5,11 +5,11 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from PySide6.QtCore import Qt, QRectF, QBuffer, QIODevice
+from PySide6.QtCore import Qt, QRectF, QBuffer, QIODevice, QObject, Signal, QThread
 from PySide6.QtGui import QColor, QPainter, QFont, QDesktopServices, QPixmap
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTabWidget, QFormLayout,
-    QDialog, QFileDialog, QMessageBox, QHeaderView, QScrollArea)
+    QDialog, QFileDialog, QMessageBox, QHeaderView, QScrollArea, QLineEdit, QCheckBox)
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 
@@ -22,6 +22,35 @@ from .excel_import import import_debtors
 from .export_paths import (EXPORT_DESTINATIONS, choose_export_file, default_directory,
                            configured_directory, employee_year_folders, setting_key)
 from .excel_trust import ensure_excel_trusted_folder, unblock_excel_file
+from .secrets import protect_secret, unprotect_secret
+from .web_sync import WebSyncClient, automatic_sync, pull_web, push_desktop
+
+
+class _AutomaticWebSyncWorker(QObject):
+    completed = Signal(str)
+    failed = Signal(str)
+    finished = Signal()
+
+    def __init__(self, database_path, url, email, password):
+        super().__init__()
+        self.database_path = database_path
+        self.url = url
+        self.email = email
+        self.password = password
+
+    def run(self):
+        from .database import Database
+        database = None
+        try:
+            database = Database(self.database_path)
+            message = automatic_sync(database, WebSyncClient(self.url, self.email, self.password, timeout=20))
+            self.completed.emit(message)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+        finally:
+            if database is not None:
+                database.close()
+            self.finished.emit()
 
 
 def save_path(parent, title, name, extension="pdf", export_key="debtors_pdf", subfolders=()):
@@ -683,6 +712,39 @@ class SettingsPage(Page):
         export_scroll.setWidget(exports)
         self.tabs.addTab(export_scroll, "Exportpfade")
 
+        web = QWidget()
+        web_layout = QVBoxLayout(web)
+        web_layout.setContentsMargins(22, 22, 22, 22)
+        web_layout.setSpacing(14)
+        web_layout.addWidget(label("Desktop und Web verbinden", "sectionTitle"))
+        web_hint = label(
+            "Verbindet diesen PC verschlüsselt mit manager.ast-elektro.ch. Die erste Übertragung wird bewusst "
+            "gewählt; danach kann die App Änderungen beider Seiten automatisch erkennen.", "muted")
+        web_hint.setWordWrap(True)
+        web_layout.addWidget(web_hint)
+        web_form = QFormLayout()
+        self.web_url = line("https://manager.ast-elektro.ch", "https://manager.ast-elektro.ch")
+        self.web_email = line("", "E-Mail des Webkontos")
+        self.web_password = line("", "Passwort des Webkontos")
+        self.web_password.setEchoMode(QLineEdit.EchoMode.Password)
+        web_form.addRow("Webadresse", self.web_url)
+        web_form.addRow("E-Mail", self.web_email)
+        web_form.addRow("Passwort", self.web_password)
+        web_layout.addLayout(web_form)
+        self.web_auto = QCheckBox("Nach der ersten Übertragung automatisch synchronisieren")
+        web_layout.addWidget(self.web_auto)
+        actions = QHBoxLayout()
+        actions.addWidget(button("Verbindung prüfen", self.test_web_connection))
+        actions.addStretch()
+        actions.addWidget(button("Webstand auf diesen PC übernehmen", self.pull_web_data))
+        actions.addWidget(button("Desktopstand ins Web übertragen", self.push_web_data, True))
+        web_layout.addLayout(actions)
+        self.web_status = label("Noch nicht verbunden.", "muted")
+        self.web_status.setWordWrap(True)
+        web_layout.addWidget(self.web_status)
+        web_layout.addStretch()
+        self.tabs.addTab(web, "Web-Synchronisation")
+
     def refresh(self):
         people = self.db.employees()
         self.people.populate([[p["code"], p["first_name"] + " " + p["last_name"], "Lernende" if p["kind"] == "apprentice" else "Mitarbeiter", p["job"], number(p["workload"], " %"), "Aktiv" if p["active"] else "Inaktiv"] for p in people], [p["id"] for p in people])
@@ -695,6 +757,94 @@ class SettingsPage(Page):
         self.backup_retention.setText(settings.get("backup_retention_days", "30"))
         for key, field in self.export_directory_fields.items():
             field.setText(settings.get(setting_key(key), ""))
+        self.web_url.setText(settings.get("web_sync_url", "https://manager.ast-elektro.ch"))
+        self.web_email.setText(settings.get("web_sync_email", ""))
+        self.web_auto.setChecked(settings.get("web_sync_enabled", "0") == "1")
+        if settings.get("web_sync_password") and not self.web_password.text():
+            try:
+                self.web_password.setText(unprotect_secret(settings["web_sync_password"]))
+            except (ValueError, OSError):
+                self.web_status.setText("Das gespeicherte Webpasswort gehört zu einem anderen Windows-Benutzer. Bitte neu eingeben.")
+        revision = settings.get("web_sync_revision", "")
+        if revision:
+            self.web_status.setText(f"Synchronisation eingerichtet · letzter Serverstand {revision}")
+
+    def _web_client(self):
+        url = self.web_url.text().strip()
+        email = self.web_email.text().strip()
+        password = self.web_password.text()
+        if not email or not password:
+            raise ValueError("Bitte E-Mail und Passwort des Webkontos eingeben.")
+        self.db.save_settings({
+            "web_sync_url": url,
+            "web_sync_email": email,
+            "web_sync_password": protect_secret(password),
+            "web_sync_enabled": "1" if self.web_auto.isChecked() else "0",
+        })
+        return WebSyncClient(url, email, password, timeout=20)
+
+    @guarded
+    def test_web_connection(self):
+        remote = self._web_client().fetch()
+        revision = int(remote.get("revision", 0))
+        self.web_status.setText(f"Verbindung erfolgreich · Serverstand {revision}")
+        QMessageBox.information(self, "Webverbindung", "Die geschützte Verbindung zur Webversion funktioniert.")
+
+    @guarded
+    def push_web_data(self):
+        if not confirm(self, "Desktopstand übertragen",
+                       "Der aktuelle Datenstand dieses PCs ersetzt die Geschäftsdaten der Webversion. Fortfahren?"):
+            return
+        revision = push_desktop(self.db, self._web_client())
+        self.web_status.setText(f"Desktop und Web sind synchron · Serverstand {revision}")
+        QMessageBox.information(self, "Synchronisation abgeschlossen", "Der vollständige Desktop-Datenstand wurde ins Web übertragen.")
+
+    @guarded
+    def pull_web_data(self):
+        if not confirm(self, "Webstand übernehmen",
+                       "Der Webdatenstand ersetzt die Geschäftsdaten auf diesem PC. Vorher wird automatisch eine lokale Sicherung erstellt. Fortfahren?"):
+            return
+        revision = pull_web(self.db, self._web_client())
+        self.refresh()
+        self.web_status.setText(f"Desktop und Web sind synchron · Serverstand {revision}")
+        QMessageBox.information(self, "Synchronisation abgeschlossen", "Der Webdatenstand wurde übernommen. Eine lokale Sicherung wurde erstellt.")
+
+    def run_automatic_web_sync(self):
+        settings = self.db.settings()
+        if settings.get("web_sync_enabled") != "1" or hasattr(self, "_sync_thread"):
+            return
+        try:
+            password = unprotect_secret(settings.get("web_sync_password", ""))
+        except (ValueError, OSError) as exc:
+            self.web_status.setText(str(exc))
+            return
+        if not settings.get("web_sync_email") or not password or not settings.get("web_sync_revision"):
+            return
+        self.web_status.setText("Synchronisation läuft im Hintergrund …")
+        self._sync_thread = QThread(self)
+        self._sync_worker = _AutomaticWebSyncWorker(
+            self.db.path, settings.get("web_sync_url", "https://manager.ast-elektro.ch"),
+            settings["web_sync_email"], password)
+        self._sync_worker.moveToThread(self._sync_thread)
+        self._sync_thread.started.connect(self._sync_worker.run)
+        self._sync_worker.completed.connect(self._automatic_sync_completed)
+        self._sync_worker.failed.connect(self._automatic_sync_failed)
+        self._sync_worker.finished.connect(self._sync_thread.quit)
+        self._sync_worker.finished.connect(self._sync_worker.deleteLater)
+        self._sync_thread.finished.connect(self._automatic_sync_finished)
+        self._sync_thread.start()
+
+    def _automatic_sync_completed(self, message):
+        self.web_status.setText(message)
+
+    def _automatic_sync_failed(self, message):
+        self.web_status.setText("Automatische Synchronisation angehalten: " + message)
+
+    def _automatic_sync_finished(self):
+        thread = self._sync_thread
+        del self._sync_worker
+        del self._sync_thread
+        thread.deleteLater()
 
     @guarded
     def choose_export_directory(self, export_key):

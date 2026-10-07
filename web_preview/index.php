@@ -117,6 +117,15 @@ CREATE TABLE IF NOT EXISTS invoice_payments (
 CREATE TABLE IF NOT EXISTS reminder_templates (
     level INTEGER PRIMARY KEY CHECK(level BETWEEN 1 AND 4), title TEXT NOT NULL, body TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sync_state (
+    id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO sync_state(id,revision,updated_at) VALUES(1,0,'');
+CREATE TABLE IF NOT EXISTS application_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, application_id INTEGER NOT NULL, category TEXT NOT NULL DEFAULT 'other',
+    original_name TEXT NOT NULL, source_ref TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+    UNIQUE(application_id,source_ref), FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
+);
 SQL);
 $columnMigrations = [
     'employees' => [
@@ -194,6 +203,7 @@ function decimal_input(string $key): float {
 function money(float $value): string { return 'CHF ' . number_format($value, 2, '.', "'"); }
 function valid_date(string $value): bool { $date = DateTimeImmutable::createFromFormat('Y-m-d', $value); return $date && $date->format('Y-m-d') === $value; }
 function can_write(array $user): bool { return in_array($user['role'], ['admin','management'], true); }
+function bump_revision(PDO $db): void { $db->prepare('UPDATE sync_state SET revision=revision+1,updated_at=? WHERE id=1')->execute([now()]); }
 function source_has_table(PDO $source, string $table): bool {
     $stmt=$source->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"); $stmt->execute([$table]); return (bool)$stmt->fetchColumn();
 }
@@ -264,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($number==='' || $customer==='' || !valid_date($invoiceDate) || !valid_date($dueDate)) { set_flash('error','Bitte fülle Rechnungsnummer, Kunde und beide Datumsfelder aus.'); redirect('/?page=invoices'); }
         try { $stmt=$db->prepare('INSERT INTO invoices(invoice_number,customer,invoice_date,due_date,amount,paid_amount,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)');
             $stmt->execute([$number,$customer,$invoiceDate,$dueDate,decimal_input('amount'),decimal_input('paid_amount'),trim((string)($_POST['notes']??'')),now(),now()]);
-            audit($db,(int)$user['id'],'invoice_created',$number); set_flash('success','Die Rechnung wurde gespeichert.');
+            bump_revision($db); audit($db,(int)$user['id'],'invoice_created',$number); set_flash('success','Die Rechnung wurde gespeichert.');
         } catch(PDOException $exception) { set_flash('error','Diese Rechnungsnummer ist bereits vorhanden.'); }
         redirect('/?page=invoices');
     }
@@ -273,44 +283,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($customer==='' || !valid_date($date) || $level<1 || $level>4) { set_flash('error','Bitte prüfe Empfänger, Datum und Mahnstufe.'); redirect('/?page=reminders'); }
         $stmt=$db->prepare('INSERT INTO reminders(invoice_id,customer,invoice_number,level,amount,reminder_date,reminder_text,status,created_at) VALUES(NULL,?,?,?,?,?,?,?,?)');
         $stmt->execute([$customer,trim((string)($_POST['invoice_number']??'')),$level,decimal_input('amount'),$date,trim((string)($_POST['reminder_text']??'')),'Entwurf',now()]);
-        audit($db,(int)$user['id'],'reminder_created',$customer.' · Stufe '.$level); set_flash('success','Die Mahnung wurde als Entwurf gespeichert.'); redirect('/?page=reminders');
+        bump_revision($db); audit($db,(int)$user['id'],'reminder_created',$customer.' · Stufe '.$level); set_flash('success','Die Mahnung wurde als Entwurf gespeichert.'); redirect('/?page=reminders');
     }
     if ($action === 'save_employee') {
         $first=trim((string)($_POST['first_name']??'')); $last=trim((string)($_POST['last_name']??'')); $type=(string)($_POST['employee_type']??'employee');
         if ($first==='' || $last==='' || !in_array($type,['employee','apprentice'],true)) { set_flash('error','Bitte gib Vorname, Nachname und Personengruppe an.'); redirect('/?page=timesheets'); }
         $vacation=$type==='apprentice'?216.25:173.0; $stmt=$db->prepare('INSERT INTO employees(first_name,last_name,personnel_number,employee_type,entry_date,vacation_hours,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)');
         $stmt->execute([$first,$last,trim((string)($_POST['personnel_number']??'')),$type,($_POST['entry_date']??'')?:null,$vacation,now(),now()]);
-        audit($db,(int)$user['id'],'employee_created',$first.' '.$last); set_flash('success','Die Person wurde gespeichert.'); redirect('/?page=timesheets');
+        bump_revision($db); audit($db,(int)$user['id'],'employee_created',$first.' '.$last); set_flash('success','Die Person wurde gespeichert.'); redirect('/?page=timesheets');
     }
     if ($action === 'save_time') {
         $employee=(int)($_POST['employee_id']??0); $date=(string)($_POST['work_date']??''); $hours=decimal_input('hours');
         $reasons=['Arbeit','Ferien','Krankheit','Unfall','Begründete Minderzeit']; $reason=(string)($_POST['reason']??'Arbeit');
         if ($employee<1 || !valid_date($date) || $hours>24 || !in_array($reason,$reasons,true)) { set_flash('error','Bitte prüfe Person, Datum, Stunden und Grund.'); redirect('/?page=timesheets'); }
         $stmt=$db->prepare('INSERT INTO time_entries(employee_id,work_date,hours,reason,notes,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(employee_id,work_date) DO UPDATE SET hours=excluded.hours,reason=excluded.reason,notes=excluded.notes');
-        $stmt->execute([$employee,$date,$hours,$reason,trim((string)($_POST['notes']??'')),now()]); audit($db,(int)$user['id'],'time_saved',$date.' · '.$hours.' h'); set_flash('success','Der Zeiteintrag wurde gespeichert.'); redirect('/?page=timesheets');
+        $stmt->execute([$employee,$date,$hours,$reason,trim((string)($_POST['notes']??'')),now()]); bump_revision($db); audit($db,(int)$user['id'],'time_saved',$date.' · '.$hours.' h'); set_flash('success','Der Zeiteintrag wurde gespeichert.'); redirect('/?page=timesheets');
     }
     if ($action === 'save_certificate') {
         $employee=(int)($_POST['employee_id']??0); $type=(string)($_POST['certificate_type']??'Arbeitszeugnis'); $date=(string)($_POST['reference_date']??'');
         if ($employee<1 || !valid_date($date) || !in_array($type,['Arbeitszeugnis','Zwischenzeugnis','Lehrzeugnis'],true)) { set_flash('error','Bitte prüfe Person, Zeugnisart und Datum.'); redirect('/?page=certificates'); }
         $stmt=$db->prepare('INSERT INTO certificates(employee_id,certificate_type,reference_date,status,notes,created_at) VALUES(?,?,?,\'Entwurf\',?,?)');
-        $stmt->execute([$employee,$type,$date,trim((string)($_POST['notes']??'')),now()]); audit($db,(int)$user['id'],'certificate_created',$type); set_flash('success','Der Zeugnisentwurf wurde angelegt.'); redirect('/?page=certificates');
+        $stmt->execute([$employee,$type,$date,trim((string)($_POST['notes']??'')),now()]); bump_revision($db); audit($db,(int)$user['id'],'certificate_created',$type); set_flash('success','Der Zeugnisentwurf wurde angelegt.'); redirect('/?page=certificates');
     }
     if ($action === 'save_application') {
         $name=trim((string)($_POST['applicant_name']??'')); $type=(string)($_POST['application_type']??'Schnupperlehre'); $date=(string)($_POST['received_date']??'');
         if ($name==='' || !valid_date($date)) { set_flash('error','Bitte gib Name und Eingangsdatum an.'); redirect('/?page=applications'); }
         $stmt=$db->prepare('INSERT INTO applications(applicant_name,email,phone,application_type,received_date,rating,notes,source,created_at) VALUES(?,?,?,?,?,\'Offen\',?,\'Manuell\',?)');
-        $stmt->execute([$name,trim((string)($_POST['email']??'')),trim((string)($_POST['phone']??'')),$type,$date,trim((string)($_POST['notes']??'')),now()]); audit($db,(int)$user['id'],'application_created',$name); set_flash('success','Die Bewerbung wurde erfasst.'); redirect('/?page=applications');
+        $stmt->execute([$name,trim((string)($_POST['email']??'')),trim((string)($_POST['phone']??'')),$type,$date,trim((string)($_POST['notes']??'')),now()]); bump_revision($db); audit($db,(int)$user['id'],'application_created',$name); set_flash('success','Die Bewerbung wurde erfasst.'); redirect('/?page=applications');
     }
     if ($action === 'rate_application') {
         $id=(int)($_POST['application_id']??0); $rating=(string)($_POST['rating']??'Offen');
         if (!in_array($rating,['Offen','Nicht geeignet','Eventuell','Geeignet'],true)) { set_flash('error','Die Beurteilung ist ungültig.'); redirect('/?page=applications'); }
-        $stmt=$db->prepare('UPDATE applications SET rating=?,notes=? WHERE id=?'); $stmt->execute([$rating,trim((string)($_POST['notes']??'')),$id]); audit($db,(int)$user['id'],'application_rated','Bewerbung '.$id.' · '.$rating); set_flash('success','Beurteilung und Notiz wurden gespeichert.'); redirect('/?page=applications');
+        $stmt=$db->prepare('UPDATE applications SET rating=?,notes=? WHERE id=?'); $stmt->execute([$rating,trim((string)($_POST['notes']??'')),$id]); bump_revision($db); audit($db,(int)$user['id'],'application_rated','Bewerbung '.$id.' · '.$rating); set_flash('success','Beurteilung und Notiz wurden gespeichert.'); redirect('/?page=applications');
     }
     if ($action === 'save_salary') {
         $employee=(int)($_POST['employee_id']??0); $year=(int)($_POST['tax_year']??date('Y'));
         if ($employee<1 || $year<2000 || $year>2100) { set_flash('error','Bitte prüfe Person und Steuerjahr.'); redirect('/?page=salary'); }
         try { $stmt=$db->prepare('INSERT INTO salary_certificates(employee_id,tax_year,gross_salary,status,notes,created_at) VALUES(?,?,?,\'Entwurf\',?,?)');
-            $stmt->execute([$employee,$year,decimal_input('gross_salary'),trim((string)($_POST['notes']??'')),now()]); set_flash('success','Der Lohnausweis-Entwurf wurde angelegt.'); audit($db,(int)$user['id'],'salary_created',(string)$year);
+            $stmt->execute([$employee,$year,decimal_input('gross_salary'),trim((string)($_POST['notes']??'')),now()]); bump_revision($db); set_flash('success','Der Lohnausweis-Entwurf wurde angelegt.'); audit($db,(int)$user['id'],'salary_created',(string)$year);
         } catch(PDOException $exception) { set_flash('error','Für diese Person und dieses Jahr besteht bereits ein Lohnausweis.'); }
         redirect('/?page=salary');
     }
@@ -319,7 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt=$db->prepare('INSERT INTO app_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at');
             $stmt->execute([$key,trim((string)($_POST[$key]??'')),now()]);
         }
-        audit($db,(int)$user['id'],'settings_updated'); set_flash('success','Die Firmeneinstellungen wurden gespeichert.'); redirect('/?page=settings');
+        bump_revision($db); audit($db,(int)$user['id'],'settings_updated'); set_flash('success','Die Firmeneinstellungen wurden gespeichert.'); redirect('/?page=settings');
     }
 
     if ($user['role'] !== 'admin') { http_response_code(403); exit('Diese Aktion ist Administratoren vorbehalten.'); }
@@ -361,7 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if(source_has_table($source,'salaries')) { $stmt=$db->prepare('INSERT INTO salary_certificates(id,employee_id,tax_year,gross_salary,status,notes,created_at,period_start,period_end,fields_json) VALUES(?,?,?,?,?,?,?,?,?,?)'); foreach(source_rows($source,'SELECT * FROM salaries ORDER BY id') as $row) { $fields=json_decode((string)$row['fields'],true)?:[]; $gross=(float)($fields['8']??$fields['8Brutto']??0); $stmt->execute([(int)$row['id'],(int)$row['employee_id'],(int)$row['year'],$gross,'Gespeichert','',now(),$row['start']??'',$row['end']??'',$row['fields']??'{}']); $counts['Lohnausweise']++; } }
             $allowedSettings=['company','address','postcode','city','phone','email','website','uid','reminder_text_1','reminder_text_2','reminder_text_3','reminder_text_4'];
             if(source_has_table($source,'settings')) { $stmt=$db->prepare('INSERT INTO app_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at'); foreach(source_rows($source,'SELECT key,value FROM settings') as $row) if(in_array($row['key'],$allowedSettings,true)) $stmt->execute([$row['key'],$row['value'],now()]); }
-            $db->commit(); audit($db,(int)$user['id'],'desktop_backup_imported',json_encode($counts,JSON_UNESCAPED_UNICODE));
+            $db->commit(); bump_revision($db); audit($db,(int)$user['id'],'desktop_backup_imported',json_encode($counts,JSON_UNESCAPED_UNICODE));
             set_flash('success','Desktop-Sicherung importiert: '.implode(' · ',array_map(fn($key,$value)=>$key.' '.$value,array_keys($counts),$counts)).'.');
         } catch(Throwable $exception) { if($db->inTransaction()) $db->rollBack(); set_flash('error','Import nicht durchgeführt: '.$exception->getMessage()); }
         finally { @unlink($importPath); }

@@ -126,6 +126,11 @@ class MainWindow(QMainWindow):
         for page_index, page in enumerate(self.pages):
             for table_index, table in enumerate(page.findChildren(Table)):
                 table.bind_layout(db, f"page_{page_index}_{table_index}")
+        self.web_sync_timer = QTimer(self)
+        self.web_sync_timer.setInterval(5 * 60 * 1000)
+        self.web_sync_timer.timeout.connect(self.pages[4].run_automatic_web_sync)
+        self.web_sync_timer.start()
+        QTimer.singleShot(2500, self.pages[4].run_automatic_web_sync)
         self.stack.currentChanged.connect(self._position_watermark)
         QTimer.singleShot(0, self._position_watermark)
         self.statusBar().showMessage(("DEMO · Fiktive Beispieldaten · " if demo else "") + "Bereit · Änderungen werden beim Speichern übernommen")
