@@ -1,5 +1,6 @@
 """Task-focused screens; the shared data and calculation services remain central."""
 import json
+import os
 import re
 from datetime import date
 from PySide6.QtCore import Qt
@@ -9,15 +10,16 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QStack
 from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line, selection_bar, guarded, confirm
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
-from .domain import TIME_CODES, chf, number, display_date, scheduled_work_minutes, worked_minutes
+from .domain import (TIME_CODES, chf, number, display_date, scheduled_work_minutes, worked_minutes,
+                     vacation_target)
 from .documents import report_pdf
 from .timesheet_excel import export_timesheet, monthly_summary
 from .excel_import import import_timesheet
-from .excel_trust import ensure_excel_trusted_folder
+from .excel_trust import ensure_excel_trusted_folder, unblock_excel_file
 from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS, PLACEHOLDER_INFO,
                         reminder_text, reminder_pdf, validate_template)
 from .update_ui import UpdateSettings
-from .export_paths import employee_year_folders
+from .export_paths import configured_directory, employee_year_folders
 
 
 def timesheet_filename(employee, year):
@@ -472,6 +474,11 @@ class TimeWorkspace(Page):
     def __init__(self, db, back, manage_team):
         super().__init__("Stundennachweis", "Arbeitszeiten und Abwesenheiten einfach erfassen und in die Excel-Vorlage exportieren.")
         self.db, self.employee, self.current_records = db, None, []
+        self._excel_trust_error = None
+        if os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+            self._excel_trust_error = ensure_excel_trusted_folder(
+                configured_directory(db, "timesheets_excel")
+            )
         self.layout.insertWidget(0, button("← Personenübersicht", back))
         self.entry_btn = button("+ Arbeitstag erfassen", self.new_entry, True)
         self.header.addWidget(self.entry_btn)
@@ -622,7 +629,8 @@ class TimeWorkspace(Page):
         hours = lambda value: f"{value / 60:.2f} h"
         summary = (f"Überstunden {hours(totals['overtime'])} · Ferien/Freizeit {hours(totals['vacation'])} · "
                    f"Krankheit {hours(totals['sick'])} · Unfall {hours(totals['accident'])} · "
-                   f"Übrige Minderzeit {hours(totals['other'])}")
+                   f"Übrige Minderzeit {hours(totals['other'])} · "
+                   f"Ferien-Soll {vacation_target(self.employee, year) / 100:.2f} h")
         name = f"{self.employee['first_name']} {self.employee['last_name']}"
         result = report_pdf(path, "Stundennachweis · " + name, f"Kalenderjahr {year}",
                             ["Datum", "Wochentag", "IST", "SOLL", "Abweichung", "Grund", "Bemerkung"],
@@ -639,12 +647,16 @@ class TimeWorkspace(Page):
                          "xlsm", "timesheets_excel", folders)
         if path:
             result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
+            unblock_excel_file(result)
             trust_error = ensure_excel_trusted_folder(result.parent)
             message = ("Die Excel-Datei wurde vollständig befüllt. Die Schaltflächen «PDF erstellen» und "
                        "«Excel speichern» sind beim Öffnen aus diesem Exportordner freigegeben.\n\n" + str(result))
             if trust_error:
                 message += ("\n\nExcel konnte den Exportordner nicht automatisch freigeben. Die Datei ist verwendbar; "
                             "verwende bei blockierten Makros bitte die PDF-Schaltfläche direkt in der AST-App.")
+            else:
+                message += ("\n\nFalls Excel bereits geöffnet ist, schliesse bitte einmal alle Excel-Fenster und öffne "
+                            "danach diese Datei erneut. Excel lädt Vertrauensordner nur beim Programmstart.")
             QMessageBox.information(self, "Excel-Datei erstellt", message)
 
     @guarded

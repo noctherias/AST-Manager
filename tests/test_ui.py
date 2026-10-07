@@ -436,6 +436,7 @@ class UiTests(unittest.TestCase):
         window.close()
         self.assertEqual(self.db.settings()["company"], before)
         person = EmployeeDialog(None, self.db, kind="apprentice")
+        self.assertEqual(person.fields["allowance"].value(), 216.25)
         person.fields["first_name"].setText("Test")
         person.fields["last_name"].setText("Person")
         person.submit()
@@ -446,6 +447,10 @@ class UiTests(unittest.TestCase):
         period.submit()
         self.assertEqual(period.result(), QDialog.DialogCode.Accepted)
         self.assertEqual(self.db.periods(saved["id"])[0]["start"], saved["hired"])
+        employee = EmployeeDialog(None, self.db, kind="employee")
+        self.assertEqual(employee.fields["allowance"].value(), 173.0)
+        employee.fields["kind"].setCurrentIndex(employee.fields["kind"].findData("apprentice"))
+        self.assertEqual(employee.fields["allowance"].value(), 216.25)
         window = MainWindow(self.db, True)
         window.navigate(4)
         settings = window.pages[4]

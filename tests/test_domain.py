@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 
 from ast_app.domain import (units, invoice_state, period_balance, salary_totals, GROSS_FIELDS,
-                            scheduled_work_minutes, worked_minutes)
+                            scheduled_work_minutes, vacation_target, worked_minutes)
 
 
 class DomainTests(unittest.TestCase):
@@ -12,6 +12,14 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(scheduled_work_minutes("2026-01-10"), 0)
         self.assertEqual(worked_minutes({"start_1": 420, "end_1": 720, "start_2": 780,
                                          "end_2": 1020, "break_minutes": 15}), 525)
+
+    def test_vacation_target_uses_employee_group_and_age(self):
+        self.assertEqual(vacation_target({"kind": "employee", "birth_date": "1990-01-01",
+                                          "allowance": 21625}, 2026), 17300)
+        self.assertEqual(vacation_target({"kind": "apprentice", "birth_date": "2008-01-01",
+                                          "allowance": 17300}, 2026), 21625)
+        self.assertEqual(vacation_target({"kind": "employee", "birth_date": "1970-01-01",
+                                          "allowance": 20000}, 2026), 20000)
 
     def test_exact_numbers_and_swiss_format(self):
         self.assertEqual(units("1’234,50"), 123450)

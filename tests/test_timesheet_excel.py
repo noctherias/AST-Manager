@@ -5,7 +5,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from ast_app.timesheet_excel import export_timesheet, monthly_summary
+from ast_app.timesheet_excel import export_timesheet, monthly_summary, monthly_target_minutes
 
 
 NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -91,6 +91,9 @@ class TimesheetExcelTests(unittest.TestCase):
                                  'IF(A4="",0,IF(D4="",0,D4))')
                 self.assertEqual(cell(january, "K5").find("x:f", NS).text,
                                  'IF(A5="",0,IF(D5="",0,D5))')
+                self.assertTrue(cell(january, "L4").find("x:f", NS).text.startswith('IF(AND(C4'))
+                self.assertAlmostEqual(float(cell(january, "F37").find("x:v", NS).text),
+                                       monthly_target_minutes(2026, 1) / 60)
                 september = ET.fromstring(exported.read("xl/worksheets/sheet14.xml"))
                 self.assertAlmostEqual(float(cell(september, "D33").find("x:v", NS).text), 8.75)
                 for reference in ("D33", "E33", "F33", "G33", "H33", "K33", "L33", "N33"):
@@ -98,7 +101,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(number_format_id(styles, september, "M33"), "176")
                 self.assertEqual(number_format_id(styles, september, "P33"), "176")
                 self.assertFalse(cell(september, "N4").find("x:f", NS).text.endswith("/24"))
-                self.assertTrue(cell(september, "L4").find("x:f", NS).text.startswith("IF(AND(D4="))
+                self.assertTrue(cell(september, "L4").find("x:f", NS).text.startswith("IF(AND(C4"))
                 self.assertTrue(cell(september, "M4").find("x:f", NS).text.startswith("IF(AND(D4="))
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
                 self.assertEqual(number_format_id(styles, annual, "AA33"), "176")
@@ -106,6 +109,11 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(cell(annual, "A37").find("x:is/x:t", NS).text,
                                  "Überstunden (h)")
                 self.assertEqual(cell(annual, "B37").find("x:f", NS).text, "Januar!P36")
+                self.assertAlmostEqual(float(cell(annual, "B35").find("x:v", NS).text),
+                                       monthly_target_minutes(2026, 1) / 60)
+                self.assertEqual(cell(annual, "B35").find("x:f", NS).text, "Januar!F37")
+                self.assertEqual(cell(annual, "AL35").find("x:f", NS).get("t"), "shared")
+                self.assertEqual(cell(annual, "AL35").find("x:f", NS).get("ref"), "AL35:AL50")
                 self.assertIn("COUNTIF(Januar!J4:J34", cell(annual, "B43").find("x:f", NS).text)
                 annual_colours = {row + 1: colour for row, colour in expected_colours.items()}
                 for row, expected_colour in annual_colours.items():
@@ -116,6 +124,9 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(cell(annual, "B40").find("x:f", NS).text, "Januar!P39")
                 self.assertIsNone(annual.find(".//x:row[@r='42']", NS).get("hidden"))
                 self.assertEqual(annual.find(".//x:row[@r='43']", NS).get("hidden"), "1")
+                self.assertIsNone(annual.find(".//x:row[@r='44']", NS).get("hidden"))
+                self.assertEqual(cell(annual, "A44").find("x:is/x:t", NS).text, "Ferien-Soll (h)")
+                self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), 173.0)
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
                 self.assertEqual(cell(settings, "C2").find("x:v", NS).text, "2026")
                 self.assertEqual(cell(settings, "C3").find("x:is/x:t", NS).text, "Max Muster")
@@ -142,6 +153,19 @@ class TimesheetExcelTests(unittest.TestCase):
         self.assertEqual(monthly_summary(records, 2026, 2), {
             "overtime": 75, "vacation": 525, "sick": 225, "accident": 0, "other": 45,
         })
+
+    def test_apprentice_receives_annual_vacation_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "apprentice.xlsm"
+            export_timesheet(target, {
+                "first_name": "Lena", "last_name": "Lernende", "code": "AST-007",
+                "kind": "apprentice", "allowance": 17300,
+            }, 2026, [], "AST Elektro AG")
+            with zipfile.ZipFile(target) as exported:
+                annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
+                self.assertAlmostEqual(float(cell(annual, "B44").find("x:v", NS).text),
+                                       216.25 / 12)
+                self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), 216.25)
 
 
 if __name__ == "__main__":

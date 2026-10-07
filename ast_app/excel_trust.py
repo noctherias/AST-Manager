@@ -49,3 +49,13 @@ def ensure_excel_trusted_folder(folder) -> str | None:
         return None
     except Exception as exc:
         return str(exc)
+
+
+def unblock_excel_file(path) -> None:
+    """Remove Windows' downloaded-file marker from a generated workbook."""
+    if os.name != "nt":
+        return
+    try:
+        os.remove(str(Path(path)) + ":Zone.Identifier")
+    except (FileNotFoundError, OSError):
+        pass

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ast_app.excel_trust import ensure_excel_trusted_folder
+from ast_app.excel_trust import ensure_excel_trusted_folder, unblock_excel_file
 
 
 class _Key:
@@ -38,6 +38,12 @@ class ExcelTrustTests(unittest.TestCase):
         self.assertEqual(trusted_paths, [str(folder) + "\\"])
         self.assertTrue(any(name == "AllowSubfolders" and value == 1
                             for _path, name, _kind, value in values))
+
+    def test_unblock_removes_only_the_zone_identifier_stream(self):
+        with (patch("ast_app.excel_trust.os.name", "nt"),
+              patch("ast_app.excel_trust.os.remove") as remove):
+            unblock_excel_file(Path(r"C:\Exports\Stundennachweis.xlsm"))
+        remove.assert_called_once_with(r"C:\Exports\Stundennachweis.xlsm:Zone.Identifier")
 
 
 if __name__ == "__main__":

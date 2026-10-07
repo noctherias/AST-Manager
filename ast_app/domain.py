@@ -78,6 +78,19 @@ def display_date(value: str | None) -> str:
     return date.fromisoformat(value).strftime("%d.%m.%Y") if value else "–"
 
 
+def vacation_target(employee: dict, year: int) -> int:
+    """Annual vacation entitlement in hundredths of an hour."""
+    if employee.get("kind") == "apprentice":
+        return 21625
+    birth = str(employee.get("birth_date") or "").strip()
+    if birth:
+        born = date.fromisoformat(birth)
+        age = int(year) - born.year
+        if age >= 50:
+            return int(employee.get("allowance") or 17300)
+    return 17300
+
+
 def scheduled_work_minutes(value: str | date) -> int:
     """Regular AST working time: Mon–Thu 8.75 h, Fri 8.25 h."""
     workday = date.fromisoformat(value) if isinstance(value, str) else value

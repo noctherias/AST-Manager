@@ -6,7 +6,7 @@ remaining ZIP members stay byte-for-byte identical.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from hashlib import sha256
 from html import escape
 from pathlib import Path
@@ -18,7 +18,7 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 from .documents import resource_path
-from .domain import scheduled_work_minutes, worked_minutes
+from .domain import scheduled_work_minutes, vacation_target, worked_minutes
 
 
 MONTH_SHEETS = {month: f"xl/worksheets/sheet{month + 5}.xml" for month in range(1, 13)}
@@ -112,6 +112,21 @@ def _replace_formula_cell(xml: str, reference: str, formula_text: str, cached_va
     value = escape(str(cached_value), quote=False)
     replacement = f"<c{attributes}><f>{formula}</f><v>{value}</v></c>"
     return xml[:match.start()] + replacement + xml[match.end():]
+
+
+def _replace_cached_value(xml: str, reference: str, cached_value) -> str:
+    """Update a formula result without changing shared-formula metadata."""
+    match = _cell_pattern(reference).search(xml)
+    if not match:
+        raise ValueError(f"Excel-Vorlage: Zelle {reference} wurde nicht gefunden.")
+    cell_xml = match.group(0)
+    value = escape(str(cached_value), quote=False)
+    cached = re.search(r'<v>.*?</v>', cell_xml, re.DOTALL)
+    if cached:
+        cell_xml = cell_xml[:cached.start()] + f"<v>{value}</v>" + cell_xml[cached.end():]
+    else:
+        cell_xml = cell_xml[:-4] + f"<v>{value}</v></c>"
+    return xml[:match.start()] + cell_xml + xml[match.end():]
 
 
 def _hide_rows(xml: str, first_row: int, last_row: int) -> str:
@@ -377,6 +392,45 @@ def _decimal_hours(minutes: int | None):
     return format(int(minutes) / 60, ".15g")
 
 
+def _easter_sunday(year: int) -> date:
+    """Gregorian Easter date, used by the supplied holiday calendar."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = (h + l - 7 * m + 114) % 31 + 1
+    return date(year, month, day)
+
+
+def company_holidays(year: int) -> set[date]:
+    """Full-day holidays configured by the original AST Excel template."""
+    easter = _easter_sunday(int(year))
+    return {
+        date(year, 1, 1), date(year, 1, 2),
+        easter - timedelta(days=2), easter + timedelta(days=1),
+        easter + timedelta(days=39), easter + timedelta(days=50),
+        date(year, 8, 1), date(year, 12, 25), date(year, 12, 26), date(year, 12, 31),
+    }
+
+
+def monthly_target_minutes(year: int, month: int) -> int:
+    """Scheduled full-time hours for one calendar month, excluding holidays."""
+    holidays = company_holidays(int(year))
+    day = date(int(year), int(month), 1)
+    total = 0
+    while day.month == int(month):
+        if day not in holidays:
+            total += scheduled_work_minutes(day)
+        day += timedelta(days=1)
+    return total
+
+
 def monthly_summary(records: list[dict], year: int, month: int) -> dict[str, int]:
     """Summarise recorded deviations without treating missing records as absences."""
     result = {"overtime": 0, "vacation": 0, "sick": 0, "accident": 0, "other": 0}
@@ -432,7 +486,7 @@ def _remove_legacy_monthly_summary(xml: str) -> str:
     return xml
 
 
-def _simplify_annual_summary(xml: str) -> str:
+def _simplify_annual_summary(xml: str, year: int, vacation_hours: float) -> str:
     labels = {
         37: "Überstunden (h)",
         38: "Ferien / Freizeit (h)",
@@ -440,11 +494,15 @@ def _simplify_annual_summary(xml: str) -> str:
         40: "Unfall (h)",
         41: "Übrige Minderzeit (h)",
         42: "Abwesenheit (h)",
+        44: "Ferien-Soll (h)",
     }
     for row, title in labels.items():
         xml = _replace_cell(xml, f"A{row}", title, "string")
     summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI")
     for month_index, (column, sheet_name) in enumerate(zip(summary_columns, MONTH_NAMES), 1):
+        xml = _replace_cached_value(
+            xml, f"{column}35", _decimal_hours(monthly_target_minutes(year, month_index))
+        )
         for target_row, source_row in ((37, 36), (38, 37), (39, 38), (40, 39), (41, 40)):
             xml = _replace_formula_cell(xml, f"{column}{target_row}",
                                         f"{sheet_name}!P{source_row}", 0)
@@ -453,10 +511,18 @@ def _simplify_annual_summary(xml: str) -> str:
         vacation_days = (f'COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B25)'
                          f'+COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B26)*Voreinstellungen!C26')
         xml = _replace_formula_cell(xml, f"{column}43", vacation_days, 0)
+        xml = _replace_cell(xml, f"{column}44", format(vacation_hours / 12, ".15g"))
     for row in range(37, 43):
         xml = _replace_formula_cell(xml, f"AL{row}", f"SUM(B{row}:AK{row})", 0)
+    year_target = sum(monthly_target_minutes(year, month) for month in range(1, 13))
+    # AL35 is the master of Excel's shared AL35:AL50 formula group. Replacing
+    # the formula itself leaves its dependent cells orphaned and Excel then
+    # rejects the workbook. Only refresh its cached result.
+    xml = _replace_cached_value(xml, "AL35", _decimal_hours(year_target))
     xml = _replace_formula_cell(xml, "AL43", "SUM(B43:AK43)", 0)
-    return _hide_rows(xml, 43, 50)
+    xml = _replace_formula_cell(xml, "AL44", "SUM(B44:AK44)", format(vacation_hours, ".15g"))
+    xml = _hide_rows(xml, 43, 43)
+    return _hide_rows(xml, 45, 50)
 
 
 def _vba_hash(members: dict[str, bytes]) -> str | None:
@@ -529,6 +595,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     members["xl/worksheets/sheet1.xml"] = settings.encode("utf-8")
 
     by_day = {date.fromisoformat(r["day"]): r for r in records if date.fromisoformat(r["day"]).year == year}
+    annual_vacation_hours = vacation_target(employee, year) / 100
     # One restrained palette is used in the month and annual summaries. This
     # prevents the same colour from meaning two different categories.
     fill_overtime = styles.fill_id("FFDDF3E4")
@@ -553,7 +620,6 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         if company:
             xml = _replace_cell(xml, "C1", company, "string")
         # L4, M4 and N4 are masters of their shared formulas down to row 34.
-        xml = _ignore_unrecorded_day_formula(xml, "L4")
         xml = _ignore_unrecorded_day_formula(xml, "M4")
         for day_number in range(1, 32):
             row = day_number + 3
@@ -566,6 +632,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             xml = _replace_cell(xml, f"J{row}", record.get("code", ""), "string")
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
         xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
+        xml = _replace_formula_cell(xml, "F37", "SUM(L4:L34)",
+                                    _decimal_hours(monthly_target_minutes(year, month)))
         xml = _remove_legacy_monthly_summary(xml)
         xml = _set_row_heights(xml, {1: 24, 2: 20, 3: 34,
                                      **{row: 20 for row in range(4, 35)},
@@ -590,7 +658,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
 
     annual_name = "xl/worksheets/sheet18.xml"
     annual = members[annual_name].decode("utf-8")
-    annual = _simplify_annual_summary(annual)
+    annual = _simplify_annual_summary(annual, year, annual_vacation_hours)
     annual = _widen_annual_hour_columns(annual)
     annual = _set_row_heights(annual, {1: 24, 2: 20, 3: 24,
                                        **{row: 20 for row in range(4, 35)},
@@ -608,7 +676,9 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         + [(f"{column}{row}", TIME_FORMAT_ID, fill_id)
            for row, fill_id in annual_category_fills for column in annual_summary_columns]
         + [("A42", "0", fill_total)]
-        + [(f"{column}42", TIME_FORMAT_ID, fill_total) for column in annual_summary_columns],
+        + [(f"{column}42", TIME_FORMAT_ID, fill_total) for column in annual_summary_columns]
+        + [("A44", "0", fill_vacation)]
+        + [(f"{column}44", TIME_FORMAT_ID, fill_vacation) for column in annual_summary_columns],
     )
     members[annual_name] = annual.encode("utf-8")
     members["xl/styles.xml"] = styles.finish().encode("utf-8")

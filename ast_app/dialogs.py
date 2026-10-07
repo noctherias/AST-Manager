@@ -38,7 +38,9 @@ class EmployeeDialog(FormDialog):
             self.add(key, title, line(r.get(key, "")))
         self.add("kind", "Bereich", combo([("Mitarbeiter", "employee"), ("Lernende", "apprentice")], r.get("kind", kind)))
         self.add("hired", "Eintritt", day(r.get("hired")))
-        self.add("allowance", "Ferienanspruch pro Jahr", numeric(r.get("allowance", 21625) / 100, " h"))
+        default_allowance = 21625 if r.get("kind", kind) == "apprentice" else 17300
+        self.add("allowance", "Ferienanspruch pro Jahr", numeric(r.get("allowance", default_allowance) / 100, " h"))
+        self.fields["kind"].currentIndexChanged.connect(self._kind_changed)
         self.form.addRow(label("Anspruch in Stunden eingeben. Das Pensum wird nicht nochmals abgezogen.", "muted"))
         basic = self.form
         extra = Disclosure("Personalangaben & Adresse (für Lohnausweise)")
@@ -56,6 +58,11 @@ class EmployeeDialog(FormDialog):
         active.setChecked(bool(r.get("active", 1)))
         self.add("active", "Status", active)
         self.form = basic
+
+    def _kind_changed(self):
+        if self.row.get("id"):
+            return
+        self.fields["allowance"].setValue(216.25 if self.fields["kind"].currentData() == "apprentice" else 173.0)
 
     @guarded
     def submit(self):
