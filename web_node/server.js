@@ -2,6 +2,7 @@ const path=require('node:path'); const fs=require('node:fs');
 const express=require('express'); const helmet=require('helmet'); const cookieParser=require('cookie-parser'); const Database=require('better-sqlite3');
 const {createSecurity,verifyPassword}=require('./src/security');
 const {debtorsPdf,timesheetPdf,reminderPdf,certificatePdf}=require('./src/documents');
+const {registerLegacyImport}=require('./src/legacy-import');
 
 const app=express(); const port=Number(process.env.PORT||3000);
 const inherited=path.resolve(__dirname,'../storage/ast-manager.sqlite3');
@@ -11,6 +12,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT NOT N
 const security=createSecurity(db);
 app.set('trust proxy',1); app.use(helmet({contentSecurityPolicy:{directives:{defaultSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'","data:"]}}}));
 app.use(express.urlencoded({extended:false,limit:'1mb'})); app.use(cookieParser()); app.use('/assets',express.static(path.join(__dirname,'public'),{maxAge:'1h'}));
+registerLegacyImport(app,db,dbPath);
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const q=(sql,args=[])=>db.prepare(sql).all(...args); const one=(sql,args=[])=>db.prepare(sql).get(...args);
