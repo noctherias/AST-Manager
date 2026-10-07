@@ -20,7 +20,8 @@ from .documents import salary_pdf, csv_export, report_pdf, time_report
 from .backups import run_automatic_backups
 from .excel_import import import_debtors
 from .export_paths import (EXPORT_DESTINATIONS, choose_export_file, default_directory,
-                           employee_year_folders, setting_key)
+                           configured_directory, employee_year_folders, setting_key)
+from .excel_trust import ensure_excel_trusted_folder, unblock_excel_file
 
 
 def save_path(parent, title, name, extension="pdf", export_key="debtors_pdf", subfolders=()):
@@ -642,6 +643,17 @@ class SettingsPage(Page):
             "automatisch geöffnet; Dateiname und Ziel können danach weiterhin geändert werden.", "muted")
         export_hint.setWordWrap(True)
         exports_layout.addWidget(export_hint)
+        excel_security = QFrame()
+        excel_security.setObjectName("card")
+        security_layout = QHBoxLayout(excel_security)
+        security_layout.setContentsMargins(16, 12, 16, 12)
+        security_text = label(
+            "Excel-Sicherheit: Der Stundennachweis-Ordner wird auf diesem PC als vertrauenswürdig "
+            "eingetragen. Danach funktionieren die Schaltflächen ohne geschützte Ansicht.", "muted")
+        security_text.setWordWrap(True)
+        security_layout.addWidget(security_text, 1)
+        security_layout.addWidget(button("Excel-Zugriff einrichten", self.setup_excel_security, True))
+        exports_layout.addWidget(excel_security)
         self.export_directory_fields = {}
         for key, title, description in EXPORT_DESTINATIONS:
             card = QFrame()
@@ -696,6 +708,25 @@ class SettingsPage(Page):
     def clear_export_directory(self, export_key):
         self.db.save_settings({setting_key(export_key): ""})
         self.export_directory_fields[export_key].clear()
+
+    @guarded
+    def setup_excel_security(self):
+        folder = configured_directory(self.db, "timesheets_excel")
+        folder.mkdir(parents=True, exist_ok=True)
+        error = ensure_excel_trusted_folder(folder)
+        if error:
+            raise ValueError("Excel konnte den Ordner nicht freigeben: " + error)
+        unblocked = 0
+        for workbook in folder.rglob("*.xlsm"):
+            unblock_excel_file(workbook)
+            unblocked += 1
+        QMessageBox.information(
+            self, "Excel-Zugriff eingerichtet",
+            f"Der Stundennachweis-Ordner ist auf diesem PC freigegeben. "
+            f"{unblocked} vorhandene Excel-Datei(en) wurden ebenfalls entsperrt.\n\n"
+            "Schliesse jetzt einmal alle Excel-Fenster vollständig. Danach die Datei direkt aus dem "
+            "eingestellten Stundennachweis-Ordner öffnen. Diese Einrichtung ist pro PC einmal erforderlich."
+        )
 
     def new_person(self):
         if EmployeeDialog(self, self.db).exec(): self.refresh()

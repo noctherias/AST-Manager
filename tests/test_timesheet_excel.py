@@ -99,6 +99,8 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertIn('UPPER(J4)="HO"', cell(january, "L4").find("x:f", NS).text)
                 self.assertAlmostEqual(float(cell(january, "F37").find("x:v", NS).text),
                                        monthly_target_minutes(2026, 1) / 60)
+                self.assertEqual(cell(january, "F40").find("x:f", NS).text,
+                                 "ROUND(F36+SUM(M4:M34),14)")
                 september = ET.fromstring(exported.read("xl/worksheets/sheet14.xml"))
                 self.assertAlmostEqual(float(cell(september, "D33").find("x:v", NS).text), 8.75)
                 for reference in ("D33", "E33", "F33", "G33", "H33", "K33", "L33", "N33"):
@@ -108,6 +110,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertFalse(cell(september, "N4").find("x:f", NS).text.endswith("/24"))
                 self.assertTrue(cell(september, "L4").find("x:f", NS).text.startswith("IF(AND(C4"))
                 self.assertTrue(cell(september, "M4").find("x:f", NS).text.startswith("IF(AND(D4="))
+                self.assertTrue(cell(september, "M34").find("x:f", NS).text.startswith("IF(AND(D34="))
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
                 self.assertEqual(number_format_id(styles, annual, "AA33"), "176")
                 self.assertEqual(number_format_id(styles, annual, "Z37"), "176")
@@ -139,12 +142,19 @@ class TimesheetExcelTests(unittest.TestCase):
                 expected_codes = ["FG", "FT", "KO", "KG", "KT", "UG", "UT", "FA",
                                   "HO", "KAG", "KAT", "BM", "BD"]
                 self.assertEqual([cell(settings, f"B{row}").find("x:is/x:t", NS).text
-                                  for row in range(19, 32)], expected_codes)
-                self.assertEqual(cell(settings, "A30").find("x:is/x:t", NS).text,
+                                  for row in range(20, 33)], expected_codes)
+                self.assertEqual(cell(settings, "A31").find("x:is/x:t", NS).text,
                                  "Andere begründete Minderzeit")
+                october_xml = exported.read("xl/worksheets/sheet15.xml").decode("utf-8")
+                self.assertIn('OR($J4=&quot;FG&quot;,$J4=&quot;FT&quot;,$J4=&quot;KO&quot;)', october_xml)
+                self.assertIn('OR($J4=&quot;KG&quot;,$J4=&quot;KT&quot;)', october_xml)
+                self.assertNotIn('$J4=Voreinstellungen!$B$33', october_xml)
                 for reference in ("D12", "E12", "F12", "G12"):
                     self.assertEqual(float(cell(settings, reference).find("x:v", NS).text), 8.75)
                 self.assertEqual(float(cell(settings, "H12").find("x:v", NS).text), 8.25)
+                locations = ET.fromstring(exported.read("xl/worksheets/sheet5.xml"))
+                self.assertEqual(cell(locations, "A2").find("x:is/x:t", NS).text, "Max Muster")
+                self.assertEqual(Path(cell(locations, "B2").find("x:is/x:t", NS).text), target.parent)
                 package = b"\n".join(exported.read(name) for name in exported.namelist()
                                      if name.endswith((".xml", ".rels")))
                 for private_value in (b"Devinsan", b"Tudisco", b"Hubeli", b"Lehmann"):

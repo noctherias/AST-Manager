@@ -235,19 +235,54 @@ def _use_direct_hours_formula(xml: str) -> str:
     return _replace_formula(xml, "L4", updated)
 
 
-def _ignore_unrecorded_day_formula(xml: str, reference: str) -> str:
-    """Keep days without an app record out of the running time balance."""
-    match = _cell_pattern(reference).search(xml)
-    if not match:
-        raise ValueError(f"Excel-Vorlage: Zelle {reference} wurde nicht gefunden.")
-    cell_xml = match.group(0)
-    formula = re.search(r'<f(?:\s[^>]*)?>(.*?)</f>', cell_xml, re.DOTALL)
-    if not formula:
-        raise ValueError(f"Excel-Vorlage: Saldoformel in {reference} wurde nicht gefunden.")
-    original = formula.group(1)
-    corrected = f'IF(AND(D4="",E4="",F4="",G4="",J4=""),0,{original})'
-    cell_xml = cell_xml[:formula.start(1)] + corrected + cell_xml[formula.end(1):]
-    return xml[:match.start()] + cell_xml + xml[match.end():]
+def _rewrite_reason_conditional_formatting(xml: str) -> str:
+    """Give recorded reasons restrained colours without matching blank codes.
+
+    The source workbook links eight extended conditional-formatting rules to
+    cells in ``Voreinstellungen``.  Once the code list is shortened, some of
+    those cells are blank; Excel then considers every blank reason a match and
+    paints nearly the complete calendar green.  Literal, non-empty conditions
+    keep the original neutral layout and colour only actual absences.
+    """
+    rules = {
+        1: ('OR($J4="FG",$J4="FT",$J4="KO")', "FFDCEEFF"),
+        2: ('OR($J4="KG",$J4="KT")', "FFFFF2CC"),
+        3: ('OR($J4="UG",$J4="UT")', "FFF7D6D6"),
+        4: ('OR($J4="KAG",$J4="KAT",$J4="BM")', "FFFCE4D6"),
+        5: ('$J4="HO"', "FFE4DFEC"),
+        6: ('$J4="BD"', "FFDDEBF7"),
+        7: ('$J4="FA"', "FFFFE699"),
+        8: ('FALSE', "FFFFFFFF"),
+    }
+    section_pattern = re.compile(
+        r'(<x14:conditionalFormattings>)(.*?)(</x14:conditionalFormattings>)', re.DOTALL
+    )
+    section = section_pattern.search(xml)
+    if not section:
+        raise ValueError("Excel-Vorlage: Farbregeln für Abwesenheiten fehlen.")
+    rule_pattern = re.compile(r'<x14:cfRule\b[^>]*>.*?</x14:cfRule>', re.DOTALL)
+    matches = list(rule_pattern.finditer(section.group(2)))
+    if len(matches) < len(rules):
+        raise ValueError("Excel-Vorlage: Farbregeln für Abwesenheiten sind unvollständig.")
+    body = section.group(2)
+    for match, (formula, colour) in reversed(list(zip(matches, rules.values()))):
+        rule = match.group(0)
+        rule = re.sub(r'<xm:f>.*?</xm:f>', f'<xm:f>{escape(formula)}</xm:f>',
+                      rule, count=1, flags=re.DOTALL)
+        rule = re.sub(r'<patternFill>.*?</patternFill>',
+                      f'<patternFill><bgColor rgb="{colour}"/></patternFill>',
+                      rule, count=1, flags=re.DOTALL)
+        body = body[:match.start()] + rule + body[match.end():]
+    return xml[:section.start()] + section.group(1) + body + section.group(3) + xml[section.end():]
+
+
+def _ignore_unrecorded_day_formulas(xml: str) -> str:
+    """Keep every unrecorded calendar day out of the running balance."""
+    for row in range(4, 35):
+        formula = (f'IF(AND(D{row}="",E{row}="",F{row}="",G{row}="",J{row}=""),0,'
+                   f'IF(A{row}="",0,ROUND(K{row}-L{row},14)))')
+        xml = _replace_formula_cell(xml, f"M{row}", formula, 0)
+    return xml
 
 
 class _StyleNormalizer:
@@ -550,7 +585,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     year = int(year)
     if year < 1900 or year > 2200:
         raise ValueError("Bitte ein gültiges Exportjahr auswählen.")
-    destination = Path(destination)
+    destination = Path(destination).absolute()
     if destination.suffix.lower() != ".xlsm":
         destination = destination.with_suffix(".xlsm")
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -564,6 +599,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     original_vba = _vba_hash(members)
     required = {"xl/vbaProject.bin", "xl/styles.xml", "xl/worksheets/sheet1.xml",
                 "xl/worksheets/sheet2.xml", "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet5.xml",
                 "xl/worksheets/sheet18.xml", *MONTH_SHEETS.values()}
     if not required <= set(members):
         raise ValueError("Die mitgelieferte Zeiterfassungsvorlage ist unvollständig.")
@@ -593,23 +629,41 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     staff_ahv = _replace_cell(staff_ahv, "C2", employee.get("code", ""), "string")
     members["xl/worksheets/sheet3.xml"] = staff_ahv.encode("utf-8")
 
+    # The original button macros look up the employee's output folder in the
+    # hidden ``Speicherorte`` sheet.  Populate that mapping for the exported
+    # employee; otherwise both buttons report that the name was not found.
+    locations_name = "xl/worksheets/sheet5.xml"
+    locations = members[locations_name].decode("utf-8")
+    for row in range(2, 101):
+        for column in "AB":
+            reference = f"{column}{row}"
+            if _cell_pattern(reference).search(locations):
+                locations = _replace_cell(locations, reference, None)
+    macro_root = destination.parent.parent if destination.parent.name == str(year) else destination.parent
+    locations = _replace_cell(locations, "A2", full_name, "string")
+    locations = _replace_cell(locations, "B2", str(macro_root), "string")
+    members[locations_name] = locations.encode("utf-8")
+
     settings = members["xl/worksheets/sheet1.xml"].decode("utf-8")
     settings = _replace_cell(settings, "C2", year)
     settings = _replace_cell(settings, "C3", full_name, "string")
+    # The workbook's named ranges ``Code`` and ``CodeList`` start at row 20.
+    # Keep every selectable code inside that range so VLOOKUP never returns
+    # #N/A for a valid reason.
     code_rows = (
-        (19, "Ferien / Freizeit · ganzer Tag", "FG", 0),
-        (20, "Ferien / Freizeit · teilweise", "FT", "REST"),
-        (21, "Freizeit / Kompensation", "KO", 1),
-        (22, "Krankheit · ganzer Tag", "KG", 0),
-        (23, "Krankheit · teilweise", "KT", "REST"),
-        (24, "Unfall · ganzer Tag", "UG", 0),
-        (25, "Unfall · teilweise", "UT", "REST"),
-        (26, "Feiertag / arbeitsfrei", "FA", "Register Feiertage"),
-        (27, "Homeoffice", "HO", 1),
-        (28, "Kurzarbeit · ganzer Tag", "KAG", 0),
-        (29, "Kurzarbeit · teilweise", "KAT", "REST"),
-        (30, "Andere begründete Minderzeit", "BM", "REST"),
-        (31, "Bereitschaftsdienst", "BD", "XTRA"),
+        (20, "Ferien / Freizeit · ganzer Tag", "FG", 0),
+        (21, "Ferien / Freizeit · teilweise", "FT", "REST"),
+        (22, "Freizeit / Kompensation", "KO", 1),
+        (23, "Krankheit · ganzer Tag", "KG", 0),
+        (24, "Krankheit · teilweise", "KT", "REST"),
+        (25, "Unfall · ganzer Tag", "UG", 0),
+        (26, "Unfall · teilweise", "UT", "REST"),
+        (27, "Feiertag / arbeitsfrei", "FA", "Register Feiertage"),
+        (28, "Homeoffice", "HO", 1),
+        (29, "Kurzarbeit · ganzer Tag", "KAG", 0),
+        (30, "Kurzarbeit · teilweise", "KAT", "REST"),
+        (31, "Andere begründete Minderzeit", "BM", "REST"),
+        (32, "Bereitschaftsdienst", "BD", "XTRA"),
     )
     for row in range(19, 34):
         for column in "ABC":
@@ -647,11 +701,11 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         xml = members[xml_name].decode("utf-8")
         xml = _simplify_time_columns(xml)
         xml = _use_direct_hours_formula(xml)
+        xml = _rewrite_reason_conditional_formatting(xml)
         xml = _replace_cell(xml, "J3", "Grund", "string")
         if company:
             xml = _replace_cell(xml, "C1", company, "string")
-        # L4, M4 and N4 are masters of their shared formulas down to row 34.
-        xml = _ignore_unrecorded_day_formula(xml, "M4")
+        xml = _ignore_unrecorded_day_formulas(xml)
         for day_number in range(1, 32):
             row = day_number + 3
             for column in INPUT_COLUMNS:
@@ -665,6 +719,10 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
         xml = _replace_formula_cell(xml, "F37", "SUM(L4:L34)",
                                     _decimal_hours(monthly_target_minutes(year, month)))
+        # Carry forward only the variance of days actually recorded in AST.
+        # The legacy formula subtracted the complete monthly target even when
+        # a month contained no entries, creating balances such as -1635 h.
+        xml = _replace_formula_cell(xml, "F40", "ROUND(F36+SUM(M4:M34),14)", 0)
         xml = _remove_legacy_monthly_summary(xml)
         xml = _set_row_heights(xml, {1: 24, 2: 20, 3: 34,
                                      **{row: 20 for row in range(4, 35)},
