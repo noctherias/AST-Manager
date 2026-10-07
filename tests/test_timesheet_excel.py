@@ -150,7 +150,9 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertIsNone(annual.find(".//x:row[@r='42']", NS).get("hidden"))
                 self.assertEqual(annual.find(".//x:row[@r='43']", NS).get("hidden"), "1")
                 self.assertIsNone(annual.find(".//x:row[@r='44']", NS).get("hidden"))
-                self.assertEqual(cell(annual, "A44").find("x:is/x:t", NS).text, "Ferien-Soll (h)")
+                self.assertEqual(cell(annual, "A44").find("x:is/x:t", NS).text,
+                                 "Ferienanspruch 01.01.–31.12.2026 (h)")
+                self.assertIsNone(cell(annual, "B44").find("x:v", NS))
                 self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), 173.0)
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
                 self.assertEqual(cell(settings, "C2").find("x:v", NS).text, "2026")
@@ -222,8 +224,7 @@ class TimesheetExcelTests(unittest.TestCase):
             }, 2026, [], "AST Elektro AG")
             with zipfile.ZipFile(target) as exported:
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
-                self.assertAlmostEqual(float(cell(annual, "B44").find("x:v", NS).text),
-                                       216.25 / 12)
+                self.assertIsNone(cell(annual, "B44").find("x:v", NS))
                 self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), 216.25)
 
 

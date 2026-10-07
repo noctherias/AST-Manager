@@ -627,7 +627,7 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
         40: "Unfall · U (h)",
         41: "Übrige Minderzeit · M (h)",
         42: "Abwesenheit (h)",
-        44: "Ferien-Soll (h)",
+        44: f"Ferienanspruch 01.01.–31.12.{year} (h)",
     }
     for row, title in labels.items():
         xml = _replace_cell(xml, f"A{row}", title, "string")
@@ -653,7 +653,9 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
         vacation_days = (f'SUMPRODUCT(({sheet_name}!J4:J34="F")*{sheet_name}!D4:D34/'
                          f'IF({sheet_name}!N4:N34=0,1,{sheet_name}!N4:N34))')
         xml = _replace_formula_cell(xml, f"{column}43", vacation_days, 0)
-        xml = _replace_cell(xml, f"{column}44", format(vacation_hours / 12, ".15g"))
+        # The entitlement belongs to the complete employment year. Splitting
+        # it evenly across months suggests a monthly claim that does not exist.
+        xml = _replace_cell(xml, f"{column}44", None)
     annual_values = {
         37: annual_totals["overtime"], 38: annual_totals["vacation"],
         39: annual_totals["sick"], 40: annual_totals["accident"],
@@ -669,7 +671,8 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
     # rejects the workbook. Only refresh its cached result.
     xml = _replace_cached_value(xml, "AL35", _decimal_hours(year_target))
     xml = _replace_formula_cell(xml, "AL43", "SUM(B43:AK43)", 0)
-    xml = _replace_formula_cell(xml, "AL44", "SUM(B44:AK44)", format(vacation_hours, ".15g"))
+    xml = _replace_formula_cell(xml, "AL44", format(vacation_hours, ".15g"),
+                                format(vacation_hours, ".15g"))
     xml = _hide_rows(xml, 43, 43)
     return _hide_rows(xml, 45, 50)
 
