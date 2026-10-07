@@ -57,7 +57,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 for sheet_name in [f"xl/worksheets/sheet{number}.xml" for number in range(6, 18)]:
                     removed_formulas = (source.read(sheet_name).count(b"<f")
                                         - exported.read(sheet_name).count(b"<f"))
-                    self.assertIn(removed_formulas, {21, 22})
+                    self.assertIn(removed_formulas, {20, 21, 22})
                 january = ET.fromstring(exported.read("xl/worksheets/sheet6.xml"))
                 self.assertAlmostEqual(float(cell(january, "D8").find("x:v", NS).text), 8.75)
                 self.assertEqual(cell(january, "D3").find("x:is/x:t", NS).text, "Arbeitszeit (h)")
@@ -78,7 +78,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(cell(january, "K39").find("x:v", NS).text,
                                  "Unfall · U (h)")
                 self.assertIn("F Ferien/Freizeit", cell(january, "K41").find("x:is/x:t", NS).text)
-                self.assertIn("T Feiertag", cell(january, "K42").find("x:is/x:t", NS).text)
+                self.assertIn("FT Feiertag", cell(january, "K42").find("x:is/x:t", NS).text)
                 expected_colours = {
                     36: "FFDDF3E4", 37: "FFDCEEFF", 38: "FFFFF2CC",
                     39: "FFF7D6D6", 40: "FFFCE4D6",
@@ -86,6 +86,14 @@ class TimesheetExcelTests(unittest.TestCase):
                 for row, expected_colour in expected_colours.items():
                     self.assertEqual(fill_rgb(styles, january, f"K{row}"), expected_colour)
                     self.assertEqual(fill_rgb(styles, january, f"P{row}"), expected_colour)
+                positive_balance = next(
+                    rule for rule in january.findall("x:conditionalFormatting", NS)
+                    if rule.get("sqref") == "P4:P34"
+                ).find("x:cfRule", NS)
+                self.assertEqual(positive_balance.get("operator"), "greaterThan")
+                self.assertEqual(positive_balance.find("x:formula", NS).text, "0")
+                dxf = styles.find("x:dxfs", NS)[int(positive_balance.get("dxfId"))]
+                self.assertEqual(dxf.find("x:font/x:color", NS).get("rgb"), "FF008A67")
                 hidden_ranges = [(int(item.get("min")), int(item.get("max")))
                                  for item in january.find("x:cols", NS) if item.get("hidden") == "1"]
                 self.assertTrue(all(any(first <= column <= last for first, last in hidden_ranges)
@@ -93,7 +101,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertIn('J4="K"', cell(january, "K4").find("x:f", NS).text)
                 self.assertIn('MAX(0,L4-', cell(january, "K4").find("x:f", NS).text)
                 self.assertIn('J5="K"', cell(january, "K5").find("x:f", NS).text)
-                self.assertIn('J4="T"', cell(january, "L4").find("x:f", NS).text)
+                self.assertIn('J4="FT"', cell(january, "L4").find("x:f", NS).text)
                 self.assertAlmostEqual(float(cell(january, "F37").find("x:v", NS).text),
                                        monthly_target_minutes(2026, 1) / 60)
                 self.assertEqual(cell(january, "F40").find("x:f", NS).text,
@@ -109,6 +117,11 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertTrue(cell(september, "M4").find("x:f", NS).text.startswith("IF(AND(D4="))
                 self.assertTrue(cell(september, "M34").find("x:f", NS).text.startswith("IF(AND(D34="))
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
+                self.assertEqual(fill_rgb(styles, annual, "B4"), "FFF4B6D7")
+                self.assertEqual(fill_rgb(styles, annual, "B6"), "FFE7EEF3")
+                self.assertEqual(fill_rgb(styles, annual, "B7"), "FFE7EEF3")
+                self.assertNotIn(fill_rgb(styles, annual, "B8"), {"FFF4B6D7", "FFE7EEF3"})
+                self.assertEqual(fill_rgb(styles, annual, "B9"), "FFDCEEFF")
                 self.assertEqual(number_format_id(styles, annual, "AA33"), "176")
                 self.assertEqual(number_format_id(styles, annual, "Z37"), "176")
                 self.assertEqual(cell(annual, "A37").find("x:is/x:t", NS).text,
@@ -136,7 +149,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
                 self.assertEqual(cell(settings, "C2").find("x:v", NS).text, "2026")
                 self.assertEqual(cell(settings, "C3").find("x:is/x:t", NS).text, "Max Muster")
-                expected_codes = ["F", "K", "U", "M", "T", "H", "B"]
+                expected_codes = ["F", "K", "U", "M", "FT", "H", "B"]
                 self.assertEqual([cell(settings, f"B{row}").find("x:is/x:t", NS).text
                                   for row in range(20, 27)], expected_codes)
                 self.assertEqual(cell(settings, "A23").find("x:is/x:t", NS).text,

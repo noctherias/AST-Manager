@@ -201,5 +201,12 @@ class DatabaseTests(unittest.TestCase):
         self.db = Database(self.path)
         self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "K")
 
+        with self.db.conn:
+            self.db.conn.execute("UPDATE time_records SET code='T' WHERE id=?", (key,))
+            self.db.conn.execute("PRAGMA user_version=13")
+        self.db.close()
+        self.db = Database(self.path)
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "FT")
+
 
 if __name__ == "__main__": unittest.main()

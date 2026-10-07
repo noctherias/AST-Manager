@@ -226,11 +226,11 @@ def _widen_annual_hour_columns(xml: str) -> str:
 def _use_direct_hours_formula(xml: str) -> str:
     """Use one hours input with an unambiguous meaning for every reason."""
     for row in range(4, 35):
-        target = (f'IF(A{row}="",0,IF(J{row}="T",0,'
+        target = (f'IF(A{row}="",0,IF(J{row}="FT",0,'
                   f'IF(AND(C{row}<>"",J{row}=""),'
                   f'IFERROR(VLOOKUP(B{row},Feiertage,3,FALSE)*N{row},N{row}),N{row})))')
         actual = (f'IF(A{row}="",0,IF(OR(J{row}="F",J{row}="K",J{row}="U",J{row}="M"),'
-                  f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(J{row}="T",0,IF(D{row}="",0,D{row}))))')
+                  f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(J{row}="FT",0,IF(D{row}="",0,D{row}))))')
         xml = _replace_formula_cell(xml, f"L{row}", target, 0)
         xml = _replace_formula_cell(xml, f"K{row}", actual, 0)
     return xml
@@ -252,7 +252,7 @@ def _rewrite_reason_conditional_formatting(xml: str) -> str:
         4: ('$J4="M"', "FFFCE4D6"),
         5: ('$J4="H"', "FFE4DFEC"),
         6: ('$J4="B"', "FFDDEBF7"),
-        7: ('$J4="T"', "FFFFE699"),
+        7: ('OR($J4="FT",$C4<>"")', "FFF4B6D7"),
         8: ('FALSE', "FFFFFFFF"),
     }
     section_pattern = re.compile(
@@ -275,6 +275,72 @@ def _rewrite_reason_conditional_formatting(xml: str) -> str:
                       rule, count=1, flags=re.DOTALL)
         body = body[:match.start()] + rule + body[match.end():]
     return xml[:section.start()] + section.group(1) + body + section.group(3) + xml[section.end():]
+
+
+def _add_positive_balance_formatting(xml: str, dxf_id: int) -> str:
+    """Show positive running overtime in green in the final balance column."""
+    block = (f'<conditionalFormatting sqref="P4:P34"><cfRule type="cellIs" '
+             f'dxfId="{dxf_id}" priority="72" operator="greaterThan">'
+             f'<formula>0</formula></cfRule></conditionalFormatting>')
+    matches = list(re.finditer(r'<conditionalFormatting\b.*?</conditionalFormatting>',
+                               xml, re.DOTALL))
+    if not matches:
+        raise ValueError("Excel-Vorlage: Bedingte Formatierungen wurden nicht gefunden.")
+    position = matches[-1].end()
+    return xml[:position] + block + xml[position:]
+
+
+ANNUAL_MONTH_COLUMNS = (
+    ("B", "C", "D"), ("E", "F", "G"), ("H", "I", "J"),
+    ("K", "L", "M"), ("N", "O", "P"), ("Q", "R", "S"),
+    ("T", "U", "V"), ("W", "X", "Y"), ("Z", "AA", "AB"),
+    ("AC", "AD", "AE"), ("AF", "AG", "AH"), ("AI", "AJ", "AK"),
+)
+
+
+def _remove_annual_calendar_formatting(xml: str) -> str:
+    """Remove the template's overlapping weekend and reason colour rules."""
+    calendar_ranges = {f"{first}4:{last}34" for first, _, last in ANNUAL_MONTH_COLUMNS}
+
+    def keep_or_remove(match):
+        return "" if match.group("range") in calendar_ranges else match.group(0)
+
+    xml = re.sub(
+        r'<conditionalFormatting\s+sqref="(?P<range>[^"]+)">.*?</conditionalFormatting>',
+        keep_or_remove, xml, flags=re.DOTALL,
+    )
+    xml = re.sub(r'<x14:conditionalFormattings>.*?</x14:conditionalFormattings>',
+                 "", xml, flags=re.DOTALL)
+    return xml
+
+
+def _annual_calendar_cells(year: int, records_by_day: dict[date, dict],
+                           holidays: set[date], fills: dict[str, int]
+                           ) -> list[tuple[str, str | None, int]]:
+    """Return direct calendar styles for weekends, holidays and absences."""
+    result = []
+    reason_fills = {
+        "F": fills["vacation"], "K": fills["sick"],
+        "U": fills["accident"], "M": fills["other"],
+    }
+    for month, columns in enumerate(ANNUAL_MONTH_COLUMNS, 1):
+        for day_number in range(1, 32):
+            if not _valid_day(year, month, day_number):
+                continue
+            current_day = date(year, month, day_number)
+            record = records_by_day.get(current_day)
+            code = normalize_time_code(record.get("code")) if record else ""
+            if current_day in holidays or code == "FT":
+                fill_id = fills["holiday"]
+            elif code in reason_fills:
+                fill_id = reason_fills[code]
+            elif current_day.weekday() >= 5:
+                fill_id = fills["weekend"]
+            else:
+                continue
+            row = day_number + 3
+            result.extend((f"{column}{row}", None, fill_id) for column in columns)
+    return result
 
 
 def _ignore_unrecorded_day_formulas(xml: str) -> str:
@@ -304,7 +370,27 @@ class _StyleNormalizer:
         if not self._match:
             raise ValueError("Excel-Vorlage: Zellformatvorlagen wurden nicht gefunden.")
         self._root = ET.fromstring(self._match.group(0))
+        self._dxfs_match = re.search(r'<dxfs\b[^>]*>.*?</dxfs>', styles_xml, re.DOTALL)
+        if not self._dxfs_match:
+            raise ValueError("Excel-Vorlage: Bedingte Zellformate wurden nicht gefunden.")
+        self._dxfs_root = ET.fromstring(self._dxfs_match.group(0))
         self._clones: dict[tuple[int, str, int | None], int] = {}
+
+    def differential_font_color(self, rgb: str) -> int:
+        """Return a differential format containing the requested font colour."""
+        rgb = rgb.upper()
+        for index, dxf in enumerate(self._dxfs_root):
+            color = dxf.find("{*}font/{*}color")
+            if color is not None and color.get("rgb", "").upper() == rgb:
+                return index
+        namespace = (self._dxfs_root.tag[1:].partition("}")[0]
+                     if self._dxfs_root.tag.startswith("{") else "")
+        tag = lambda name: f"{{{namespace}}}{name}" if namespace else name
+        dxf = ET.Element(tag("dxf"))
+        font = ET.SubElement(dxf, tag("font"))
+        ET.SubElement(font, tag("color"), {"rgb": rgb})
+        self._dxfs_root.append(dxf)
+        return len(self._dxfs_root) - 1
 
     def fill_id(self, rgb: str) -> int:
         rgb = rgb.upper()
@@ -361,9 +447,11 @@ class _StyleNormalizer:
     def finish(self) -> str:
         self._root.set("count", str(len(self._root)))
         self._fills_root.set("count", str(len(self._fills_root)))
+        self._dxfs_root.set("count", str(len(self._dxfs_root)))
         replacements = (
             (self._match, ET.tostring(self._root, encoding="unicode", short_empty_elements=True)),
             (self._fills_match, ET.tostring(self._fills_root, encoding="unicode", short_empty_elements=True)),
+            (self._dxfs_match, ET.tostring(self._dxfs_root, encoding="unicode", short_empty_elements=True)),
         )
         xml = self.xml
         for match, replacement in sorted(replacements, key=lambda item: item[0].start(), reverse=True):
@@ -513,7 +601,7 @@ def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
         xml = _replace_formula_cell(xml, f"K{row}", f'"{title}"', title, "string")
         xml = _replace_formula_cell(xml, f"P{row}", formula, _decimal_hours(summary[key]))
     xml = _replace_cell(xml, "K41", "Kürzel: F Ferien/Freizeit · K Krankheit · U Unfall · M übrige Minderzeit", "string")
-    xml = _replace_cell(xml, "K42", "T Feiertag · H Homeoffice · B Bereitschaft", "string")
+    xml = _replace_cell(xml, "K42", "FT Feiertag · H Homeoffice · B Bereitschaft", "string")
     return xml
 
 
@@ -669,7 +757,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         (21, "Krankheit", "K", "REST"),
         (22, "Unfall", "U", "REST"),
         (23, "Andere begründete Minderzeit", "M", "REST"),
-        (24, "Feiertag / arbeitsfrei", "T", 0),
+        (24, "Feiertag / arbeitsfrei", "FT", 0),
         (25, "Homeoffice", "H", 1),
         (26, "Bereitschaftsdienst", "B", "XTRA"),
     )
@@ -696,8 +784,11 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     fill_sick = styles.fill_id("FFFFF2CC")
     fill_accident = styles.fill_id("FFF7D6D6")
     fill_other = styles.fill_id("FFFCE4D6")
+    fill_holiday = styles.fill_id("FFF4B6D7")
+    fill_weekend = styles.fill_id("FFE7EEF3")
     fill_total = styles.fill_id("FFE9EEF2")
     fill_header = styles.fill_id("FFDCE6EB")
+    positive_balance_dxf = styles.differential_font_color("FF008A67")
     category_fills = (
         (36, fill_overtime),
         (37, fill_vacation),
@@ -712,6 +803,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         xml = _simplify_time_columns(xml)
         xml = _use_direct_hours_formula(xml)
         xml = _rewrite_reason_conditional_formatting(xml)
+        xml = _add_positive_balance_formatting(xml, positive_balance_dxf)
         xml = _replace_cell(xml, "J3", "Grund", "string")
         if company:
             xml = _replace_cell(xml, "C1", company, "string")
@@ -746,7 +838,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             current_day = date(year, month, day_number)
             record = by_day.get(current_day)
             target = 0 if current_day in holidays else scheduled_work_minutes(current_day)
-            if record and normalize_time_code(record.get("code")) == "T":
+            if record and normalize_time_code(record.get("code")) == "FT":
                 target = 0
             actual = effective_work_minutes(record) if record else 0
             difference = actual - target if record else 0
@@ -791,6 +883,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     annual_name = "xl/worksheets/sheet18.xml"
     annual = members[annual_name].decode("utf-8")
     annual = _simplify_annual_summary(annual, year, annual_vacation_hours, records)
+    annual = _remove_annual_calendar_formatting(annual)
     annual = _widen_annual_hour_columns(annual)
     annual = _set_row_heights(annual, {1: 24, 2: 20, 3: 24,
                                        **{row: 20 for row in range(4, 35)},
@@ -799,6 +892,14 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     annual = styles.apply_colored(
         annual,
         [(reference, None, fill_header) for reference in _references_in_rows(annual, {3})],
+    )
+    annual = styles.apply_colored(
+        annual,
+        _annual_calendar_cells(year, by_day, holidays, {
+            "vacation": fill_vacation, "sick": fill_sick,
+            "accident": fill_accident, "other": fill_other,
+            "holiday": fill_holiday, "weekend": fill_weekend,
+        }),
     )
     annual_summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI", "AL")
     annual_category_fills = tuple((row + 1, fill_id) for row, fill_id in category_fills)

@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submi
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 
 class Database:
@@ -115,8 +115,8 @@ class Database:
             for record in self.rows("SELECT * FROM time_records"):
                 self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                   (worked_minutes({**record, "worked_minutes": None}), record["id"]))
-        if version < 13:
-            self._migrate_time_codes(version < 12)
+        if version < 14:
+            self._migrate_time_codes(version)
         invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
         if "reminder_level" not in invoice_columns:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
@@ -150,16 +150,26 @@ class Database:
         self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         self.conn.commit()
 
-    def _migrate_time_codes(self, original_codes=False):
+    def _migrate_time_codes(self, version):
         """Replace the old cryptic Excel codes without losing time records."""
         original = {
-            "F": "T", "G": "F", "K": "K", "KR": "K", "A": "U", "AR": "U",
+            "F": "FT", "G": "F", "K": "K", "KR": "K", "A": "U", "AR": "U",
             "KU": "M", "KA": "M", "U": "F", "UH": "F", "H": "H", "B": "B",
             "E1": "M", "E2": "M", "E3": "M", "E4": "M", "E5": "M",
         }
+        extended = {
+            "FG": "F", "FT": "F", "KO": "F", "KG": "K", "KT": "K",
+            "UG": "U", "UT": "U", "KAG": "M", "KAT": "M", "BM": "M",
+            "FA": "FT", "HO": "H", "BD": "B",
+        }
         for record in self.rows("SELECT id,code FROM time_records"):
             raw = str(record["code"] or "").strip().upper()
-            code = original.get(raw, normalize_time_code(raw)) if original_codes else normalize_time_code(raw)
+            if version < 12:
+                code = original.get(raw, normalize_time_code(raw))
+            elif version < 13:
+                code = extended.get(raw, normalize_time_code(raw))
+            else:
+                code = "FT" if raw == "T" else normalize_time_code(raw)
             if code != record["code"]:
                 self.conn.execute("UPDATE time_records SET code=? WHERE id=?", (code, record["id"]))
 
@@ -385,7 +395,7 @@ class Database:
         absence_reasons = {"F", "K", "U", "M"}
         if d["code"] in absence_reasons and d["worked_minutes"] > scheduled:
             raise ValueError("Die Abwesenheitszeit darf die Sollzeit dieses Tages nicht überschreiten.")
-        if d["worked_minutes"] < scheduled and d["code"] != "T" and d["code"] not in absence_reasons:
+        if d["worked_minutes"] < scheduled and d["code"] != "FT" and d["code"] not in absence_reasons:
             raise ValueError("Bitte einen Grund für die geringere IST-Zeit auswählen.")
         if d["code"] == "M" and not d["note"]:
             raise ValueError("Bitte die andere Minderzeit unter Bemerkung kurz begründen.")
@@ -579,7 +589,7 @@ class Database:
                 for record in self.rows("SELECT * FROM time_records"):
                     self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                       (worked_minutes({**record, "worked_minutes": None}), record["id"]))
-            if saved_version < 12:
-                self._migrate_time_codes()
+            if saved_version < SCHEMA_VERSION:
+                self._migrate_time_codes(saved_version)
             self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         return safety
