@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b3b47">
+  <meta name="description" content="AST Manager – zentrale Verwaltung für AST Elektro Tüscher AG">
+  <title>AST Manager</title>
+  <style>
+    :root {
+      --navy:#092f39; --navy-2:#0d414e; --ink:#0c2e3d; --muted:#617785;
+      --green:#07856f; --green-2:#0b9c82; --mint:#e5f5f0; --line:#dbe5e9;
+      --paper:#fff; --canvas:#f3f7f8; --warning:#f1a43b; --danger:#d95b59;
+      --shadow:0 16px 45px rgba(17,49,61,.12); --radius:18px;
+    }
+    *{box-sizing:border-box} html{font-family:Inter,"Segoe UI",Arial,sans-serif;color:var(--ink);background:var(--canvas)}
+    body{margin:0;min-height:100vh} button,input{font:inherit} button{cursor:pointer}
+    .preview-bar{height:34px;background:#fff4d9;color:#6e5018;display:flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:650;border-bottom:1px solid #eedaa8;position:relative;z-index:10}
+    .preview-dot{width:8px;height:8px;border-radius:50%;background:var(--warning)}
+    .shell{min-height:calc(100vh - 34px);display:grid;grid-template-columns:252px minmax(0,1fr)}
+    aside{background:linear-gradient(180deg,var(--navy),#0b3945);color:#fff;padding:28px 18px 22px;display:flex;flex-direction:column;position:sticky;top:0;height:calc(100vh - 34px)}
+    .brand{padding:5px 10px 28px}.brand strong{display:block;font-size:38px;line-height:1;letter-spacing:-1px}.brand span{display:block;margin-top:10px;color:#79ddcc;font-size:12px;letter-spacing:.13em}
+    .nav-label{font-size:11px;color:#83b4bd;letter-spacing:.13em;padding:0 12px;margin:12px 0 8px}
+    nav{display:grid;gap:5px}.nav-button{appearance:none;border:0;background:transparent;color:#d8e8eb;border-radius:12px;display:flex;align-items:center;gap:12px;text-align:left;padding:12px 13px;transition:.18s ease}
+    .nav-button:hover{background:rgba(255,255,255,.08);color:#fff}.nav-button.active{background:#e4f4f0;color:#073c46;font-weight:700;box-shadow:inset 4px 0 #33cbb1}
+    .icon{width:23px;height:23px;display:grid;place-items:center;font-size:17px}.aside-foot{margin-top:auto;padding:18px 10px 3px;color:#a9cad0;font-size:12px;line-height:1.55}.aside-foot strong{color:#7ce0ce;display:block;margin-bottom:3px}
+    main{padding:38px clamp(25px,4vw,62px) 46px;max-width:1500px;width:100%;margin:0 auto;position:relative;overflow:hidden}
+    main:before{content:"AST";position:absolute;right:-18px;top:225px;font-weight:800;font-size:280px;color:rgba(9,47,57,.025);pointer-events:none}
+    header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:28px}.eyebrow{color:var(--green);font-weight:750;font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}h1{font-size:clamp(29px,3vw,42px);letter-spacing:-.035em;margin:0 0 8px}.lead{color:var(--muted);margin:0;line-height:1.5}.profile{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:8px 12px 8px 8px;box-shadow:0 5px 20px rgba(17,49,61,.06)}.avatar{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--mint);color:var(--green);font-weight:800}.profile small{display:block;color:var(--muted);margin-top:2px}
+    .hero{background:linear-gradient(120deg,#0b755f,#0c9077);border-radius:22px;padding:27px 30px;color:#fff;display:flex;justify-content:space-between;gap:24px;align-items:center;box-shadow:0 18px 42px rgba(7,133,111,.22);margin-bottom:25px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:240px;height:240px;border:45px solid rgba(255,255,255,.07);border-radius:50%;right:-75px;top:-95px}.hero h2{margin:0 0 7px;font-size:24px}.hero p{margin:0;color:#d3f5ed;line-height:1.5}.hero button,.primary{border:0;border-radius:11px;background:#fff;color:var(--green);font-weight:750;padding:12px 17px;white-space:nowrap;position:relative;z-index:1}.primary{background:var(--green);color:#fff}.primary:hover{background:var(--green-2)}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:27px}.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:var(--radius);padding:21px;box-shadow:0 8px 24px rgba(17,49,61,.055)}.stat-label{font-size:13px;color:var(--muted);margin-bottom:12px}.stat-value{font-size:28px;font-weight:750;letter-spacing:-.025em}.stat-foot{font-size:12px;color:var(--muted);margin-top:7px}.stat-card.accent{background:var(--mint);border-color:#b8dfd5}.stat-card.accent .stat-value{color:#056f5d}
+    .section-title{display:flex;justify-content:space-between;align-items:center;margin:2px 0 14px}.section-title h2{font-size:20px;margin:0}.text-button{border:0;background:transparent;color:var(--green);font-weight:700;padding:7px}
+    .module-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}.module{min-height:160px;display:flex;flex-direction:column;transition:transform .18s ease,box-shadow .18s ease}.module:hover{transform:translateY(-3px);box-shadow:var(--shadow)}.module-icon{width:42px;height:42px;border-radius:13px;background:#eef4f6;display:grid;place-items:center;font-size:21px;margin-bottom:20px}.module h3{font-size:16px;margin:0 0 7px}.module p{font-size:13px;line-height:1.45;color:var(--muted);margin:0}.module a{margin-top:auto;padding-top:15px;color:var(--green);font-size:13px;font-weight:750;text-decoration:none}
+    .activity{margin-top:25px}.empty{display:flex;align-items:center;gap:14px}.empty-icon{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#eef4f6;color:#6c838e}.empty strong{display:block;margin-bottom:4px}.empty span{color:var(--muted);font-size:13px}
+    .login{position:fixed;inset:0;background:radial-gradient(circle at 72% 22%,#e6f7f2 0,transparent 35%),#f4f8f9;z-index:50;display:grid;place-items:center;padding:24px;transition:.3s ease}.login.hidden{opacity:0;visibility:hidden;transform:scale(1.01)}.login-card{width:min(440px,100%);background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 25px 80px rgba(14,49,61,.17);padding:34px}.login-logo{width:62px;height:62px;background:var(--navy);color:#fff;border-radius:18px;display:grid;place-items:center;font-size:25px;font-weight:850;margin-bottom:25px}.login h1{font-size:30px}.login .lead{margin-bottom:25px}.notice{padding:13px 14px;background:#fff7df;border:1px solid #f0ddab;color:#765718;border-radius:12px;font-size:13px;line-height:1.45;margin:18px 0}.login button{width:100%;padding:13px;border-radius:11px;border:0;background:var(--green);color:#fff;font-weight:750}.login button:hover{background:var(--green-2)}.secure-note{text-align:center;color:var(--muted);font-size:12px;margin:15px 0 0}
+    .mobile-top{display:none}.toast{position:fixed;right:24px;bottom:24px;padding:14px 17px;border-radius:12px;background:#092f39;color:#fff;box-shadow:var(--shadow);font-size:13px;opacity:0;transform:translateY(15px);pointer-events:none;transition:.2s ease;z-index:40}.toast.show{opacity:1;transform:none}
+    @media(max-width:1100px){.stats,.module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:760px){.preview-bar{height:auto;min-height:38px;padding:8px 14px;text-align:center}.shell{display:block}.mobile-top{display:flex;align-items:center;justify-content:space-between;background:var(--navy);color:#fff;padding:14px 19px}.mobile-top strong{font-size:22px}.menu-toggle{border:0;background:rgba(255,255,255,.1);color:#fff;border-radius:9px;padding:8px 11px}aside{position:fixed;left:-275px;top:0;height:100vh;width:252px;z-index:30;transition:.22s ease;box-shadow:20px 0 50px rgba(0,0,0,.2)}aside.open{left:0}main{padding:25px 18px 36px}header{display:block}.profile{display:none}.hero{align-items:flex-start;flex-direction:column}.stats,.module-grid{grid-template-columns:1fr}.module{min-height:145px}}
+  </style>
+</head>
+<body>
+  <div class="login" id="login">
+    <div class="login-card">
+      <div class="login-logo">AST</div>
+      <div class="eyebrow">Web-Vorschau</div>
+      <h1>AST Manager</h1>
+      <p class="lead">Die zentrale Verwaltung für Administration, Personal und Bewerbungen.</p>
+      <div class="notice"><strong>Erste Fassung:</strong> Diese Vorschau enthält noch keine produktive Anmeldung und speichert keine Daten.</div>
+      <button id="openPreview">Vorschau öffnen&nbsp; →</button>
+      <p class="secure-note">Produktive Benutzerdatenbank und Rechteverwaltung folgen im nächsten Schritt.</p>
+    </div>
+  </div>
+
+  <div class="preview-bar"><span class="preview-dot"></span> Designvorschau – keine produktiven Daten</div>
+  <div class="mobile-top"><strong>AST</strong><button class="menu-toggle" id="menuToggle">☰ Menü</button></div>
+  <div class="shell">
+    <aside id="sidebar">
+      <div class="brand"><strong>AST</strong><span>VERWALTUNG</span></div>
+      <div class="nav-label">ARBEITSBEREICHE</div>
+      <nav>
+        <button class="nav-button active" data-page="Übersicht"><span class="icon">▣</span>Übersicht</button>
+        <button class="nav-button" data-page="Debitoren"><span class="icon">▤</span>Debitoren</button>
+        <button class="nav-button" data-page="Mahnungen"><span class="icon">△</span>Mahnungen</button>
+        <button class="nav-button" data-page="Stundennachweis"><span class="icon">◫</span>Stundennachweis</button>
+        <button class="nav-button" data-page="Zeugnisse"><span class="icon">◉</span>Zeugnisse</button>
+        <button class="nav-button" data-page="Bewerbungen"><span class="icon">▰</span>Bewerbungen</button>
+        <button class="nav-button" data-page="Lohnausweise"><span class="icon">◧</span>Lohnausweise</button>
+        <button class="nav-button" data-page="Einstellungen"><span class="icon">⚙</span>Einstellungen</button>
+      </nav>
+      <div class="aside-foot"><strong>WEB-VORSCHAU</strong>Version 0.1<br>manager.ast-elektro.ch</div>
+    </aside>
+
+    <main>
+      <header>
+        <div><div class="eyebrow">Übersicht</div><h1 id="pageTitle">Guten Tag</h1><p class="lead" id="pageLead">Was möchtest du heute erledigen?</p></div>
+        <div class="profile"><div class="avatar">A</div><div><strong>AST Verwaltung</strong><small>Vorschau-Modus</small></div></div>
+      </header>
+
+      <section class="hero">
+        <div><h2>Alles an einem Ort</h2><p>Rechnungen, Arbeitszeiten, Dokumente und Bewerbungen übersichtlich verwalten.</p></div>
+        <button data-demo>Neue Aufgabe&nbsp; +</button>
+      </section>
+
+      <section class="stats">
+        <div class="card stat-card accent"><div class="stat-label">Offene Rechnungen</div><div class="stat-value">CHF 0.00</div><div class="stat-foot">Noch keine Daten verbunden</div></div>
+        <div class="card stat-card"><div class="stat-label">Überfällige Rechnungen</div><div class="stat-value">0</div><div class="stat-foot">Aktueller Überblick</div></div>
+        <div class="card stat-card"><div class="stat-label">Aktive Mitarbeitende</div><div class="stat-value">–</div><div class="stat-foot">Datenbank folgt</div></div>
+        <div class="card stat-card"><div class="stat-label">Neue Bewerbungen</div><div class="stat-value">0</div><div class="stat-foot">Webserver-Anbindung folgt</div></div>
+      </section>
+
+      <div class="section-title"><h2>Bereiche</h2><button class="text-button" data-demo>Alle anzeigen →</button></div>
+      <section class="module-grid">
+        <article class="card module"><div class="module-icon">▤</div><h3>Debitoren</h3><p>Rechnungen erfassen, Zahlungen verbuchen und offene Beträge prüfen.</p><a href="#" data-page-link="Debitoren">Bereich öffnen →</a></article>
+        <article class="card module"><div class="module-icon">◫</div><h3>Stundennachweis</h3><p>Arbeitszeiten, Ferien, Krankheit und Unfall einfach dokumentieren.</p><a href="#" data-page-link="Stundennachweis">Bereich öffnen →</a></article>
+        <article class="card module"><div class="module-icon">▰</div><h3>Bewerbungen</h3><p>Bewerbungsdossiers prüfen, beurteilen und übersichtlich verwalten.</p><a href="#" data-page-link="Bewerbungen">Bereich öffnen →</a></article>
+        <article class="card module"><div class="module-icon">◉</div><h3>Zeugnisse</h3><p>Arbeits-, Zwischen- und Lehrzeugnisse geführt erstellen.</p><a href="#" data-page-link="Zeugnisse">Bereich öffnen →</a></article>
+      </section>
+
+      <section class="activity">
+        <div class="section-title"><h2>Letzte Aktivitäten</h2></div>
+        <div class="card empty"><div class="empty-icon">✓</div><div><strong>Noch keine Aktivitäten vorhanden</strong><span>Hier erscheinen später die wichtigsten Änderungen und Aufgaben.</span></div></div>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast">Diese Funktion wird mit der produktiven Webversion verbunden.</div>
+  <script>
+    const login=document.getElementById('login'), sidebar=document.getElementById('sidebar');
+    const title=document.getElementById('pageTitle'), lead=document.getElementById('pageLead');
+    const toast=document.getElementById('toast');
+    const descriptions={
+      'Übersicht':'Was möchtest du heute erledigen?', 'Debitoren':'Rechnungen und Zahlungseingänge zentral bearbeiten.',
+      'Mahnungen':'Offene Forderungen prüfen und Mahnungen erstellen.', 'Stundennachweis':'Arbeitszeiten und Abwesenheiten einfach erfassen.',
+      'Zeugnisse':'Arbeits-, Zwischen- und Lehrzeugnisse erstellen.', 'Bewerbungen':'Bewerbungsdossiers übersichtlich prüfen und beurteilen.',
+      'Lohnausweise':'Lohnausweise erfassen und als PDF ausgeben.', 'Einstellungen':'Stammdaten, Benutzer und Exportpfade verwalten.'
+    };
+    document.getElementById('openPreview').addEventListener('click',()=>{login.classList.add('hidden');sessionStorage.setItem('astPreview','open')});
+    if(sessionStorage.getItem('astPreview')==='open') login.classList.add('hidden');
+    document.getElementById('menuToggle').addEventListener('click',()=>sidebar.classList.toggle('open'));
+    function selectPage(page){document.querySelectorAll('.nav-button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));title.textContent=page;lead.textContent=descriptions[page]||'';sidebar.classList.remove('open');showToast()}
+    document.querySelectorAll('.nav-button').forEach(b=>b.addEventListener('click',()=>selectPage(b.dataset.page)));
+    document.querySelectorAll('[data-page-link]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();selectPage(a.dataset.pageLink)}));
+    document.querySelectorAll('[data-demo]').forEach(b=>b.addEventListener('click',showToast));
+    let timer; function showToast(){clearTimeout(timer);toast.classList.add('show');timer=setTimeout(()=>toast.classList.remove('show'),2600)}
+  </script>
+</body>
+</html>

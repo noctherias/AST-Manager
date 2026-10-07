@@ -1,0 +1,13 @@
+DirectoryIndex index.php
+Options -Indexes
+
+<IfModule mod_headers.c>
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set Referrer-Policy "no-referrer"
+</IfModule>
+
+<FilesMatch "^(config\.php|ast-capabilities\.php)$">
+Require all denied
+</FilesMatch>
