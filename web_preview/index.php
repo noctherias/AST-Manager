@@ -104,7 +104,47 @@ CREATE TABLE IF NOT EXISTS salary_certificates (
 CREATE TABLE IF NOT EXISTS app_settings (
     setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    customer_number TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', postcode TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS invoice_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_id INTEGER NOT NULL, payment_date TEXT NOT NULL,
+    amount REAL NOT NULL CHECK(amount>0), notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+    FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS reminder_templates (
+    level INTEGER PRIMARY KEY CHECK(level BETWEEN 1 AND 4), title TEXT NOT NULL, body TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 SQL);
+$columnMigrations = [
+    'employees' => [
+        'salutation'=>"TEXT NOT NULL DEFAULT ''", 'ahv'=>"TEXT NOT NULL DEFAULT ''", 'ahv_old'=>"TEXT NOT NULL DEFAULT ''",
+        'birth_date'=>"TEXT NOT NULL DEFAULT ''", 'address'=>"TEXT NOT NULL DEFAULT ''", 'postcode'=>"TEXT NOT NULL DEFAULT ''",
+        'city'=>"TEXT NOT NULL DEFAULT ''", 'job'=>"TEXT NOT NULL DEFAULT ''", 'workload'=>"REAL NOT NULL DEFAULT 100"
+    ],
+    'applications' => [
+        'first_name'=>"TEXT NOT NULL DEFAULT ''", 'last_name'=>"TEXT NOT NULL DEFAULT ''", 'address'=>"TEXT NOT NULL DEFAULT ''",
+        'postcode'=>"TEXT NOT NULL DEFAULT ''", 'city'=>"TEXT NOT NULL DEFAULT ''", 'status'=>"TEXT NOT NULL DEFAULT 'Neu'",
+        'trial_dates'=>"TEXT NOT NULL DEFAULT ''", 'vocational_baccalaureate'=>"INTEGER NOT NULL DEFAULT 0",
+        'message'=>"TEXT NOT NULL DEFAULT ''", 'server_deleted'=>"INTEGER NOT NULL DEFAULT 0"
+    ],
+    'certificates' => [
+        'reason'=>"TEXT NOT NULL DEFAULT ''", 'tasks'=>"TEXT NOT NULL DEFAULT ''", 'ratings'=>"TEXT NOT NULL DEFAULT '{}'",
+        'generated_text'=>"TEXT NOT NULL DEFAULT ''"
+    ],
+    'salary_certificates' => ['period_start'=>"TEXT NOT NULL DEFAULT ''", 'period_end'=>"TEXT NOT NULL DEFAULT ''", 'fields_json'=>"TEXT NOT NULL DEFAULT '{}'"]
+];
+foreach($columnMigrations as $table=>$columns) {
+    $existing=[]; foreach($db->query("PRAGMA table_info($table)") as $info) $existing[$info['name']]=true;
+    foreach($columns as $name=>$definition) if(!isset($existing[$name])) $db->exec("ALTER TABLE $table ADD COLUMN $name $definition");
+}
+$templateCount=(int)$db->query('SELECT COUNT(*) FROM reminder_templates')->fetchColumn();
+if($templateCount===0) {
+    $templates=[1=>['Zahlungserinnerung','Bitte begleichen Sie den offenen Betrag der Rechnung {rechnungsnummer} bis {zahlungsfrist}.'],2=>['Mahnung 1','Trotz unserer Zahlungserinnerung ist der Betrag der Rechnung {rechnungsnummer} noch offen.'],3=>['Mahnung 2','Wir bitten Sie letztmals, den offenen Betrag der Rechnung {rechnungsnummer} zu begleichen.'],4=>['Betreibung','Die Forderung der Rechnung {rechnungsnummer} wird zur Betreibung vorbereitet.']];
+    $stmt=$db->prepare('INSERT INTO reminder_templates(level,title,body,updated_at) VALUES(?,?,?,?)'); foreach($templates as $level=>$values) $stmt->execute([$level,$values[0],$values[1],now()]);
+}
 
 function e(mixed $value): string { return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function now(): string { return gmdate('Y-m-d\TH:i:s\Z'); }
@@ -154,6 +194,10 @@ function decimal_input(string $key): float {
 function money(float $value): string { return 'CHF ' . number_format($value, 2, '.', "'"); }
 function valid_date(string $value): bool { $date = DateTimeImmutable::createFromFormat('Y-m-d', $value); return $date && $date->format('Y-m-d') === $value; }
 function can_write(array $user): bool { return in_array($user['role'], ['admin','management'], true); }
+function source_has_table(PDO $source, string $table): bool {
+    $stmt=$source->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"); $stmt->execute([$table]); return (bool)$stmt->fetchColumn();
+}
+function source_rows(PDO $source, string $sql): array { return $source->query($sql)->fetchAll(PDO::FETCH_ASSOC); }
 
 $userCount = (int)$db->query('SELECT COUNT(*) FROM users')->fetchColumn();
 $action = (string)($_POST['action'] ?? '');
@@ -279,6 +323,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($user['role'] !== 'admin') { http_response_code(403); exit('Diese Aktion ist Administratoren vorbehalten.'); }
+
+    if ($action === 'import_backup') {
+        $file=$_FILES['backup_file']??null;
+        if (!$file || (int)$file['error']!==UPLOAD_ERR_OK) { set_flash('error','Bitte wähle eine gültige AST-Sicherungsdatei.'); redirect('/?page=settings'); }
+        if ((int)$file['size']<100 || (int)$file['size']>64*1024*1024) { set_flash('error','Die Sicherung muss zwischen 100 Bytes und 64 MB gross sein.'); redirect('/?page=settings'); }
+        $handle=fopen($file['tmp_name'],'rb'); $header=$handle?fread($handle,16):''; if($handle) fclose($handle);
+        if ($header!=="SQLite format 3\0") { set_flash('error','Die Datei ist keine gültige SQLite-Sicherung.'); redirect('/?page=settings'); }
+        $importDir=$storage.'/imports'; $backupDir=$storage.'/backups';
+        if(!is_dir($importDir)) mkdir($importDir,0770,true); if(!is_dir($backupDir)) mkdir($backupDir,0770,true);
+        $importPath=$importDir.'/desktop-'.bin2hex(random_bytes(8)).'.sqlite3';
+        if(!move_uploaded_file($file['tmp_name'],$importPath)) { set_flash('error','Die Sicherung konnte nicht geschützt abgelegt werden.'); redirect('/?page=settings'); }
+        try {
+            $source=new PDO('sqlite:'.$importPath,null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
+            foreach(['employees','customers','invoices','payments','time_records'] as $required) if(!source_has_table($source,$required)) throw new RuntimeException('Die Datei ist keine vollständige AST-Desktop-Sicherung. Tabelle fehlt: '.$required);
+            $db->exec('PRAGMA wal_checkpoint(FULL)');
+            $safety=$backupDir.'/web-vor-import-'.date('Ymd-His').'.sqlite3';
+            if(!copy($storage.'/ast-manager.sqlite3',$safety)) throw new RuntimeException('Die automatische Sicherung vor dem Import ist fehlgeschlagen.');
+            $counts=['Kunden'=>0,'Personen'=>0,'Rechnungen'=>0,'Zahlungen'=>0,'Zeiten'=>0,'Zeugnisse'=>0,'Bewerbungen'=>0,'Lohnausweise'=>0];
+            $db->beginTransaction();
+            foreach(['invoice_payments','reminders','invoices','time_entries','certificates','salary_certificates','applications','employees','customers'] as $table) $db->exec('DELETE FROM '.$table);
+            $stmt=$db->prepare('INSERT INTO customers(id,name,customer_number,address,postcode,city,email,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)');
+            foreach(source_rows($source,'SELECT * FROM customers ORDER BY id') as $row) { $stmt->execute([(int)$row['id'],$row['name'],$row['customer_number']??'',$row['address']??'',$row['postcode']??'',$row['city']??'',$row['email']??'',now(),now()]); $counts['Kunden']++; }
+            $stmt=$db->prepare('INSERT INTO employees(id,first_name,last_name,personnel_number,employee_type,entry_date,vacation_hours,active,created_at,updated_at,salutation,ahv,ahv_old,birth_date,address,postcode,city,job,workload) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            foreach(source_rows($source,'SELECT * FROM employees ORDER BY id') as $row) { $stmt->execute([(int)$row['id'],$row['first_name'],$row['last_name'],$row['code']??'',($row['kind']??'employee')==='apprentice'?'apprentice':'employee',$row['hired']??null,((int)($row['allowance']??17300))/100,(int)($row['active']??1),now(),now(),$row['salutation']??'',$row['ahv']??'',$row['ahv_old']??'',$row['birth_date']??'',$row['address']??'',$row['postcode']??'',$row['city']??'',$row['job']??'',((int)($row['workload']??10000))/100]); $counts['Personen']++; }
+            $invoiceRows=source_rows($source,"SELECT i.*,c.name AS customer,COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id=i.id),0) AS paid FROM invoices i JOIN customers c ON c.id=i.customer_id ORDER BY i.id");
+            $stmt=$db->prepare('INSERT INTO invoices(id,invoice_number,customer,invoice_date,due_date,amount,paid_amount,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
+            $reminderStmt=$db->prepare('INSERT INTO reminders(invoice_id,customer,invoice_number,level,amount,reminder_date,reminder_text,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)');
+            foreach($invoiceRows as $row) { $amount=((int)$row['amount'])/100; $paid=((int)$row['paid'])/100; $stmt->execute([(int)$row['id'],$row['number'],$row['customer'],$row['issued'],$row['due'],$amount,$paid,$row['note']??'',now(),now()]); $counts['Rechnungen']++; if((int)($row['reminder_level']??0)>0) $reminderStmt->execute([(int)$row['id'],$row['customer'],$row['number'],(int)$row['reminder_level'],max(0,$amount-$paid),$row['reminder_date']?:date('Y-m-d'),'','Aktiv',now()]); }
+            $stmt=$db->prepare('INSERT INTO invoice_payments(id,invoice_id,payment_date,amount,notes,created_at) VALUES(?,?,?,?,?,?)');
+            foreach(source_rows($source,'SELECT * FROM payments ORDER BY id') as $row) { $stmt->execute([(int)$row['id'],(int)$row['invoice_id'],$row['day'],((int)$row['amount'])/100,$row['note']??'',now()]); $counts['Zahlungen']++; }
+            $reasonMap=[''=>'Arbeit','H'=>'Feiertag','F'=>'Ferien','K'=>'Krankheit','U'=>'Unfall','M'=>'Begründete Minderzeit','HO'=>'Homeoffice','B'=>'Bereitschaft'];
+            $stmt=$db->prepare('INSERT INTO time_entries(id,employee_id,work_date,hours,reason,notes,created_at) VALUES(?,?,?,?,?,?,?)');
+            foreach(source_rows($source,'SELECT * FROM time_records ORDER BY id') as $row) { $code=strtoupper(trim((string)($row['code']??''))); $stmt->execute([(int)$row['id'],(int)$row['employee_id'],$row['day'],((int)($row['worked_minutes']??0))/60,$reasonMap[$code]??'Begründete Minderzeit',$row['note']??'',now()]); $counts['Zeiten']++; }
+            if(source_has_table($source,'employment_references')) { $stmt=$db->prepare('INSERT INTO certificates(id,employee_id,certificate_type,reference_date,status,notes,created_at,reason,tasks,ratings,generated_text) VALUES(?,?,?,?,?,?,?,?,?,?,?)'); $typeMap=['work'=>'Arbeitszeugnis','interim'=>'Zwischenzeugnis','apprentice'=>'Lehrzeugnis']; foreach(source_rows($source,'SELECT * FROM employment_references ORDER BY id') as $row) { $stmt->execute([(int)$row['id'],(int)$row['employee_id'],$typeMap[$row['reference_type']]??'Arbeitszeugnis',$row['issue_date'],'Gespeichert','',now(),$row['reason']??'',$row['tasks']??'',$row['ratings']??'{}',$row['text']??'']); $counts['Zeugnisse']++; } }
+            if(source_has_table($source,'applicants')) { $stmt=$db->prepare('INSERT INTO applications(id,applicant_name,email,phone,application_type,received_date,rating,notes,source,created_at,first_name,last_name,address,postcode,city,status,trial_dates,vocational_baccalaureate,message,server_deleted) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'); $cat=['trial'=>'Schnupperlehre','installer'=>'Elektroinstallateur/in EFZ','assembly'=>'Montage-Elektriker/in EFZ']; $rating=[''=>'Offen','unsuitable'=>'Nicht geeignet','possible'=>'Eventuell','suitable'=>'Geeignet']; foreach(source_rows($source,'SELECT * FROM applicants ORDER BY id') as $row) { $full=trim(($row['first_name']??'').' '.($row['last_name']??'')); $stmt->execute([(int)$row['id'],$full,$row['email']??'',$row['phone']??'',$cat[$row['category']]??'Schnupperlehre',substr((string)$row['submitted_at'],0,10),$rating[$row['suitability']??'']??'Offen',$row['notes']??'','Desktop-Import',now(),$row['first_name']??'',$row['last_name']??'',$row['address']??'',$row['postcode']??'',$row['city']??'',$row['status']??'new',$row['trial_dates']??'',(int)($row['vocational_baccalaureate']??0),$row['message']??'',(int)($row['server_deleted']??0)]); $counts['Bewerbungen']++; } }
+            if(source_has_table($source,'salaries')) { $stmt=$db->prepare('INSERT INTO salary_certificates(id,employee_id,tax_year,gross_salary,status,notes,created_at,period_start,period_end,fields_json) VALUES(?,?,?,?,?,?,?,?,?,?)'); foreach(source_rows($source,'SELECT * FROM salaries ORDER BY id') as $row) { $fields=json_decode((string)$row['fields'],true)?:[]; $gross=(float)($fields['8']??$fields['8Brutto']??0); $stmt->execute([(int)$row['id'],(int)$row['employee_id'],(int)$row['year'],$gross,'Gespeichert','',now(),$row['start']??'',$row['end']??'',$row['fields']??'{}']); $counts['Lohnausweise']++; } }
+            $allowedSettings=['company','address','postcode','city','phone','email','website','uid','reminder_text_1','reminder_text_2','reminder_text_3','reminder_text_4'];
+            if(source_has_table($source,'settings')) { $stmt=$db->prepare('INSERT INTO app_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at'); foreach(source_rows($source,'SELECT key,value FROM settings') as $row) if(in_array($row['key'],$allowedSettings,true)) $stmt->execute([$row['key'],$row['value'],now()]); }
+            $db->commit(); audit($db,(int)$user['id'],'desktop_backup_imported',json_encode($counts,JSON_UNESCAPED_UNICODE));
+            set_flash('success','Desktop-Sicherung importiert: '.implode(' · ',array_map(fn($key,$value)=>$key.' '.$value,array_keys($counts),$counts)).'.');
+        } catch(Throwable $exception) { if($db->inTransaction()) $db->rollBack(); set_flash('error','Import nicht durchgeführt: '.$exception->getMessage()); }
+        finally { @unlink($importPath); }
+        redirect('/?page=settings');
+    }
 
     if ($action === 'create_user') {
         $name = trim((string)($_POST['name'] ?? '')); $email = mb_strtolower(trim((string)($_POST['email'] ?? '')));
@@ -468,7 +556,7 @@ if ($user) {
     <section class="card form-card"><h2>Neuer Lohnausweis</h2><p class="sub">Die offizielle PDF-Vorlage wird im nächsten Ausbauschritt serverseitig ausgefüllt.</p><?php if(can_write($user) && $employees): ?><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="save_salary"><div class="field"><label>Person</label><select class="input" name="employee_id"><?php foreach($employees as $row): ?><option value="<?= (int)$row['id'] ?>"><?= e($row['first_name'].' '.$row['last_name']) ?></option><?php endforeach; ?></select></div><div class="form-grid"><div class="field"><label>Steuerjahr</label><input class="input" type="number" name="tax_year" value="<?= date('Y') ?>" min="2000" max="2100"></div><div class="field"><label>Bruttolohn CHF</label><input class="input" inputmode="decimal" name="gross_salary"></div><div class="field wide"><label>Notiz</label><textarea class="input" name="notes"></textarea></div></div><button class="btn" type="submit">Entwurf anlegen</button></form><?php else: ?><div class="readonly-note"><?= !$employees?'Zuerst im Stundennachweis eine Person anlegen.':'Nur lesender Zugriff.' ?></div><?php endif; ?></section></div>
   <?php elseif ($page==='settings'): ?>
     <div class="top"><div><div class="eyebrow">Konfiguration</div><h1>Einstellungen</h1><p class="sub">Zentrale Firmen- und Webeinstellungen verwalten.</p></div><div class="profile"><div class="avatar"><?= e(initials($user['name'])) ?></div><div><strong><?= e($user['name']) ?></strong><small><?= e(role_name($user['role'])) ?></small></div></div></div>
-    <?php if($flash): ?><div class="alert <?= e($flash[0]) ?>"><?= e($flash[1]) ?></div><?php endif; ?><div class="workspace"><section class="card form-card"><h2>Firmendaten</h2><p class="sub">Diese Angaben werden später für Mahnungen, Zeugnisse und Exporte verwendet.</p><?php if(can_write($user)): ?><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="save_settings"><div class="field"><label>Firmenname</label><input class="input" name="company_name" value="<?= e($appSettings['company_name']??'AST Elektro Tüscher AG') ?>"></div><div class="field"><label>Adresse</label><input class="input" name="company_address" value="<?= e($appSettings['company_address']??'') ?>"></div><div class="field"><label>PLZ und Ort</label><input class="input" name="company_postcode_city" value="<?= e($appSettings['company_postcode_city']??'') ?>"></div><div class="form-grid"><div class="field"><label>Telefon</label><input class="input" name="company_phone" value="<?= e($appSettings['company_phone']??'') ?>"></div><div class="field"><label>E-Mail</label><input class="input" type="email" name="company_email" value="<?= e($appSettings['company_email']??'') ?>"></div></div><button class="btn" type="submit">Einstellungen speichern</button></form><?php else: ?><div class="readonly-note">Nur lesender Zugriff.</div><?php endif; ?></section><section class="card"><h2>Web-Datenbank</h2><p class="sub">Alle Webmodule verwenden bereits dieselbe geschützte Datenbank. Der Desktop-Abgleich wird als kontrollierter Import ergänzt.</p><div class="readonly-note">Die lokale Desktop-Datenbank wird noch nicht automatisch synchronisiert. So werden Konflikte und Datenverluste während des Umbaus vermieden.</div><?php if($user['role']==='admin'): ?><a class="btn secondary" href="/?page=users">Benutzerverwaltung öffnen</a><?php endif; ?></section></div>
+    <?php if($flash): ?><div class="alert <?= e($flash[0]) ?>"><?= e($flash[1]) ?></div><?php endif; ?><div class="workspace"><section class="card form-card"><h2>Firmendaten</h2><p class="sub">Diese Angaben werden für Mahnungen, Zeugnisse und Exporte verwendet.</p><?php if(can_write($user)): ?><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="save_settings"><div class="field"><label>Firmenname</label><input class="input" name="company_name" value="<?= e($appSettings['company_name']??$appSettings['company']??'AST Elektro Tüscher AG') ?>"></div><div class="field"><label>Adresse</label><input class="input" name="company_address" value="<?= e($appSettings['company_address']??$appSettings['address']??'') ?>"></div><div class="field"><label>PLZ und Ort</label><input class="input" name="company_postcode_city" value="<?= e($appSettings['company_postcode_city']??trim(($appSettings['postcode']??'').' '.($appSettings['city']??''))) ?>"></div><div class="form-grid"><div class="field"><label>Telefon</label><input class="input" name="company_phone" value="<?= e($appSettings['company_phone']??$appSettings['phone']??'') ?>"></div><div class="field"><label>E-Mail</label><input class="input" type="email" name="company_email" value="<?= e($appSettings['company_email']??$appSettings['email']??'') ?>"></div></div><button class="btn" type="submit">Einstellungen speichern</button></form><?php else: ?><div class="readonly-note">Nur lesender Zugriff.</div><?php endif; ?></section><section class="card"><h2>Gemeinsamer Datenstand</h2><p class="sub">Eine Desktop-Sicherung kann als vollständiger Ausgangsstand übernommen werden.</p><?php if($user['role']==='admin'): ?><form method="post" enctype="multipart/form-data"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="import_backup"><div class="field"><label>AST-Sicherung auswählen</label><input class="input" type="file" name="backup_file" accept=".sqlite3,.db" required><span class="hint">Übernimmt Fachdaten und Stammdaten. Web-Benutzerkonten bleiben unverändert. Vorher wird automatisch eine Web-Sicherung erstellt.</span></div><button class="btn" type="submit">Desktop-Sicherung importieren</button></form><hr style="border:0;border-top:1px solid var(--line);margin:24px 0"><a class="btn secondary" href="/?page=users">Benutzerverwaltung öffnen</a><?php else: ?><div class="readonly-note">Sicherungsimporte sind Administratoren vorbehalten.</div><?php endif; ?></section></div>
   <?php else: ?>
     <div class="top"><div><div class="eyebrow">Übersicht</div><h1>Guten Tag, <?= e(explode(' ',trim($user['name']))[0]) ?></h1><p class="sub">Was möchtest du heute erledigen?</p></div><div class="profile"><div class="avatar"><?= e(initials($user['name'])) ?></div><div><strong><?= e($user['name']) ?></strong><small><?= e(role_name($user['role'])) ?></small></div></div></div>
     <?php if ($flash): ?><div class="alert <?= e($flash[0]) ?>"><?= e($flash[1]) ?></div><?php endif; ?>
