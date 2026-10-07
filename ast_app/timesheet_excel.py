@@ -129,6 +129,23 @@ def _hide_rows(xml: str, first_row: int, last_row: int) -> str:
     return xml
 
 
+def _remove_calc_chain(members: dict[str, bytes]) -> None:
+    """Remove the stale formula cache index so Excel rebuilds it on open."""
+    if "xl/calcChain.xml" not in members:
+        return
+    members.pop("xl/calcChain.xml")
+    content_types = members["[Content_Types].xml"].decode("utf-8")
+    content_types = re.sub(
+        r'<Override\b[^>]*\bPartName="/xl/calcChain\.xml"[^>]*/>', "", content_types
+    )
+    members["[Content_Types].xml"] = content_types.encode("utf-8")
+    relationships = members["xl/_rels/workbook.xml.rels"].decode("utf-8")
+    relationships = re.sub(
+        r'<Relationship\b[^>]*\bTarget="calcChain\.xml"[^>]*/>', "", relationships
+    )
+    members["xl/_rels/workbook.xml.rels"] = relationships.encode("utf-8")
+
+
 def _simplify_time_columns(xml: str) -> str:
     """Expose one direct-hours column and hide the obsolete clock columns."""
     xml = _replace_cell(xml, "D3", "Arbeitszeit (h)", "string")
@@ -439,6 +456,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     annual = _simplify_annual_summary(annual)
     members[annual_name] = styles.apply(annual, _annual_time_cells()).encode("utf-8")
     members["xl/styles.xml"] = styles.finish().encode("utf-8")
+    _remove_calc_chain(members)
 
     workbook = members["xl/workbook.xml"].decode("utf-8")
     workbook = re.sub(r'(<[^>]*absPath\b[^>]*\burl=")[^"]*(")', r'\1\2', workbook, count=1)
@@ -455,7 +473,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     try:
         with zipfile.ZipFile(temporary, "w") as target:
             for info in infos:
-                target.writestr(info, members[info.filename])
+                if info.filename in members:
+                    target.writestr(info, members[info.filename])
         with zipfile.ZipFile(temporary, "r") as check:
             written = {name: check.read(name) for name in check.namelist()}
         if set(written) != set(members) or _vba_hash(written) != original_vba:

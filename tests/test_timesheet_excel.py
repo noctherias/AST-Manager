@@ -36,7 +36,10 @@ class TimesheetExcelTests(unittest.TestCase):
             ]
             export_timesheet(target, employee, 2026, records, "AST Elektro AG")
             with zipfile.ZipFile(template) as source, zipfile.ZipFile(target) as exported:
-                self.assertEqual(set(source.namelist()), set(exported.namelist()))
+                expected_members = set(source.namelist()) - {"xl/calcChain.xml"}
+                self.assertEqual(expected_members, set(exported.namelist()))
+                self.assertNotIn(b"calcChain.xml", exported.read("[Content_Types].xml"))
+                self.assertNotIn(b"calcChain.xml", exported.read("xl/_rels/workbook.xml.rels"))
                 self.assertEqual(hashlib.sha256(source.read("xl/vbaProject.bin")).digest(),
                                  hashlib.sha256(exported.read("xl/vbaProject.bin")).digest())
                 for sheet_name in [f"xl/worksheets/sheet{number}.xml" for number in range(6, 18)]:
