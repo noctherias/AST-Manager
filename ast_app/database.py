@@ -332,7 +332,8 @@ class Database:
         d["code"] = str(d.get("code") or "").strip().upper()
         d["note"] = str(d.get("note") or "").strip()
         d["break_minutes"] = int(d.get("break_minutes") or 0)
-        valid_codes = {"", "F", "G", "K", "KR", "KU", "KA", "U", "UH", "H", "B", "E1", "E2", "E3", "E4", "E5"}
+        valid_codes = {"", "F", "G", "K", "KR", "A", "AR", "KU", "KA", "U", "UH", "H", "B",
+                       "E1", "E2", "E3", "E4", "E5"}
         if d["code"] not in valid_codes:
             raise ValueError("Bitte einen gültigen Abwesenheits- oder Arbeitscode auswählen.")
         if not self.employee(d["employee_id"]):
@@ -367,7 +368,7 @@ class Database:
         if d["worked_minutes"] == 0 and not d["code"]:
             raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
         scheduled = scheduled_work_minutes(d["day"])
-        shortfall_reasons = {"U", "UH", "K", "KR", "G", "KU", "KA", "E1"}
+        shortfall_reasons = {"U", "UH", "K", "KR", "A", "AR", "G", "KU", "KA", "E1"}
         if d["worked_minutes"] < scheduled and d["code"] != "F" and d["code"] not in shortfall_reasons:
             raise ValueError("Bitte einen Grund für die geringere IST-Zeit auswählen.")
         if d["code"] == "E1" and not d["note"]:

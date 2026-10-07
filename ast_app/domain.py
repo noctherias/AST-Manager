@@ -7,7 +7,8 @@ from decimal import Decimal, InvalidOperation
 KINDS = {"vacation": "Ferien", "overtime": "Überzeit", "sick": "Krankheit", "accident": "Unfall"}
 TIME_CODES = {
     "": "Normaler Arbeitstag", "U": "Ferien / Freizeit · ganzer Tag", "UH": "Ferien / Freizeit · Teil des Tages",
-    "K": "Krankheit · ganzer Tag", "KR": "Krankheit · Teil des Tages", "G": "Freizeit / Kompensation",
+    "K": "Krankheit · ganzer Tag", "KR": "Krankheit · Teil des Tages",
+    "A": "Unfall · ganzer Tag", "AR": "Unfall · Teil des Tages", "G": "Freizeit / Kompensation",
     "H": "Homeoffice", "F": "Feiertag", "KU": "Kurzarbeit · ganzer Tag",
     "KA": "Kurzarbeit · Teil des Tages", "E1": "Andere begründete Minderzeit", "B": "Bereitschaft",
 }

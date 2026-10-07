@@ -56,6 +56,28 @@ class UiTests(unittest.TestCase):
         self.assertEqual(timesheet_filename(employee, 2027),
                          "Stundennachweis_2027_von_Muster_Anna_Maria.xlsm")
 
+    def test_timesheet_excel_and_pdf_buttons_create_files(self):
+        window = MainWindow(self.db, True)
+        window.navigate(2)
+        page = window.pages[2]
+        page.refresh()
+        page.table.selectRow(0)
+        page.open_person()
+        workspace = page.workspace
+        self.assertIsNotNone(workspace.employee)
+        excel_path = Path(self.temp.name) / "Stundennachweis.xlsm"
+        pdf_path = Path(self.temp.name) / "Stundennachweis.pdf"
+        with (patch("ast_app.experience.save_path", side_effect=[str(excel_path), str(pdf_path)]),
+              patch("ast_app.experience.ensure_excel_trusted_folder", return_value=None) as trusted,
+              patch("ast_app.experience.QMessageBox.information"),
+              patch("ast_app.experience.PdfPreview.exec", return_value=QDialog.DialogCode.Accepted)):
+            workspace.export_excel()
+            workspace.export_pdf()
+        self.assertTrue(excel_path.is_file())
+        self.assertTrue(pdf_path.is_file())
+        self.assertGreater(pdf_path.stat().st_size, 1000)
+        trusted.assert_called_once_with(excel_path.parent)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.db = Database(Path(self.temp.name) / "ui.sqlite3")
@@ -123,6 +145,8 @@ class UiTests(unittest.TestCase):
         page.open_person()
         self.assertEqual(page.stack.currentIndex(), 1)
         self.assertIsNotNone(page.workspace.employee)
+        self.assertEqual(page.workspace.pdf_btn.text(), "PDF erstellen")
+        self.assertEqual(page.workspace.export_btn.text(), "Excel speichern")
         displayed_hours = {page.workspace.table.item(row, 2).text()
                            for row in range(page.workspace.table.rowCount())}
         self.assertIn("8.75 h", displayed_hours)

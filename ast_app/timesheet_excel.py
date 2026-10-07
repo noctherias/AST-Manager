@@ -129,6 +129,29 @@ def _hide_rows(xml: str, first_row: int, last_row: int) -> str:
     return xml
 
 
+def _set_row_heights(xml: str, heights: dict[int, float]) -> str:
+    for row, height in heights.items():
+        pattern = re.compile(rf'<row\b(?=[^>]*\br="{row}")(?P<attrs>[^>]*)>')
+        match = pattern.search(xml)
+        if not match:
+            continue
+        tag = match.group(0)
+        tag = re.sub(r'\sht="[^"]*"', "", tag)
+        tag = re.sub(r'\scustomHeight="[^"]*"', "", tag)
+        tag = tag[:-1] + f' ht="{height:g}" customHeight="1">'
+        xml = xml[:match.start()] + tag + xml[match.end():]
+    return xml
+
+
+def _references_in_rows(xml: str, rows: set[int]) -> list[str]:
+    references = []
+    for reference in re.findall(r'<c\b[^>]*\br="([A-Z]+\d+)"', xml):
+        row = int(re.search(r'\d+', reference).group(0))
+        if row in rows:
+            references.append(reference)
+    return references
+
+
 def _remove_calc_chain(members: dict[str, bytes]) -> None:
     """Remove the stale formula cache index so Excel rebuilds it on open."""
     if "xl/calcChain.xml" not in members:
@@ -154,15 +177,29 @@ def _simplify_time_columns(xml: str) -> str:
         tag = match.group(0)
         minimum = int(re.search(r'\bmin="(\d+)"', tag).group(1))
         maximum = int(re.search(r'\bmax="(\d+)"', tag).group(1))
+        widths = {1: 14, 2: 5, 3: 19, 4: 14, 10: 9, 11: 12, 12: 12, 13: 10, 15: 34, 16: 12}
         if 5 <= minimum and maximum <= 9:
             if ' hidden=' in tag:
                 tag = re.sub(r'\bhidden="[^"]*"', 'hidden="1"', tag)
             else:
                 tag = tag[:-2] + ' hidden="1"/>'
-        if minimum == maximum == 4:
-            tag = re.sub(r'\bwidth="[^"]*"', 'width="12"', tag)
-        if minimum == maximum == 10:
-            tag = re.sub(r'\bwidth="[^"]*"', 'width="7"', tag)
+        if minimum == maximum and minimum in widths:
+            tag = re.sub(r'\bwidth="[^"]*"', f'width="{widths[minimum]}"', tag)
+        return tag
+
+    return re.sub(r'<col\b[^>]*/>', adjust, xml)
+
+
+def _widen_annual_hour_columns(xml: str) -> str:
+    """Keep two-decimal hour values readable in every month group."""
+    hour_columns = set(range(3, 37, 3))
+
+    def adjust(match):
+        tag = match.group(0)
+        minimum = int(re.search(r'\bmin="(\d+)"', tag).group(1))
+        maximum = int(re.search(r'\bmax="(\d+)"', tag).group(1))
+        if minimum == maximum and minimum in hour_columns:
+            tag = re.sub(r'\bwidth="[^"]*"', 'width="7.5"', tag)
         return tag
 
     return re.sub(r'<col\b[^>]*/>', adjust, xml)
@@ -199,16 +236,38 @@ class _StyleNormalizer:
 
     def __init__(self, styles_xml: str):
         self.xml = styles_xml
+        self._fills_match = re.search(r'<fills\b[^>]*>.*?</fills>', styles_xml, re.DOTALL)
+        if not self._fills_match:
+            raise ValueError("Excel-Vorlage: Farbdefinitionen wurden nicht gefunden.")
+        self._fills_root = ET.fromstring(self._fills_match.group(0))
         self._match = re.search(r'<cellXfs\b[^>]*>.*?</cellXfs>', styles_xml, re.DOTALL)
         if not self._match:
             raise ValueError("Excel-Vorlage: Zellformatvorlagen wurden nicht gefunden.")
         self._root = ET.fromstring(self._match.group(0))
         self._clones: dict[tuple[int, str, int | None], int] = {}
 
-    def style_for(self, old_style_id: int, number_format_id: str, fill_id: int | None = None) -> int:
+    def fill_id(self, rgb: str) -> int:
+        rgb = rgb.upper()
+        for index, fill in enumerate(self._fills_root):
+            color = fill.find("{*}patternFill/{*}fgColor")
+            if color is not None and color.get("rgb", "").upper() == rgb:
+                return index
+        namespace = (self._fills_root.tag[1:].partition("}")[0]
+                     if self._fills_root.tag.startswith("{") else "")
+        tag = lambda name: f"{{{namespace}}}{name}" if namespace else name
+        fill = ET.Element(tag("fill"))
+        pattern = ET.SubElement(fill, tag("patternFill"), {"patternType": "solid"})
+        ET.SubElement(pattern, tag("fgColor"), {"rgb": rgb})
+        ET.SubElement(pattern, tag("bgColor"), {"indexed": "64"})
+        self._fills_root.append(fill)
+        return len(self._fills_root) - 1
+
+    def style_for(self, old_style_id: int, number_format_id: str | None,
+                  fill_id: int | None = None) -> int:
         if old_style_id < 0 or old_style_id >= len(self._root):
             raise ValueError("Excel-Vorlage: Ungültige Zellformatvorlage.")
         old_style = self._root[old_style_id]
+        number_format_id = number_format_id or old_style.get("numFmtId", "0")
         if (old_style.get("numFmtId", "0") == number_format_id
                 and (fill_id is None or old_style.get("fillId", "0") == str(fill_id))):
             return old_style_id
@@ -231,7 +290,7 @@ class _StyleNormalizer:
                 sheet_xml = _replace_cell_style(sheet_xml, reference, new_style_id)
         return sheet_xml
 
-    def apply_colored(self, sheet_xml: str, references: list[tuple[str, str, int]]) -> str:
+    def apply_colored(self, sheet_xml: str, references: list[tuple[str, str | None, int]]) -> str:
         for reference, number_format_id, fill_id in references:
             old_style_id = _cell_style(sheet_xml, reference)
             new_style_id = self.style_for(old_style_id, number_format_id, fill_id)
@@ -241,8 +300,15 @@ class _StyleNormalizer:
 
     def finish(self) -> str:
         self._root.set("count", str(len(self._root)))
-        replacement = ET.tostring(self._root, encoding="unicode", short_empty_elements=True)
-        return self.xml[:self._match.start()] + replacement + self.xml[self._match.end():]
+        self._fills_root.set("count", str(len(self._fills_root)))
+        replacements = (
+            (self._match, ET.tostring(self._root, encoding="unicode", short_empty_elements=True)),
+            (self._fills_match, ET.tostring(self._fills_root, encoding="unicode", short_empty_elements=True)),
+        )
+        xml = self.xml
+        for match, replacement in sorted(replacements, key=lambda item: item[0].start(), reverse=True):
+            xml = xml[:match.start()] + replacement + xml[match.end():]
+        return xml
 
 
 def _monthly_time_cells() -> list[tuple[str, str]]:
@@ -256,7 +322,7 @@ def _monthly_time_cells() -> list[tuple[str, str]]:
         ("F38", TIME_FORMAT_ID), ("F39", TIME_FORMAT_ID),
         ("F40", BALANCE_FORMAT_ID),
     ])
-    cells.extend((f"P{row}", TIME_FORMAT_ID) for row in (36, 37, 38, 39, 42, 43, 44, 45, 46, 47))
+    cells.extend((f"P{row}", TIME_FORMAT_ID) for row in range(36, 41))
     return cells
 
 
@@ -269,9 +335,9 @@ def _annual_time_cells() -> list[tuple[str, str]]:
     # Monthly summary values live in the first column of every month group.
     summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI")
     for column in summary_columns:
-        cells.extend((f"{column}{row}", TIME_FORMAT_ID) for row in range(35, 42))
+        cells.extend((f"{column}{row}", TIME_FORMAT_ID) for row in range(35, 43))
     cells.extend([
-        *[(f"AL{row}", TIME_FORMAT_ID) for row in range(35, 42)],
+        *[(f"AL{row}", TIME_FORMAT_ID) for row in range(35, 43)],
     ])
     return cells
 
@@ -313,7 +379,7 @@ def _decimal_hours(minutes: int | None):
 
 def monthly_summary(records: list[dict], year: int, month: int) -> dict[str, int]:
     """Summarise recorded deviations without treating missing records as absences."""
-    result = {"overtime": 0, "vacation": 0, "sick": 0, "other": 0}
+    result = {"overtime": 0, "vacation": 0, "sick": 0, "accident": 0, "other": 0}
     for record in records:
         day = date.fromisoformat(record["day"])
         if day.year != year or day.month != month:
@@ -330,6 +396,8 @@ def monthly_summary(records: list[dict], year: int, month: int) -> dict[str, int
             result["vacation"] += shortfall
         elif code in {"K", "KR"}:
             result["sick"] += shortfall
+        elif code in {"A", "AR"}:
+            result["accident"] += shortfall
         else:
             result["other"] += shortfall
     return result
@@ -343,7 +411,9 @@ def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
          'SUMPRODUCT(((J4:J34="U")+(J4:J34="UH")+(J4:J34="G"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
         (38, "Krankheit (h)", "sick",
          'SUMPRODUCT(((J4:J34="K")+(J4:J34="KR"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
-        (39, "Übrige begründete Minderzeit (h)", "other",
+        (39, "Unfall (h)", "accident",
+         'SUMPRODUCT(((J4:J34="A")+(J4:J34="AR"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (40, "Übrige begründete Minderzeit (h)", "other",
          'SUMPRODUCT(((J4:J34="KU")+(J4:J34="KA")+(J4:J34="E1"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
     )
     for row, title, key, formula in rows:
@@ -356,7 +426,7 @@ def _remove_legacy_monthly_summary(xml: str) -> str:
     """Remove obsolete visible counters and detail labels from the monthly sheet."""
     for row in range(36, 48):
         xml = _replace_cell(xml, f"J{row}", None)
-    for row in range(40, 48):
+    for row in range(41, 48):
         xml = _replace_cell(xml, f"K{row}", None)
         xml = _replace_cell(xml, f"P{row}", None)
     return xml
@@ -364,28 +434,29 @@ def _remove_legacy_monthly_summary(xml: str) -> str:
 
 def _simplify_annual_summary(xml: str) -> str:
     labels = {
-        37: "Überstunden geleistet (h)",
-        38: "Ferien / Freizeit bezogen (h)",
+        37: "Überstunden (h)",
+        38: "Ferien / Freizeit (h)",
         39: "Krankheit (h)",
-        40: "Übrige begründete Minderzeit (h)",
-        41: "Abwesenheiten gesamt (h)",
+        40: "Unfall (h)",
+        41: "Übrige Minderzeit (h)",
+        42: "Abwesenheit (h)",
     }
     for row, title in labels.items():
         xml = _replace_cell(xml, f"A{row}", title, "string")
     summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI")
     for month_index, (column, sheet_name) in enumerate(zip(summary_columns, MONTH_NAMES), 1):
-        for target_row, source_row in ((37, 36), (38, 37), (39, 38), (40, 39)):
+        for target_row, source_row in ((37, 36), (38, 37), (39, 38), (40, 39), (41, 40)):
             xml = _replace_formula_cell(xml, f"{column}{target_row}",
                                         f"{sheet_name}!P{source_row}", 0)
-        xml = _replace_formula_cell(xml, f"{column}41",
-                                    f"SUM({column}38:{column}40)", 0)
+        xml = _replace_formula_cell(xml, f"{column}42",
+                                    f"SUM({column}38:{column}41)", 0)
         vacation_days = (f'COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B25)'
                          f'+COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B26)*Voreinstellungen!C26')
         xml = _replace_formula_cell(xml, f"{column}43", vacation_days, 0)
-    for row in range(37, 42):
+    for row in range(37, 43):
         xml = _replace_formula_cell(xml, f"AL{row}", f"SUM(B{row}:AK{row})", 0)
     xml = _replace_formula_cell(xml, "AL43", "SUM(B43:AK43)", 0)
-    return _hide_rows(xml, 42, 50)
+    return _hide_rows(xml, 43, 50)
 
 
 def _vba_hash(members: dict[str, bytes]) -> str | None:
@@ -445,6 +516,12 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     settings = _replace_cell(settings, "C2", year)
     settings = _replace_cell(settings, "C3", full_name, "string")
     settings = _replace_cell(settings, "A29", "Andere begründete Minderzeit", "string")
+    settings = _replace_cell(settings, "A31", "Unfall · ganzer Tag", "string")
+    settings = _replace_cell(settings, "B31", "A", "string")
+    settings = _replace_cell(settings, "C31", "REST", "string")
+    settings = _replace_cell(settings, "A32", "Unfall · Teil des Tages", "string")
+    settings = _replace_cell(settings, "B32", "AR", "string")
+    settings = _replace_cell(settings, "C32", "REST", "string")
     settings = re.sub(r'(<dataValidation\b[^>]*>.*?<formula1>).*?(</formula1>)',
                       lambda m: m.group(1) + '"' + escape(full_name, quote=False) + '"' + m.group(2),
                       settings, count=1, flags=re.DOTALL)
@@ -452,8 +529,22 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     members["xl/worksheets/sheet1.xml"] = settings.encode("utf-8")
 
     by_day = {date.fromisoformat(r["day"]): r for r in records if date.fromisoformat(r["day"]).year == year}
-    # Existing template fill IDs: cyan, green, yellow and orange.
-    category_fills = ((36, 14), (37, 17), (38, 13), (39, 20))
+    # One restrained palette is used in the month and annual summaries. This
+    # prevents the same colour from meaning two different categories.
+    fill_overtime = styles.fill_id("FFDDF3E4")
+    fill_vacation = styles.fill_id("FFDCEEFF")
+    fill_sick = styles.fill_id("FFFFF2CC")
+    fill_accident = styles.fill_id("FFF7D6D6")
+    fill_other = styles.fill_id("FFFCE4D6")
+    fill_total = styles.fill_id("FFE9EEF2")
+    fill_header = styles.fill_id("FFDCE6EB")
+    category_fills = (
+        (36, fill_overtime),
+        (37, fill_vacation),
+        (38, fill_sick),
+        (39, fill_accident),
+        (40, fill_other),
+    )
     for month, xml_name in MONTH_SHEETS.items():
         xml = members[xml_name].decode("utf-8")
         xml = _simplify_time_columns(xml)
@@ -476,7 +567,14 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
         xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
         xml = _remove_legacy_monthly_summary(xml)
+        xml = _set_row_heights(xml, {1: 24, 2: 20, 3: 34,
+                                     **{row: 20 for row in range(4, 35)},
+                                     **{row: 22 for row in range(36, 41)}})
         xml = styles.apply(xml, _monthly_time_cells())
+        xml = styles.apply_colored(
+            xml,
+            [(reference, None, fill_header) for reference in _references_in_rows(xml, {3})],
+        )
         xml = styles.apply_colored(
             xml,
             [(f"{column}{row}", TIME_FORMAT_ID, fill_id)
@@ -486,20 +584,31 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             xml,
             [(f"J{row}", "0", 0) for row in range(36, 48)]
             + [(f"{column}{row}", "0", 0)
-               for row in range(40, 48) for column in ("K", "P")],
+               for row in range(41, 48) for column in ("K", "P")],
         )
         members[xml_name] = xml.encode("utf-8")
 
     annual_name = "xl/worksheets/sheet18.xml"
     annual = members[annual_name].decode("utf-8")
     annual = _simplify_annual_summary(annual)
+    annual = _widen_annual_hour_columns(annual)
+    annual = _set_row_heights(annual, {1: 24, 2: 20, 3: 24,
+                                       **{row: 20 for row in range(4, 35)},
+                                       **{row: 22 for row in range(35, 43)}})
     annual = styles.apply(annual, _annual_time_cells())
-    annual_summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI", "AL")
     annual = styles.apply_colored(
         annual,
-        [(f"A{row}", "0", fill_id) for row, fill_id in category_fills]
+        [(reference, None, fill_header) for reference in _references_in_rows(annual, {3})],
+    )
+    annual_summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI", "AL")
+    annual_category_fills = tuple((row + 1, fill_id) for row, fill_id in category_fills)
+    annual = styles.apply_colored(
+        annual,
+        [(f"A{row}", "0", fill_id) for row, fill_id in annual_category_fills]
         + [(f"{column}{row}", TIME_FORMAT_ID, fill_id)
-           for row, fill_id in category_fills for column in annual_summary_columns],
+           for row, fill_id in annual_category_fills for column in annual_summary_columns]
+        + [("A42", "0", fill_total)]
+        + [(f"{column}42", TIME_FORMAT_ID, fill_total) for column in annual_summary_columns],
     )
     members[annual_name] = annual.encode("utf-8")
     members["xl/styles.xml"] = styles.finish().encode("utf-8")

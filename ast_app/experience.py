@@ -10,8 +10,10 @@ from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
 from .domain import TIME_CODES, chf, number, display_date, scheduled_work_minutes, worked_minutes
-from .timesheet_excel import export_timesheet
+from .documents import report_pdf
+from .timesheet_excel import export_timesheet, monthly_summary
 from .excel_import import import_timesheet
+from .excel_trust import ensure_excel_trusted_folder
 from .reminders import (REMINDER_LEVELS, DEFAULT_REMINDER_TEXTS, PLACEHOLDERS, PLACEHOLDER_INFO,
                         reminder_text, reminder_pdf, validate_template)
 from .update_ui import UpdateSettings
@@ -24,6 +26,10 @@ def timesheet_filename(employee, year):
         value = re.sub(r'[<>:"/\\|?*]+', "", str(value).strip())
         return re.sub(r"\s+", "_", value).strip("._") or "Unbekannt"
     return f"Stundennachweis_{int(year)}_{part(employee.get('last_name'))}_{part(employee.get('first_name'))}.xlsm"
+
+
+def timesheet_pdf_filename(employee, year):
+    return timesheet_filename(employee, year).removesuffix(".xlsm") + ".pdf"
 
 
 def menu_button(title, entries):
@@ -477,8 +483,10 @@ class TimeWorkspace(Page):
         self.year = combo([(str(y), y) for y in range(current + 2, current - 7, -1)], current)
         row.addWidget(self.year)
         row.addStretch()
-        self.export_btn = button("Excel-Liste exportieren", self.export_excel, True)
+        self.pdf_btn = button("PDF erstellen", self.export_pdf)
+        self.export_btn = button("Excel speichern", self.export_excel, True)
         row.addWidget(button("Excel importieren", self.import_excel))
+        row.addWidget(self.pdf_btn)
         row.addWidget(self.export_btn)
         self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
                                    ("Arbeitstage", "Tage mit eingetragener Arbeitszeit"),
@@ -549,6 +557,7 @@ class TimeWorkspace(Page):
         self.cards[1].set(str(workdays))
         self.cards[2].set(str(absences))
         self.export_btn.setEnabled(bool(self.employee))
+        self.pdf_btn.setEnabled(bool(self.employee))
         self.selection()
 
     def selection(self):
@@ -585,6 +594,42 @@ class TimeWorkspace(Page):
             self.refresh()
 
     @guarded
+    def export_pdf(self):
+        if not self.employee:
+            return
+        year = self.year.currentData()
+        folders = employee_year_folders(self.employee, year)
+        path = save_path(self, "Stundennachweis als PDF", timesheet_pdf_filename(self.employee, year),
+                         "pdf", "timesheets_pdf", folders)
+        if not path:
+            return
+        weekdays = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
+        rows = []
+        for record in self.current_records:
+            day_value = date.fromisoformat(record["day"])
+            worked = worked_minutes(record)
+            scheduled = scheduled_work_minutes(day_value)
+            rows.append([
+                display_date(record["day"]), weekdays[day_value.weekday()],
+                f"{worked / 60:.2f} h", f"{scheduled / 60:.2f} h",
+                self._difference(worked - scheduled),
+                TIME_CODES.get(record["code"], record["code"]), record["note"],
+            ])
+        totals = {key: 0 for key in ("overtime", "vacation", "sick", "accident", "other")}
+        for month in range(1, 13):
+            for key, value in monthly_summary(self.current_records, year, month).items():
+                totals[key] += value
+        hours = lambda value: f"{value / 60:.2f} h"
+        summary = (f"Überstunden {hours(totals['overtime'])} · Ferien/Freizeit {hours(totals['vacation'])} · "
+                   f"Krankheit {hours(totals['sick'])} · Unfall {hours(totals['accident'])} · "
+                   f"Übrige Minderzeit {hours(totals['other'])}")
+        name = f"{self.employee['first_name']} {self.employee['last_name']}"
+        result = report_pdf(path, "Stundennachweis · " + name, f"Kalenderjahr {year}",
+                            ["Datum", "Wochentag", "IST", "SOLL", "Abweichung", "Grund", "Bemerkung"],
+                            rows, summary, [65, 62, 48, 48, 58, 118, 340])
+        PdfPreview(self, result).exec()
+
+    @guarded
     def export_excel(self):
         if not self.employee:
             return
@@ -594,7 +639,13 @@ class TimeWorkspace(Page):
                          "xlsm", "timesheets_excel", folders)
         if path:
             result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
-            QMessageBox.information(self, "Excel-Liste erstellt", "Die Originalvorlage wurde vollständig befüllt.\n\n" + str(result))
+            trust_error = ensure_excel_trusted_folder(result.parent)
+            message = ("Die Excel-Datei wurde vollständig befüllt. Die Schaltflächen «PDF erstellen» und "
+                       "«Excel speichern» sind beim Öffnen aus diesem Exportordner freigegeben.\n\n" + str(result))
+            if trust_error:
+                message += ("\n\nExcel konnte den Exportordner nicht automatisch freigeben. Die Datei ist verwendbar; "
+                            "verwende bei blockierten Makros bitte die PDF-Schaltfläche direkt in der AST-App.")
+            QMessageBox.information(self, "Excel-Datei erstellt", message)
 
     @guarded
     def import_excel(self):
