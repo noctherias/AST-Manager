@@ -121,6 +121,9 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(fill_rgb(styles, annual, "B4"), "FFF4B6D7")
                 # 1 August 2026 is a Saturday: the holiday colour must win.
                 self.assertEqual(fill_rgb(styles, annual, "W4"), "FFF4B6D7")
+                # Easter and Pentecost Sunday must also win over weekend orange.
+                self.assertEqual(fill_rgb(styles, annual, "K8"), "FFF4B6D7")
+                self.assertEqual(fill_rgb(styles, annual, "N27"), "FFF4B6D7")
                 self.assertEqual(fill_rgb(styles, annual, "B6"), "FFFFD59A")
                 self.assertEqual(fill_rgb(styles, annual, "B7"), "FFFFD59A")
                 self.assertNotIn(fill_rgb(styles, annual, "B8"), {"FFF4B6D7", "FFFFD59A"})

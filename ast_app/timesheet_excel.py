@@ -546,8 +546,9 @@ def company_holidays(year: int) -> set[date]:
     easter = _easter_sunday(int(year))
     return {
         date(year, 1, 1), date(year, 1, 2),
-        easter - timedelta(days=2), easter + timedelta(days=1),
-        easter + timedelta(days=39), easter + timedelta(days=50),
+        easter - timedelta(days=2), easter, easter + timedelta(days=1),
+        easter + timedelta(days=39), easter + timedelta(days=49),
+        easter + timedelta(days=50),
         date(year, 8, 1), date(year, 12, 25), date(year, 12, 26), date(year, 12, 31),
     }
 
