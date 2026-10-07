@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from hashlib import sha256
-from html import escape
+from html import escape, unescape
 from pathlib import Path
 from copy import deepcopy
 import os
@@ -18,7 +18,7 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 from .documents import resource_path
-from .domain import scheduled_work_minutes, vacation_target, worked_minutes
+from .domain import normalize_time_code, scheduled_work_minutes, vacation_target, worked_minutes
 
 
 MONTH_SHEETS = {month: f"xl/worksheets/sheet{month + 5}.xml" for month in range(1, 13)}
@@ -213,6 +213,8 @@ def _widen_annual_hour_columns(xml: str) -> str:
         tag = match.group(0)
         minimum = int(re.search(r'\bmin="(\d+)"', tag).group(1))
         maximum = int(re.search(r'\bmax="(\d+)"', tag).group(1))
+        if minimum == maximum == 1:
+            tag = re.sub(r'\bwidth="[^"]*"', 'width="28"', tag)
         if minimum == maximum and minimum in hour_columns:
             tag = re.sub(r'\bwidth="[^"]*"', 'width="7.5"', tag)
         return tag
@@ -223,7 +225,14 @@ def _widen_annual_hour_columns(xml: str) -> str:
 def _use_direct_hours_formula(xml: str) -> str:
     # K4 is a standalone formula; K5 is the shared master for K5:K34.
     xml = _replace_formula(xml, "K4", 'IF(A4="",0,IF(D4="",0,D4))')
-    return _replace_formula(xml, "K5", 'IF(A5="",0,IF(D5="",0,D5))')
+    xml = _replace_formula(xml, "K5", 'IF(A5="",0,IF(D5="",0,D5))')
+    # The supplied formula treats compensation and home office specially on
+    # half holidays. Keep that behaviour with the clearer new codes.
+    match = _cell_pattern("L4").search(xml)
+    formula = re.search(r'<f(?:\s[^>]*)?>(.*?)</f>', match.group(0), re.DOTALL)
+    updated = unescape(formula.group(1)).replace('UPPER(J4)="G"', 'UPPER(J4)="KO"')
+    updated = updated.replace('UPPER(J4)="H"', 'UPPER(J4)="HO"')
+    return _replace_formula(xml, "L4", updated)
 
 
 def _ignore_unrecorded_day_formula(xml: str, reference: str) -> str:
@@ -440,17 +449,17 @@ def monthly_summary(records: list[dict], year: int, month: int) -> dict[str, int
             continue
         scheduled = scheduled_work_minutes(day)
         actual = worked_minutes(record)
-        code = str(record.get("code") or "").upper()
+        code = normalize_time_code(record.get("code"))
         if actual > scheduled:
             result["overtime"] += actual - scheduled
-        if actual >= scheduled or not scheduled or code == "F":
+        if actual >= scheduled or not scheduled or code == "FA":
             continue
         shortfall = scheduled - actual
-        if code in {"U", "UH", "G"}:
+        if code in {"FG", "FT", "KO"}:
             result["vacation"] += shortfall
-        elif code in {"K", "KR"}:
+        elif code in {"KG", "KT"}:
             result["sick"] += shortfall
-        elif code in {"A", "AR"}:
+        elif code in {"UG", "UT"}:
             result["accident"] += shortfall
         else:
             result["other"] += shortfall
@@ -459,20 +468,22 @@ def monthly_summary(records: list[dict], year: int, month: int) -> dict[str, int
 
 def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
     rows = (
-        (36, "Überstunden geleistet (h)", "overtime",
+        (36, "Überstunden geleistet · automatisch (h)", "overtime",
          'SUMPRODUCT((K4:K34>N4:N34)*(K4:K34-N4:N34))'),
-        (37, "Ferien / Freizeit bezogen (h)", "vacation",
-         'SUMPRODUCT(((J4:J34="U")+(J4:J34="UH")+(J4:J34="G"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
-        (38, "Krankheit (h)", "sick",
-         'SUMPRODUCT(((J4:J34="K")+(J4:J34="KR"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
-        (39, "Unfall (h)", "accident",
-         'SUMPRODUCT(((J4:J34="A")+(J4:J34="AR"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
-        (40, "Übrige begründete Minderzeit (h)", "other",
-         'SUMPRODUCT(((J4:J34="KU")+(J4:J34="KA")+(J4:J34="E1"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (37, "Ferien / Freizeit · FG / FT / KO (h)", "vacation",
+         'SUMPRODUCT(((J4:J34="FG")+(J4:J34="FT")+(J4:J34="KO"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (38, "Krankheit · KG / KT (h)", "sick",
+         'SUMPRODUCT(((J4:J34="KG")+(J4:J34="KT"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (39, "Unfall · UG / UT (h)", "accident",
+         'SUMPRODUCT(((J4:J34="UG")+(J4:J34="UT"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (40, "Übrige Minderzeit · KAG / KAT / BM (h)", "other",
+         'SUMPRODUCT(((J4:J34="KAG")+(J4:J34="KAT")+(J4:J34="BM"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
     )
     for row, title, key, formula in rows:
         xml = _replace_formula_cell(xml, f"K{row}", f'"{title}"', title, "string")
         xml = _replace_formula_cell(xml, f"P{row}", formula, _decimal_hours(summary[key]))
+    xml = _replace_cell(xml, "K41", "Kürzel: FG/FT Ferien · KG/KT Krankheit · UG/UT Unfall", "string")
+    xml = _replace_cell(xml, "K42", "KO Kompensation · FA Feiertag · HO Homeoffice · KAG/KAT Kurzarbeit · BM Minderzeit · BD Bereitschaft", "string")
     return xml
 
 
@@ -480,19 +491,21 @@ def _remove_legacy_monthly_summary(xml: str) -> str:
     """Remove obsolete visible counters and detail labels from the monthly sheet."""
     for row in range(36, 48):
         xml = _replace_cell(xml, f"J{row}", None)
-    for row in range(41, 48):
+    for row in range(43, 48):
         xml = _replace_cell(xml, f"K{row}", None)
+        xml = _replace_cell(xml, f"P{row}", None)
+    for row in (41, 42):
         xml = _replace_cell(xml, f"P{row}", None)
     return xml
 
 
 def _simplify_annual_summary(xml: str, year: int, vacation_hours: float) -> str:
     labels = {
-        37: "Überstunden (h)",
-        38: "Ferien / Freizeit (h)",
-        39: "Krankheit (h)",
-        40: "Unfall (h)",
-        41: "Übrige Minderzeit (h)",
+        37: "Überstunden · automatisch (h)",
+        38: "Ferien / Freizeit · FG / FT / KO (h)",
+        39: "Krankheit · KG / KT (h)",
+        40: "Unfall · UG / UT (h)",
+        41: "Übrige Minderzeit · KAG / KAT / BM (h)",
         42: "Abwesenheit (h)",
         44: "Ferien-Soll (h)",
     }
@@ -508,8 +521,10 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float) -> str:
                                         f"{sheet_name}!P{source_row}", 0)
         xml = _replace_formula_cell(xml, f"{column}42",
                                     f"SUM({column}38:{column}41)", 0)
-        vacation_days = (f'COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B25)'
-                         f'+COUNTIF({sheet_name}!J4:J34,Voreinstellungen!B26)*Voreinstellungen!C26')
+        vacation_days = (f'COUNTIF({sheet_name}!J4:J34,"FG")+'
+                         f'SUMPRODUCT(({sheet_name}!J4:J34="FT")*({sheet_name}!N4:N34>0)*'
+                         f'({sheet_name}!N4:N34-{sheet_name}!K4:K34)/'
+                         f'IF({sheet_name}!N4:N34=0,1,{sheet_name}!N4:N34))')
         xml = _replace_formula_cell(xml, f"{column}43", vacation_days, 0)
         xml = _replace_cell(xml, f"{column}44", format(vacation_hours / 12, ".15g"))
     for row in range(37, 43):
@@ -581,13 +596,29 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     settings = members["xl/worksheets/sheet1.xml"].decode("utf-8")
     settings = _replace_cell(settings, "C2", year)
     settings = _replace_cell(settings, "C3", full_name, "string")
-    settings = _replace_cell(settings, "A29", "Andere begründete Minderzeit", "string")
-    settings = _replace_cell(settings, "A31", "Unfall · ganzer Tag", "string")
-    settings = _replace_cell(settings, "B31", "A", "string")
-    settings = _replace_cell(settings, "C31", "REST", "string")
-    settings = _replace_cell(settings, "A32", "Unfall · Teil des Tages", "string")
-    settings = _replace_cell(settings, "B32", "AR", "string")
-    settings = _replace_cell(settings, "C32", "REST", "string")
+    code_rows = (
+        (19, "Ferien / Freizeit · ganzer Tag", "FG", 0),
+        (20, "Ferien / Freizeit · teilweise", "FT", "REST"),
+        (21, "Freizeit / Kompensation", "KO", 1),
+        (22, "Krankheit · ganzer Tag", "KG", 0),
+        (23, "Krankheit · teilweise", "KT", "REST"),
+        (24, "Unfall · ganzer Tag", "UG", 0),
+        (25, "Unfall · teilweise", "UT", "REST"),
+        (26, "Feiertag / arbeitsfrei", "FA", "Register Feiertage"),
+        (27, "Homeoffice", "HO", 1),
+        (28, "Kurzarbeit · ganzer Tag", "KAG", 0),
+        (29, "Kurzarbeit · teilweise", "KAT", "REST"),
+        (30, "Andere begründete Minderzeit", "BM", "REST"),
+        (31, "Bereitschaftsdienst", "BD", "XTRA"),
+    )
+    for row in range(19, 34):
+        for column in "ABC":
+            settings = _replace_cell(settings, f"{column}{row}", None)
+    for row, title, code, factor in code_rows:
+        settings = _replace_cell(settings, f"A{row}", title, "string")
+        settings = _replace_cell(settings, f"B{row}", code, "string")
+        settings = _replace_cell(settings, f"C{row}", factor,
+                                 "string" if isinstance(factor, str) else "number")
     settings = re.sub(r'(<dataValidation\b[^>]*>.*?<formula1>).*?(</formula1>)',
                       lambda m: m.group(1) + '"' + escape(full_name, quote=False) + '"' + m.group(2),
                       settings, count=1, flags=re.DOTALL)
@@ -629,7 +660,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             if not record:
                 continue
             xml = _replace_cell(xml, f"D{row}", _decimal_hours(worked_minutes(record)))
-            xml = _replace_cell(xml, f"J{row}", record.get("code", ""), "string")
+            xml = _replace_cell(xml, f"J{row}", normalize_time_code(record.get("code")), "string")
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
         xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
         xml = _replace_formula_cell(xml, "F37", "SUM(L4:L34)",
@@ -637,7 +668,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         xml = _remove_legacy_monthly_summary(xml)
         xml = _set_row_heights(xml, {1: 24, 2: 20, 3: 34,
                                      **{row: 20 for row in range(4, 35)},
-                                     **{row: 22 for row in range(36, 41)}})
+                                     **{row: 22 for row in range(36, 43)}})
         xml = styles.apply(xml, _monthly_time_cells())
         xml = styles.apply_colored(
             xml,

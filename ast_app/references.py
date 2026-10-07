@@ -10,13 +10,14 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, Q
                                QDialogButtonBox, QPlainTextEdit, QMessageBox, QHeaderView, QWidget,
                                QScrollArea)
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, KeepTogether
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Image, KeepTogether,
+                                Table as PdfTable, TableStyle)
 
-from .documents import resource_path
 from .domain import display_date
 from .export_paths import employee_year_folders
 from .pages import save_path, PdfPreview
@@ -181,52 +182,93 @@ def reference_pdf(path, reference, employee, settings):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     styles = getSampleStyleSheet()
-    body = ParagraphStyle("Body", parent=styles["BodyText"], fontName="Helvetica", fontSize=10.5,
-                          leading=15, spaceAfter=10, textColor=colors.HexColor("#172f3d"))
-    title_style = ParagraphStyle("Title", parent=styles["Title"], fontName="Helvetica-Bold",
-                                 fontSize=18, leading=22, alignment=TA_CENTER, textColor=colors.black,
-                                 spaceAfter=16)
-    small = ParagraphStyle("Small", parent=body, fontSize=8.5, leading=11, textColor=colors.HexColor("#536b79"))
+    body = ParagraphStyle("ASTLetter", parent=styles["Normal"], fontName="Helvetica", fontSize=9.8,
+                          leading=12, spaceAfter=0, textColor=colors.black)
+    small = ParagraphStyle("ASTSmall", parent=body, fontSize=8, leading=10)
+    right = ParagraphStyle("ASTRight", parent=body, alignment=TA_RIGHT)
+    footer_right = ParagraphStyle("ASTFooterRight", parent=small, alignment=TA_RIGHT)
+    subject_style = ParagraphStyle("ASTSubject", parent=body, fontName="Helvetica-Bold",
+                                   fontSize=13, leading=16)
+
+    full_name = (employee.get("first_name", "") + " " + employee.get("last_name", "")).strip()
+    reference_type = REFERENCE_TYPES[reference["reference_type"]]
+    effective_date = display_date(reference.get("end_date") or reference["issue_date"])
+    subject_text = f"{reference_type} {full_name} per {effective_date}"
+    company_name = escape(settings.get("company", "AST Elektro Tüscher AG"))
 
     def footer(canvas, doc):
-        canvas.saveState()
-        canvas.setStrokeColor(colors.HexColor("#b9c9cf"))
-        canvas.line(22 * mm, 17 * mm, 188 * mm, 17 * mm)
-        canvas.setFont("Helvetica", 7.2)
-        canvas.setFillColor(colors.HexColor("#536b79"))
-        company = settings.get("company", "AST Elektro Tüscher AG")
-        address = " · ".join(filter(None, [settings.get("address", ""),
-                                             (settings.get("postcode", "") + " " + settings.get("city", "")).strip()]))
-        canvas.drawString(22 * mm, 11 * mm, company)
-        canvas.drawCentredString(105 * mm, 11 * mm, address)
-        canvas.drawRightString(188 * mm, 11 * mm, settings.get("phone", ""))
-        online = " · ".join(filter(None, [settings.get("email", ""), settings.get("website", "")]))
-        canvas.drawRightString(188 * mm, 7.5 * mm, online)
-        canvas.restoreState()
+        canvas.setStrokeColor(colors.HexColor("#555555"))
+        canvas.setLineWidth(.6)
+        canvas.line(20 * mm, 27 * mm, 190 * mm, 27 * mm)
+        footer_left = [f"<b>{company_name}</b>", escape(settings.get("address", "")),
+                       escape(" ".join(filter(None, (settings.get("postcode", ""), settings.get("city", ""))))),
+                       escape(settings.get("phone", "")), escape(settings.get("email", ""))]
+        footer_middle = []
+        if settings.get("website", ""):
+            footer_middle.append("Mehr Infos auf <b>" + escape(settings["website"]) + "</b>")
+        left_paragraph = Paragraph("<br/>".join(value for value in footer_left if value), small)
+        middle_paragraph = Paragraph("<br/>".join(footer_middle), small)
+        page_paragraph = Paragraph(f"Seite {doc.page}", footer_right)
+        footer_table = PdfTable([[left_paragraph, middle_paragraph, page_paragraph]],
+                                colWidths=[72 * mm, 58 * mm, 40 * mm])
+        footer_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                                          ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                          ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                          ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                          ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        footer_table.wrapOn(canvas, 170 * mm, 22 * mm)
+        footer_table.drawOn(canvas, 20 * mm, 5 * mm)
 
-    doc = SimpleDocTemplate(str(path), pagesize=A4, rightMargin=22 * mm, leftMargin=22 * mm,
-                            topMargin=20 * mm, bottomMargin=24 * mm,
-                            title=REFERENCE_TYPES[reference["reference_type"]], author=settings.get("company", "AST"))
+    doc = SimpleDocTemplate(str(path), pagesize=A4, leftMargin=20 * mm, rightMargin=30 * mm,
+                            topMargin=15 * mm, bottomMargin=39 * mm,
+                            title=subject_text, author=settings.get("company", "AST"))
     story = []
-    logo_path = Path(settings.get("logo_path", ""))
-    if not logo_path.is_file():
-        logo_path = resource_path("assets/logo_ast_black.png")
-    if logo_path.is_file():
-        logo = Image(str(logo_path), width=70 * mm, height=36 * mm, kind="proportional")
-        logo.hAlign = "LEFT"
-        story.extend([logo, Spacer(1, 8 * mm)])
-    story.append(Paragraph(REFERENCE_TYPES[reference["reference_type"]], title_style))
-    story.append(Paragraph(f"<b>{escape(employee['first_name'] + ' ' + employee['last_name'])}</b>", body))
-    story.append(Spacer(1, 4 * mm))
+    logo_path = str(settings.get("logo_path", "")).strip()
+    logo = None
+    if logo_path and Path(logo_path).is_file():
+        try:
+            width, height = ImageReader(logo_path).getSize()
+            scale = min((58 * mm) / width, (25 * mm) / height)
+            logo = Image(logo_path, width=width * scale, height=height * scale)
+        except Exception as exc:
+            raise ValueError("Das gespeicherte Firmenlogo kann nicht gelesen werden.") from exc
+    if logo is None:
+        logo = Paragraph(f"<b>{company_name}</b>", ParagraphStyle(
+            "ASTCompany", parent=body, fontName="Helvetica-Bold", fontSize=18, leading=21))
+    company_lines = [settings.get("address", ""),
+                     " ".join(filter(None, (settings.get("postcode", ""), settings.get("city", "")))),
+                     settings.get("phone", ""), settings.get("email", ""), settings.get("website", "")]
+    identity = [logo, Spacer(1, 3 * mm), Paragraph("<br/>".join(escape(v) for v in company_lines if v), small)]
+    header = PdfTable([[identity, ""]], colWidths=[82 * mm, 78 * mm], hAlign="LEFT")
+    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    story.extend((header, Spacer(1, 6 * mm)))
+    recipient_name = " ".join(filter(None, (employee.get("salutation", ""), full_name)))
+    recipient = [recipient_name, employee.get("address", ""),
+                 " ".join(filter(None, (employee.get("postcode", ""), employee.get("city", ""))))]
+    recipient_block = PdfTable([["", Paragraph("<br/>".join(escape(v) for v in recipient if v), body)]],
+                               colWidths=[92 * mm, 68 * mm], hAlign="LEFT")
+    recipient_block.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                         ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                         ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    issued = display_date(reference["issue_date"])
+    place_date = Paragraph(f"{escape(settings.get('city', ''))}, {issued}", right)
+    info = PdfTable([["", place_date]], colWidths=[92 * mm, 68 * mm], hAlign="LEFT")
+    info.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                              ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                              ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    story.extend((recipient_block, Spacer(1, 8 * mm), info, Spacer(1, 8 * mm),
+                  Paragraph(escape(subject_text), subject_style), Spacer(1, 5 * mm)))
     for paragraph in reference["text"].split("\n\n"):
         if paragraph.strip():
-            story.append(Paragraph(escape(paragraph.strip()).replace("\n", "<br/>"), body))
-    place = settings.get("city", "Aarburg")
-    issued = display_date(reference["issue_date"])
-    company = escape(settings.get("company", "AST Elektro Tüscher AG"))
+            story.extend((Paragraph(escape(paragraph.strip()).replace("\n", "<br/>"), body),
+                          Spacer(1, 3 * mm)))
     contact = escape(settings.get("contact", ""))
-    story.extend([Spacer(1, 10 * mm), Paragraph(f"{escape(place)}, {issued}", body), Spacer(1, 14 * mm),
-                  KeepTogether([Paragraph(f"<b>{company}</b>", body), Spacer(1, 8 * mm),
+    story.extend([Spacer(1, 5 * mm),
+                  KeepTogether([Paragraph(f"<b>{company_name}</b>", body), Spacer(1, 8 * mm),
                                 Paragraph("__________________________________", small),
                                 Paragraph(contact or "Unterschrift", small)])])
     doc.build(story, onFirstPage=footer, onLaterPages=footer)

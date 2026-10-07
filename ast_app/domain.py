@@ -6,12 +6,33 @@ from decimal import Decimal, InvalidOperation
 
 KINDS = {"vacation": "Ferien", "overtime": "Überzeit", "sick": "Krankheit", "accident": "Unfall"}
 TIME_CODES = {
-    "": "Normaler Arbeitstag", "U": "Ferien / Freizeit · ganzer Tag", "UH": "Ferien / Freizeit · Teil des Tages",
-    "K": "Krankheit · ganzer Tag", "KR": "Krankheit · Teil des Tages",
-    "A": "Unfall · ganzer Tag", "AR": "Unfall · Teil des Tages", "G": "Freizeit / Kompensation",
-    "H": "Homeoffice", "F": "Feiertag", "KU": "Kurzarbeit · ganzer Tag",
-    "KA": "Kurzarbeit · Teil des Tages", "E1": "Andere begründete Minderzeit", "B": "Bereitschaft",
+    "": "Normaler Arbeitstag",
+    "FG": "Ferien / Freizeit · ganzer Tag",
+    "FT": "Ferien / Freizeit · teilweise",
+    "KO": "Freizeit / Kompensation",
+    "KG": "Krankheit · ganzer Tag",
+    "KT": "Krankheit · teilweise",
+    "UG": "Unfall · ganzer Tag",
+    "UT": "Unfall · teilweise",
+    "FA": "Feiertag / arbeitsfrei",
+    "HO": "Homeoffice",
+    "KAG": "Kurzarbeit · ganzer Tag",
+    "KAT": "Kurzarbeit · teilweise",
+    "BM": "Andere begründete Minderzeit",
+    "BD": "Bereitschaftsdienst",
 }
+
+# Codes from exports and databases created before the simplified code system.
+LEGACY_TIME_CODES = {
+    "F": "FA", "G": "KO", "K": "KG", "KR": "KT", "A": "UG", "AR": "UT",
+    "KU": "KAG", "KA": "KAT", "U": "FG", "UH": "FT", "H": "HO", "B": "BD",
+    "E1": "BM", "E2": "BM", "E3": "BM", "E4": "BM", "E5": "BM",
+}
+
+
+def normalize_time_code(value) -> str:
+    code = str(value or "").strip().upper()
+    return LEGACY_TIME_CODES.get(code, code)
 SALARY_AMOUNTS = [
     ("1", "1 · Lohn / Rente"),
     ("2-1", "2.1 · Verpflegung und Unterkunft"),

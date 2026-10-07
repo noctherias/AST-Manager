@@ -336,7 +336,7 @@ class TimeRecordDialog(FormDialog):
         value = self.fields["day"].date()
         selected_day = date(value.year(), value.month(), value.day())
         code = self.fields["code"].currentData() or ""
-        minutes = scheduled_work_minutes(selected_day) if code in ("", "H") else 0
+        minutes = scheduled_work_minutes(selected_day) if code in ("", "HO") else 0
         self.hours.setValue(minutes / 60)
 
     @guarded
@@ -410,7 +410,7 @@ class BulkTimeDialog(FormDialog):
         current = start
         while current <= end:
             if current.weekday() in selected:
-                minutes = (scheduled_work_minutes(current) if code in ("", "H") else 0) \
+                minutes = (scheduled_work_minutes(current) if code in ("", "HO") else 0) \
                     if self.regular.isChecked() else round(self.hours.value() * 60)
                 records.append({**common, "day": current.isoformat(), "worked_minutes": minutes})
             current += timedelta(days=1)

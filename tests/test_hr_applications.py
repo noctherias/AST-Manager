@@ -20,6 +20,7 @@ class HrApplicationTests(unittest.TestCase):
         self.employee_id = self.db.save_employee({
             "code": "AST-01", "first_name": "Anna", "last_name": "Muster", "kind": "employee",
             "salutation": "Frau", "birth_date": "1995-05-14", "hired": "2020-02-01",
+            "address": "Musterweg 7", "postcode": "5000", "city": "Aarau",
             "job": "Elektroinstallateurin EFZ", "workload": 10000, "allowance": 21625, "active": 1,
         })
 
@@ -44,10 +45,17 @@ class HrApplicationTests(unittest.TestCase):
         row = self.db.reference(key)
         self.assertEqual(row["ratings"]["quality_1"], 4)
         path = self.root / "zeugnis.pdf"
-        reference_pdf(path, row, employee, {"company": "AST Elektro Tüscher AG", "city": "Aarburg"})
+        reference_pdf(path, row, employee, {"company": "AST Elektro Tüscher AG", "city": "Aarburg",
+                                                  "address": "Werkstrasse 1", "postcode": "4663",
+                                                  "phone": "+41 62 000 00 00", "email": "info@ast.ch",
+                                                  "website": "www.ast-elektro.ch", "contact": "Geschäftsleitung"})
         pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
         self.assertIn("Zwischenzeugnis", pdf_text)
         self.assertIn("Anna Muster", pdf_text)
+        self.assertIn("Zwischenzeugnis Anna Muster per 05.10.2026", pdf_text)
+        self.assertIn("Musterweg 7", pdf_text)
+        self.assertIn("5000 Aarau", pdf_text)
+        self.assertIn("Werkstrasse 1", pdf_text)
 
     def test_reserved_reference_wording_remains_benevolent(self):
         employee = self.db.employee(self.employee_id)

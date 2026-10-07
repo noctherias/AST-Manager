@@ -8,8 +8,8 @@ from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from .domain import (KINDS, iso, invoice_state, period_balance, salary_totals,
-                     scheduled_work_minutes, worked_minutes)
+from .domain import (KINDS, TIME_CODES, iso, invoice_state, normalize_time_code, period_balance,
+                     salary_totals, scheduled_work_minutes, worked_minutes)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submi
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
 class Database:
@@ -115,6 +115,8 @@ class Database:
             for record in self.rows("SELECT * FROM time_records"):
                 self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                   (worked_minutes({**record, "worked_minutes": None}), record["id"]))
+        if version < 12:
+            self._migrate_time_codes()
         invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
         if "reminder_level" not in invoice_columns:
             self.conn.execute("ALTER TABLE invoices ADD COLUMN reminder_level INTEGER NOT NULL DEFAULT 0")
@@ -147,6 +149,13 @@ class Database:
             self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         self.conn.commit()
+
+    def _migrate_time_codes(self):
+        """Replace the old cryptic Excel codes without losing time records."""
+        for record in self.rows("SELECT id,code FROM time_records"):
+            code = normalize_time_code(record["code"])
+            if code != record["code"]:
+                self.conn.execute("UPDATE time_records SET code=? WHERE id=?", (code, record["id"]))
 
     def close(self):
         self.conn.close()
@@ -329,11 +338,10 @@ class Database:
                   "worked_minutes", "code", "note")
         d = {name: data.get(name) for name in fields}
         d["day"] = iso(d["day"])
-        d["code"] = str(d.get("code") or "").strip().upper()
+        d["code"] = normalize_time_code(d.get("code"))
         d["note"] = str(d.get("note") or "").strip()
         d["break_minutes"] = int(d.get("break_minutes") or 0)
-        valid_codes = {"", "F", "G", "K", "KR", "A", "AR", "KU", "KA", "U", "UH", "H", "B",
-                       "E1", "E2", "E3", "E4", "E5"}
+        valid_codes = set(TIME_CODES)
         if d["code"] not in valid_codes:
             raise ValueError("Bitte einen gültigen Abwesenheits- oder Arbeitscode auswählen.")
         if not self.employee(d["employee_id"]):
@@ -368,10 +376,10 @@ class Database:
         if d["worked_minutes"] == 0 and not d["code"]:
             raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
         scheduled = scheduled_work_minutes(d["day"])
-        shortfall_reasons = {"U", "UH", "K", "KR", "A", "AR", "G", "KU", "KA", "E1"}
-        if d["worked_minutes"] < scheduled and d["code"] != "F" and d["code"] not in shortfall_reasons:
+        shortfall_reasons = {"FG", "FT", "KG", "KT", "UG", "UT", "KO", "KAG", "KAT", "BM"}
+        if d["worked_minutes"] < scheduled and d["code"] != "FA" and d["code"] not in shortfall_reasons:
             raise ValueError("Bitte einen Grund für die geringere IST-Zeit auswählen.")
-        if d["code"] == "E1" and not d["note"]:
+        if d["code"] == "BM" and not d["note"]:
             raise ValueError("Bitte die andere Minderzeit unter Bemerkung kurz begründen.")
         return self._save("time_records", d, key)
 
@@ -563,5 +571,7 @@ class Database:
                 for record in self.rows("SELECT * FROM time_records"):
                     self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                       (worked_minutes({**record, "worked_minutes": None}), record["id"]))
+            if saved_version < 12:
+                self._migrate_time_codes()
             self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         return safety
