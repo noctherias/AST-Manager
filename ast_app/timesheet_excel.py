@@ -18,10 +18,12 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 from .documents import resource_path
-from .domain import worked_minutes
+from .domain import scheduled_work_minutes, worked_minutes
 
 
 MONTH_SHEETS = {month: f"xl/worksheets/sheet{month + 5}.xml" for month in range(1, 13)}
+MONTH_NAMES = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+               "August", "September", "Oktober", "November", "Dezember")
 INPUT_COLUMNS = ("D", "E", "F", "G", "H", "J", "O")
 TIME_FORMAT_ID = "176"       # #,##0.00 "h"; red negative values
 SIGNED_TIME_FORMAT_ID = "176"
@@ -89,6 +91,42 @@ def _replace_formula(xml: str, reference: str, formula_text: str) -> str:
     replacement = formula.group(1) + escape(formula_text, quote=False) + formula.group(2)
     cell_xml = cell_xml[:formula.start()] + replacement + cell_xml[formula.end():]
     return xml[:match.start()] + cell_xml + xml[match.end():]
+
+
+def _replace_formula_cell(xml: str, reference: str, formula_text: str, cached_value,
+                          result_kind="number") -> str:
+    """Write a formula and its cached result while retaining the cell style."""
+    pattern = _cell_pattern(reference)
+    match = pattern.search(xml)
+    if not match:
+        raise ValueError(f"Excel-Vorlage: Zelle {reference} wurde nicht gefunden.")
+    attrs = match.group("attrs") or ""
+    kept = []
+    for name, content in re.findall(r'([\w:]+)="([^"]*)"', attrs):
+        if name != "t":
+            kept.append(f'{name}="{content}"')
+    if result_kind == "string":
+        kept.append('t="str"')
+    attributes = (" " + " ".join(kept)) if kept else ""
+    formula = escape(formula_text, quote=False)
+    value = escape(str(cached_value), quote=False)
+    replacement = f"<c{attributes}><f>{formula}</f><v>{value}</v></c>"
+    return xml[:match.start()] + replacement + xml[match.end():]
+
+
+def _hide_rows(xml: str, first_row: int, last_row: int) -> str:
+    for row in range(first_row, last_row + 1):
+        pattern = re.compile(rf'<row\b(?=[^>]*\br="{row}")(?P<attrs>[^>]*)>')
+        match = pattern.search(xml)
+        if not match:
+            continue
+        tag = match.group(0)
+        if re.search(r'\bhidden="[^"]*"', tag):
+            tag = re.sub(r'\bhidden="[^"]*"', 'hidden="1"', tag, count=1)
+        else:
+            tag = tag[:-1] + ' hidden="1">'
+        xml = xml[:match.start()] + tag + xml[match.end():]
+    return xml
 
 
 def _simplify_time_columns(xml: str) -> str:
@@ -190,7 +228,7 @@ def _monthly_time_cells() -> list[tuple[str, str]]:
         ("F38", TIME_FORMAT_ID), ("F39", TIME_FORMAT_ID),
         ("F40", BALANCE_FORMAT_ID),
     ])
-    cells.extend((f"P{row}", TIME_FORMAT_ID) for row in (36, 37, 39, 42, 43, 44, 45, 46, 47))
+    cells.extend((f"P{row}", TIME_FORMAT_ID) for row in (36, 37, 38, 39, 42, 43, 44, 45, 46, 47))
     return cells
 
 
@@ -203,11 +241,9 @@ def _annual_time_cells() -> list[tuple[str, str]]:
     # Monthly summary values live in the first column of every month group.
     summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI")
     for column in summary_columns:
-        cells.extend((f"{column}{row}", TIME_FORMAT_ID) for row in (35, 36))
-        cells.append((f"{column}37", SIGNED_TIME_FORMAT_ID))
+        cells.extend((f"{column}{row}", TIME_FORMAT_ID) for row in range(35, 42))
     cells.extend([
-        ("AL35", TIME_FORMAT_ID), ("AL36", TIME_FORMAT_ID),
-        ("AL37", SIGNED_TIME_FORMAT_ID),
+        *[(f"AL{row}", TIME_FORMAT_ID) for row in range(35, 42)],
     ])
     return cells
 
@@ -245,6 +281,69 @@ def _decimal_hours(minutes: int | None):
     if minutes is None:
         return None
     return format(int(minutes) / 60, ".15g")
+
+
+def monthly_summary(records: list[dict], year: int, month: int) -> dict[str, int]:
+    """Summarise recorded deviations without treating missing records as absences."""
+    result = {"overtime": 0, "vacation": 0, "sick": 0, "other": 0}
+    for record in records:
+        day = date.fromisoformat(record["day"])
+        if day.year != year or day.month != month:
+            continue
+        scheduled = scheduled_work_minutes(day)
+        actual = worked_minutes(record)
+        code = str(record.get("code") or "").upper()
+        if actual > scheduled:
+            result["overtime"] += actual - scheduled
+        if actual >= scheduled or not scheduled or code == "F":
+            continue
+        shortfall = scheduled - actual
+        if code in {"U", "UH", "G"}:
+            result["vacation"] += shortfall
+        elif code in {"K", "KR"}:
+            result["sick"] += shortfall
+        else:
+            result["other"] += shortfall
+    return result
+
+
+def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
+    rows = (
+        (36, "Überstunden geleistet (h)", "overtime",
+         'SUMPRODUCT((K4:K34>N4:N34)*(K4:K34-N4:N34))'),
+        (37, "Ferien / Freizeit bezogen (h)", "vacation",
+         'SUMPRODUCT(((J4:J34="U")+(J4:J34="UH")+(J4:J34="G"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (38, "Krankheit (h)", "sick",
+         'SUMPRODUCT(((J4:J34="K")+(J4:J34="KR"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+        (39, "Übrige begründete Minderzeit (h)", "other",
+         'SUMPRODUCT(((J4:J34="KU")+(J4:J34="KA")+(J4:J34="E1"))*(N4:N34>K4:K34)*(N4:N34-K4:K34))'),
+    )
+    for row, title, key, formula in rows:
+        xml = _replace_formula_cell(xml, f"K{row}", f'"{title}"', title, "string")
+        xml = _replace_formula_cell(xml, f"P{row}", formula, _decimal_hours(summary[key]))
+    return xml
+
+
+def _simplify_annual_summary(xml: str) -> str:
+    labels = {
+        37: "Überstunden geleistet (h)",
+        38: "Ferien / Freizeit bezogen (h)",
+        39: "Krankheit (h)",
+        40: "Übrige begründete Minderzeit (h)",
+        41: "Abwesenheiten gesamt (h)",
+    }
+    for row, title in labels.items():
+        xml = _replace_cell(xml, f"A{row}", title, "string")
+    summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI")
+    for month_index, (column, sheet_name) in enumerate(zip(summary_columns, MONTH_NAMES), 1):
+        for target_row, source_row in ((37, 36), (38, 37), (39, 38), (40, 39)):
+            xml = _replace_formula_cell(xml, f"{column}{target_row}",
+                                        f"{sheet_name}!P{source_row}", 0)
+        xml = _replace_formula_cell(xml, f"{column}41",
+                                    f"SUM({column}38:{column}40)", 0)
+    for row in range(37, 42):
+        xml = _replace_formula_cell(xml, f"AL{row}", f"SUM(B{row}:AK{row})", 0)
+    return _hide_rows(xml, 42, 50)
 
 
 def _vba_hash(members: dict[str, bytes]) -> str | None:
@@ -303,6 +402,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     settings = members["xl/worksheets/sheet1.xml"].decode("utf-8")
     settings = _replace_cell(settings, "C2", year)
     settings = _replace_cell(settings, "C3", full_name, "string")
+    settings = _replace_cell(settings, "A29", "Andere begründete Minderzeit", "string")
     settings = re.sub(r'(<dataValidation\b[^>]*>.*?<formula1>).*?(</formula1>)',
                       lambda m: m.group(1) + '"' + escape(full_name, quote=False) + '"' + m.group(2),
                       settings, count=1, flags=re.DOTALL)
@@ -314,6 +414,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
         xml = members[xml_name].decode("utf-8")
         xml = _simplify_time_columns(xml)
         xml = _use_direct_hours_formula(xml)
+        xml = _replace_cell(xml, "J3", "Grund", "string")
         if company:
             xml = _replace_cell(xml, "C1", company, "string")
         # L4, M4 and N4 are masters of their shared formulas down to row 34.
@@ -329,11 +430,13 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             xml = _replace_cell(xml, f"D{row}", _decimal_hours(worked_minutes(record)))
             xml = _replace_cell(xml, f"J{row}", record.get("code", ""), "string")
             xml = _replace_cell(xml, f"O{row}", record.get("note", ""), "string")
+        xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
         xml = styles.apply(xml, _monthly_time_cells())
         members[xml_name] = xml.encode("utf-8")
 
     annual_name = "xl/worksheets/sheet18.xml"
     annual = members[annual_name].decode("utf-8")
+    annual = _simplify_annual_summary(annual)
     members[annual_name] = styles.apply(annual, _annual_time_cells()).encode("utf-8")
     members["xl/styles.xml"] = styles.finish().encode("utf-8")
 

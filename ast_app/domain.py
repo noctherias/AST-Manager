@@ -6,10 +6,10 @@ from decimal import Decimal, InvalidOperation
 
 KINDS = {"vacation": "Ferien", "overtime": "Überzeit", "sick": "Krankheit", "accident": "Unfall"}
 TIME_CODES = {
-    "": "Normaler Arbeitstag", "U": "Ferien · ganzer Tag", "UH": "Ferien · halber Tag",
-    "K": "Krank · ganzer Tag", "KR": "Krank · Restzeit", "G": "Gleittag",
+    "": "Normaler Arbeitstag", "U": "Ferien / Freizeit · ganzer Tag", "UH": "Ferien / Freizeit · Teil des Tages",
+    "K": "Krankheit · ganzer Tag", "KR": "Krankheit · Teil des Tages", "G": "Freizeit / Kompensation",
     "H": "Homeoffice", "F": "Feiertag", "KU": "Kurzarbeit · ganzer Tag",
-    "KA": "Kurzarbeit · Restzeit", "B": "Bereitschaft",
+    "KA": "Kurzarbeit · Teil des Tages", "E1": "Andere begründete Minderzeit", "B": "Bereitschaft",
 }
 SALARY_AMOUNTS = [
     ("1", "1 · Lohn / Rente"),

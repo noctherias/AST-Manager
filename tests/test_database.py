@@ -140,6 +140,16 @@ class DatabaseTests(unittest.TestCase):
         self.db = Database(self.path)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["note"], "Test")
 
+    def test_reduced_actual_time_requires_a_reason(self):
+        data = {"employee_id": self.person, "day": "2026-01-05", "worked_minutes": 480,
+                "code": "", "note": ""}
+        with self.assertRaisesRegex(ValueError, "Grund"):
+            self.db.save_time_record(data)
+        with self.assertRaisesRegex(ValueError, "Bemerkung"):
+            self.db.save_time_record({**data, "code": "E1"})
+        key = self.db.save_time_record({**data, "code": "E1", "note": "Arzttermin"})
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["id"], key)
+
     def test_bulk_time_records_skip_or_overwrite_existing_days(self):
         base = {"employee_id": self.person, "worked_minutes": 525,
                 "code": "", "note": "Serie"}

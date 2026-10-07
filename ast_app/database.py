@@ -8,7 +8,8 @@ from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from .domain import KINDS, iso, invoice_state, period_balance, salary_totals, worked_minutes
+from .domain import (KINDS, iso, invoice_state, period_balance, salary_totals,
+                     scheduled_work_minutes, worked_minutes)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -365,6 +366,12 @@ class Database:
             raise ValueError("Bitte die Arbeitszeit in 0.25-Stunden-Schritten eingeben.")
         if d["worked_minutes"] == 0 and not d["code"]:
             raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
+        scheduled = scheduled_work_minutes(d["day"])
+        shortfall_reasons = {"U", "UH", "K", "KR", "G", "KU", "KA", "E1"}
+        if d["worked_minutes"] < scheduled and d["code"] != "F" and d["code"] not in shortfall_reasons:
+            raise ValueError("Bitte einen Grund für die geringere IST-Zeit auswählen.")
+        if d["code"] == "E1" and not d["note"]:
+            raise ValueError("Bitte die andere Minderzeit unter Bemerkung kurz begründen.")
         return self._save("time_records", d, key)
 
     def save_time_records(self, records, overwrite=False):

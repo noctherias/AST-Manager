@@ -303,14 +303,15 @@ class TimeRecordDialog(FormDialog):
         self.db, self.employee, self.row = db, employee, row or {}
         r = self.row
         self.add("day", "Datum", day(r.get("day")))
-        self.add("code", "Art des Tages", combo([(title, code) for code, title in TIME_CODES.items()], r.get("code", "")))
+        self.add("code", "Grund bei Abweichung", combo([(title, code) for code, title in TIME_CODES.items()], r.get("code", "")))
         initial = worked_minutes(r) if row else scheduled_work_minutes(date.today())
         self.hours = numeric(initial / 60, " h")
         self.hours.setRange(0, 24)
         self.add("hours", "Arbeitszeit", self.hours)
         self.add("note", "Bemerkung", line(r.get("note", ""), "z. B. Baustelle Zürich"))
         hint = label("Regelzeit: Montag–Donnerstag 8.75 h, Freitag 8.25 h. "
-                     "Bei einer vollständigen Abwesenheit bleibt die Arbeitszeit 0.00 h.", "muted")
+                     "Liegt die IST-Zeit darunter, wähle bitte den Grund aus. "
+                     "Bei «Andere begründete Minderzeit» ist eine kurze Bemerkung erforderlich.", "muted")
         hint.setWordWrap(True)
         self.form.addRow("", hint)
         if not row:
@@ -364,7 +365,7 @@ class BulkTimeDialog(FormDialog):
             self.weekdays.append(check)
         week_row.addStretch()
         self.form.addRow("Wochentage", week)
-        self.add("code", "Art des Tages", combo([(title, code) for code, title in TIME_CODES.items()], ""))
+        self.add("code", "Grund bei Abweichung", combo([(title, code) for code, title in TIME_CODES.items()], ""))
         self.regular = QCheckBox("Regelarbeitszeit automatisch einsetzen")
         self.regular.setChecked(True)
         self.form.addRow("", self.regular)
@@ -375,7 +376,8 @@ class BulkTimeDialog(FormDialog):
         self.overwrite = QCheckBox("Bereits erfasste Tage überschreiben")
         self.form.addRow("", self.overwrite)
         hint = label("Automatisch werden Montag–Donnerstag 8.75 h und Freitag 8.25 h eingesetzt. "
-                     "Bei Abwesenheiten werden 0.00 h gespeichert. Für Teilzeiten die Automatik ausschalten.", "muted")
+                     "Bei einer geringeren IST-Zeit muss ein Grund gewählt werden. "
+                     "Für Teilabwesenheiten die Automatik ausschalten und die tatsächlich gearbeiteten Stunden eintragen.", "muted")
         hint.setWordWrap(True)
         self.form.addRow("", hint)
         self.regular.toggled.connect(self._state)

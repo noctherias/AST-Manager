@@ -483,7 +483,7 @@ class TimeWorkspace(Page):
         self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
                                    ("Arbeitstage", "Tage mit eingetragener Arbeitszeit"),
                                    ("Abwesenheiten", "Tage mit einem Code")])
-        self.table = Table(["Datum", "Wochentag", "Arbeitszeit", "Sollzeit", "Abweichung", "Art", "Bemerkung"])
+        self.table = Table(["Datum", "Wochentag", "Arbeitszeit", "Sollzeit", "Abweichung", "Grund", "Bemerkung"])
         self.layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(self.layout, "Wähle einen Tag aus oder erfasse einen neuen.")
         self.edit_btn = button("Tag bearbeiten", self.edit_entry)
@@ -540,7 +540,7 @@ class TimeWorkspace(Page):
             total += worked
             workdays += int(worked > 0)
             absences += int(bool(record["code"]))
-            difference = "–" if record["code"] and not worked else self._difference(worked - scheduled)
+            difference = "–" if not scheduled and not worked else self._difference(worked - scheduled)
             rows.append([display_date(record["day"]), weekdays[day_value.weekday()], self._duration(worked),
                          self._duration(scheduled), difference,
                          TIME_CODES.get(record["code"], record["code"]), record["note"]])
