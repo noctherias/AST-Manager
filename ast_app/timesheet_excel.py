@@ -223,14 +223,19 @@ def _widen_annual_hour_columns(xml: str) -> str:
     return re.sub(r'<col\b[^>]*/>', adjust, xml)
 
 
-def _use_direct_hours_formula(xml: str) -> str:
+def _use_direct_hours_formula(xml: str, year=None, month=None, employment_start=None) -> str:
     """Use one hours input with an unambiguous meaning for every reason."""
     for row in range(4, 35):
-        target = (f'IF(A{row}="",0,IF(J{row}="H",0,'
+        target = (f'IF(A{row}="",0,IF(AND(J{row}="H",IF(D{row}="",0,D{row})>=N{row}),0,'
                   f'IF(AND(C{row}<>"",J{row}=""),'
                   f'IFERROR(VLOOKUP(B{row},Feiertage,3,FALSE)*N{row},N{row}),N{row})))')
-        actual = (f'IF(A{row}="",0,IF(OR(J{row}="F",J{row}="K",J{row}="U",J{row}="M"),'
-                  f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(J{row}="H",0,IF(D{row}="",0,D{row}))))')
+        if employment_start and year and month:
+            start = (date.fromisoformat(employment_start) if isinstance(employment_start, str)
+                     else employment_start)
+            target = (f'IF(DATE({int(year)},{int(month)},B{row})<DATE({start.year},{start.month},{start.day}),0,'
+                      f'{target})')
+        actual = (f'IF(A{row}="",0,IF(OR(J{row}="F",J{row}="K",J{row}="U",J{row}="M",J{row}="H"),'
+                  f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(D{row}="",0,D{row})))')
         xml = _replace_formula_cell(xml, f"L{row}", target, 0)
         xml = _replace_formula_cell(xml, f"K{row}", actual, 0)
     return xml
@@ -250,8 +255,8 @@ def _rewrite_reason_conditional_formatting(xml: str) -> str:
         2: ('$J4="K"', "FFFFF2CC"),
         3: ('$J4="U"', "FFF7D6D6"),
         4: ('$J4="M"', "FFFCE4D6"),
-        5: ('$J4="HO"', "FFE4DFEC"),
-        6: ('$J4="B"', "FFDDEBF7"),
+        5: ('FALSE', "FFE4DFEC"),
+        6: ('FALSE', "FFDDEBF7"),
         7: ('OR($J4="H",$C4<>"")', "FFF4B6D7"),
         8: ('FALSE', "FFFFFFFF"),
     }
@@ -553,13 +558,15 @@ def company_holidays(year: int) -> set[date]:
     }
 
 
-def monthly_target_minutes(year: int, month: int) -> int:
+def monthly_target_minutes(year: int, month: int, employment_start: str | date | None = None) -> int:
     """Scheduled full-time hours for one calendar month, excluding holidays."""
     holidays = company_holidays(int(year))
     day = date(int(year), int(month), 1)
+    start = (date.fromisoformat(employment_start) if isinstance(employment_start, str)
+             else employment_start)
     total = 0
     while day.month == int(month):
-        if day not in holidays:
+        if day not in holidays and (not start or day >= start):
             total += scheduled_work_minutes(day)
         day += timedelta(days=1)
     return total
@@ -593,16 +600,16 @@ def _write_monthly_summary(xml: str, summary: dict[str, int]) -> str:
     rows = (
         (36, "Überstunden geleistet · automatisch (h)", "overtime",
          'SUMPRODUCT((K4:K34>L4:L34)*(K4:K34-L4:L34))'),
-        (37, "Ferien / Freizeit · F (h)", "vacation", 'SUMIF(J4:J34,"F",D4:D34)'),
+        (37, "Ferien · F (h)", "vacation", 'SUMIF(J4:J34,"F",D4:D34)'),
         (38, "Krankheit · K (h)", "sick", 'SUMIF(J4:J34,"K",D4:D34)'),
         (39, "Unfall · U (h)", "accident", 'SUMIF(J4:J34,"U",D4:D34)'),
-        (40, "Übrige Minderzeit · M (h)", "other", 'SUMIF(J4:J34,"M",D4:D34)'),
+        (40, "Andere begründete Minderzeit · M (h)", "other", 'SUMIF(J4:J34,"M",D4:D34)'),
     )
     for row, title, key, formula in rows:
         xml = _replace_formula_cell(xml, f"K{row}", f'"{title}"', title, "string")
         xml = _replace_formula_cell(xml, f"P{row}", formula, _decimal_hours(summary[key]))
-    xml = _replace_cell(xml, "K41", "Kürzel: F Ferien/Freizeit · K Krankheit · U Unfall · M übrige Minderzeit", "string")
-    xml = _replace_cell(xml, "K42", "H Feiertag · HO Homeoffice · B Bereitschaft", "string")
+    xml = _replace_cell(xml, "K41", "Kürzel: F Ferien · K Krankheit · U Unfall · M andere begründete Minderzeit", "string")
+    xml = _replace_cell(xml, "K42", "H Feiertag (auch für verkürzte Arbeitstage)", "string")
     return xml
 
 
@@ -619,15 +626,17 @@ def _remove_legacy_monthly_summary(xml: str) -> str:
 
 
 def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
-                             records: list[dict]) -> str:
+                             records: list[dict], employment_start=None) -> str:
     labels = {
         37: "Überstunden · automatisch (h)",
-        38: "Ferien / Freizeit · F (h)",
+        38: "Ferien · F (h)",
         39: "Krankheit · K (h)",
         40: "Unfall · U (h)",
-        41: "Übrige Minderzeit · M (h)",
+        41: "Andere begründete Minderzeit · M (h)",
         42: "Abwesenheit (h)",
-        44: f"Ferienanspruch 01.01.–31.12.{year} (h)",
+        44: (f"Ferienanspruch ab {date.fromisoformat(employment_start).strftime('%d.%m.%Y')} (h)"
+             if isinstance(employment_start, str) and employment_start else
+             f"Ferienanspruch 01.01.–31.12.{year} (h)"),
     }
     for row, title in labels.items():
         xml = _replace_cell(xml, f"A{row}", title, "string")
@@ -638,7 +647,7 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
         for key, value in summary.items():
             annual_totals[key] += value
         xml = _replace_cached_value(
-            xml, f"{column}35", _decimal_hours(monthly_target_minutes(year, month_index))
+            xml, f"{column}35", _decimal_hours(monthly_target_minutes(year, month_index, employment_start))
         )
         for target_row, source_row, key in ((37, 36, "overtime"), (38, 37, "vacation"),
                                             (39, 38, "sick"), (40, 39, "accident"),
@@ -665,7 +674,7 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
     for row in range(37, 43):
         xml = _replace_formula_cell(xml, f"AL{row}", f"SUM(B{row}:AK{row})",
                                     _decimal_hours(annual_values[row]))
-    year_target = sum(monthly_target_minutes(year, month) for month in range(1, 13))
+    year_target = sum(monthly_target_minutes(year, month, employment_start) for month in range(1, 13))
     # AL35 is the master of Excel's shared AL35:AL50 formula group. Replacing
     # the formula itself leaves its dependent cells orphaned and Excel then
     # rejects the workbook. Only refresh its cached result.
@@ -682,7 +691,8 @@ def _vba_hash(members: dict[str, bytes]) -> str | None:
     return sha256(value).hexdigest() if value else None
 
 
-def export_timesheet(destination, employee: dict, year: int, records: list[dict], company="") -> Path:
+def export_timesheet(destination, employee: dict, year: int, records: list[dict], company="",
+                     employment_start=None) -> Path:
     """Export one employee/year into the original macro-enabled template."""
     year = int(year)
     if year < 1900 or year > 2200:
@@ -757,13 +767,11 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     # Keep every selectable code inside that range so VLOOKUP never returns
     # #N/A for a valid reason.
     code_rows = (
-        (20, "Ferien / Freizeit", "F", "REST"),
+        (20, "Ferien", "F", "REST"),
         (21, "Krankheit", "K", "REST"),
         (22, "Unfall", "U", "REST"),
         (23, "Andere begründete Minderzeit", "M", "REST"),
-        (24, "Feiertag / arbeitsfrei", "H", 0),
-        (25, "Homeoffice", "HO", 1),
-        (26, "Bereitschaftsdienst", "B", "XTRA"),
+        (24, "Feiertag", "H", "REST"),
     )
     for row in range(19, 34):
         for column in "ABC":
@@ -779,8 +787,12 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     settings = styles.apply(settings, [(reference, TIME_FORMAT_ID) for reference in ("C7", "C8", "C9")])
     members["xl/worksheets/sheet1.xml"] = settings.encode("utf-8")
 
+    start = (date.fromisoformat(employment_start) if isinstance(employment_start, str)
+             else employment_start)
+    records = [record for record in records
+               if not start or date.fromisoformat(record["day"]) >= start]
     by_day = {date.fromisoformat(r["day"]): r for r in records if date.fromisoformat(r["day"]).year == year}
-    annual_vacation_hours = vacation_target(employee, year) / 100
+    annual_vacation_hours = vacation_target(employee, year, employment_start) / 100
     # One restrained palette is used in the month and annual summaries. This
     # prevents the same colour from meaning two different categories.
     fill_overtime = styles.fill_id("FFDDF3E4")
@@ -805,7 +817,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     for month, xml_name in MONTH_SHEETS.items():
         xml = members[xml_name].decode("utf-8")
         xml = _simplify_time_columns(xml)
-        xml = _use_direct_hours_formula(xml)
+        xml = _use_direct_hours_formula(xml, year, month, employment_start)
         xml = _rewrite_reason_conditional_formatting(xml)
         xml = _add_positive_balance_formatting(xml, positive_balance_dxf)
         xml = _replace_cell(xml, "J3", "Grund", "string")
@@ -841,8 +853,9 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
                 continue
             current_day = date(year, month, day_number)
             record = by_day.get(current_day)
-            target = 0 if current_day in holidays else scheduled_work_minutes(current_day)
-            if record and normalize_time_code(record.get("code")) == "H":
+            target = 0 if current_day in holidays or (start and current_day < start) else scheduled_work_minutes(current_day)
+            if (record and normalize_time_code(record.get("code")) == "H"
+                    and worked_minutes(record) >= scheduled_work_minutes(current_day)):
                 target = 0
             actual = effective_work_minutes(record) if record else 0
             difference = actual - target if record else 0
@@ -855,7 +868,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
                                         _decimal_hours(running_minutes))
         xml = _write_monthly_summary(xml, monthly_summary(records, year, month))
         xml = _replace_formula_cell(xml, "F37", "SUM(L4:L34)",
-                                    _decimal_hours(monthly_target_minutes(year, month)))
+                                    _decimal_hours(monthly_target_minutes(year, month, employment_start)))
         # Carry forward only the variance of days actually recorded in AST.
         # The legacy formula subtracted the complete monthly target even when
         # a month contained no entries, creating balances such as -1635 h.
@@ -886,7 +899,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
 
     annual_name = "xl/worksheets/sheet18.xml"
     annual = members[annual_name].decode("utf-8")
-    annual = _simplify_annual_summary(annual, year, annual_vacation_hours, records)
+    annual = _simplify_annual_summary(annual, year, annual_vacation_hours, records,
+                                      employment_start)
     annual = _remove_annual_calendar_formatting(annual)
     annual = _widen_annual_hour_columns(annual)
     annual = _set_row_heights(annual, {1: 24, 2: 20, 3: 24,

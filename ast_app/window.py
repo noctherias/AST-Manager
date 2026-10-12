@@ -8,6 +8,7 @@ from .widgets import label, button, Table
 from .experience import Start, Invoices, Reminders, Team, Salaries, Settings
 from .references import ReferencesPage
 from .applications import ApplicationsPage
+from .payroll import PayrollPage
 from .update_ui import UpdateController
 from . import __version__
 from .documents import resource_path
@@ -78,13 +79,14 @@ class MainWindow(QMainWindow):
         self.nav.addSpacing(4)
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
-        self.buttons = [None] * 8
+        self.buttons = [None] * 9
         self.nav_items = {}
         for page_index, name, child, icon in [
             (0, "Übersicht", False, QStyle.StandardPixmap.SP_DesktopIcon),
             (1, "Debitoren", False, QStyle.StandardPixmap.SP_FileDialogDetailedView),
             (5, "Mahnungen", True, QStyle.StandardPixmap.SP_MessageBoxWarning),
             (2, "Stundennachweis", False, QStyle.StandardPixmap.SP_FileDialogListView),
+            (8, "Lohnbuch", False, QStyle.StandardPixmap.SP_DriveHDIcon),
             (6, "Zeugnisse", False, QStyle.StandardPixmap.SP_FileDialogContentsView),
             (7, "Bewerbungen", False, QStyle.StandardPixmap.SP_DirHomeIcon),
             (3, "Lohnausweise", False, QStyle.StandardPixmap.SP_FileIcon),
@@ -117,7 +119,7 @@ class MainWindow(QMainWindow):
         self.updates = UpdateController(self, db, demo)
         self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db),
                       Settings(db, self.updates, self.set_watermark_enabled), Reminders(db, self), ReferencesPage(db),
-                      ApplicationsPage(db)]
+                      ApplicationsPage(db), PayrollPage(db)]
         for page in self.pages:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)

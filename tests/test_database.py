@@ -127,10 +127,11 @@ class DatabaseTests(unittest.TestCase):
 
     def test_daily_time_records_are_unique_and_persisted(self):
         data = {"employee_id": self.person, "day": "2026-01-05", "worked_minutes": 525,
-                "code": "HO", "note": "Test"}
+                "code": "", "rapport_number": "R-204", "note": "Test"}
         key = self.db.save_time_record(data)
         self.assertEqual(self.db.time_records(self.person, 2026)[0]["id"], key)
-        self.assertEqual(self.db.time_records(self.person, 2026)[0]["code"], "HO")
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["code"], "")
+        self.assertEqual(self.db.time_records(self.person, 2026)[0]["rapport_number"], "R-204")
         with self.assertRaises(ValueError):
             self.db.save_time_record(data)
         with self.assertRaises(ValueError):
@@ -219,7 +220,19 @@ class DatabaseTests(unittest.TestCase):
         self.db.close()
         self.db = Database(self.path)
         self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (key,))["code"], "H")
-        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (homeoffice,))["code"], "HO")
+        self.assertEqual(self.db.one("SELECT code FROM time_records WHERE id=?", (homeoffice,))["code"], "")
+
+    def test_payroll_calculates_percentage_deductions_and_net(self):
+        key = self.db.save_payroll_record({
+            "employee_id": self.person, "year": 2026, "month": 5,
+            "gross": 600000, "allowance": 10000,
+            "ahv_rate": 5300, "alv_rate": 1100, "nbuv_rate": 1670,
+            "ktv_rate": 1855, "bvg_rate": 2000, "pk_rate": 1000, "note": "Test",
+        })
+        row = self.db.payroll_records(self.person, 2026)[0]
+        self.assertEqual(row["id"], key)
+        self.assertEqual(row["ahv"], 31800)
+        self.assertEqual(row["net"], row["gross"] - row["deductions"] + row["allowance"])
 
 
 if __name__ == "__main__": unittest.main()

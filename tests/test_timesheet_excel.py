@@ -2,9 +2,11 @@ import hashlib
 import tempfile
 import unittest
 import zipfile
+from datetime import date
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from ast_app.domain import vacation_target
 from ast_app.timesheet_excel import export_timesheet, monthly_summary, monthly_target_minutes
 
 
@@ -38,7 +40,7 @@ class TimesheetExcelTests(unittest.TestCase):
             target = Path(folder) / "export.xlsm"
             employee = {"first_name": "Max", "last_name": "Muster", "code": "AST-999"}
             records = [
-                {"day": "2026-01-05", "worked_minutes": 525, "code": "", "note": "Baustelle Zürich"},
+                {"day": "2026-01-05", "worked_minutes": 525, "code": "", "rapport_number": "R-SECRET", "note": "Baustelle Zürich"},
                 {"day": "2026-01-06", "worked_minutes": 525, "code": "F", "note": "Ferien"},
                 {"day": "2026-01-07", "worked_minutes": 225, "code": "K", "note": "Krank am Vormittag"},
                 {"day": "2026-01-08", "worked_minutes": 45, "code": "M", "note": "Arzttermin"},
@@ -77,9 +79,9 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertIsNone(cell(january, "J37").find("x:f", NS))
                 self.assertEqual(cell(january, "K39").find("x:v", NS).text,
                                  "Unfall · U (h)")
-                self.assertIn("F Ferien/Freizeit", cell(january, "K41").find("x:is/x:t", NS).text)
+                self.assertIn("F Ferien", cell(january, "K41").find("x:is/x:t", NS).text)
                 self.assertIn("H Feiertag", cell(january, "K42").find("x:is/x:t", NS).text)
-                self.assertIn("HO Homeoffice", cell(january, "K42").find("x:is/x:t", NS).text)
+                self.assertNotIn("Homeoffice", cell(january, "K42").find("x:is/x:t", NS).text)
                 expected_colours = {
                     36: "FFDDF3E4", 37: "FFDCEEFF", 38: "FFFFF2CC",
                     39: "FFF7D6D6", 40: "FFFCE4D6",
@@ -157,9 +159,9 @@ class TimesheetExcelTests(unittest.TestCase):
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
                 self.assertEqual(cell(settings, "C2").find("x:v", NS).text, "2026")
                 self.assertEqual(cell(settings, "C3").find("x:is/x:t", NS).text, "Max Muster")
-                expected_codes = ["F", "K", "U", "M", "H", "HO", "B"]
+                expected_codes = ["F", "K", "U", "M", "H"]
                 self.assertEqual([cell(settings, f"B{row}").find("x:is/x:t", NS).text
-                                  for row in range(20, 27)], expected_codes)
+                                  for row in range(20, 25)], expected_codes)
                 self.assertEqual(cell(settings, "A23").find("x:is/x:t", NS).text,
                                  "Andere begründete Minderzeit")
                 october_xml = exported.read("xl/worksheets/sheet15.xml").decode("utf-8")
@@ -174,6 +176,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(Path(cell(locations, "B2").find("x:is/x:t", NS).text), target.parent)
                 package = b"\n".join(exported.read(f"xl/worksheets/sheet{number}.xml")
                                      for number in range(6, 19))
+                self.assertNotIn(b"R-SECRET", package)
                 for private_value in (b"Devinsan", b"Tudisco", b"Hubeli", b"Lehmann"):
                     self.assertNotIn(private_value, package)
 
@@ -226,6 +229,30 @@ class TimesheetExcelTests(unittest.TestCase):
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
                 self.assertIsNone(cell(annual, "B44").find("x:v", NS))
                 self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), 216.25)
+
+    def test_employment_start_prorates_target_hours_and_vacation(self):
+        employee = {"first_name": "Neu", "last_name": "Eintritt", "code": "AST-008",
+                    "kind": "employee", "hired": "2026-05-15"}
+        self.assertEqual(monthly_target_minutes(2026, 4, employee["hired"]), 0)
+        self.assertLess(monthly_target_minutes(2026, 5, employee["hired"]),
+                        monthly_target_minutes(2026, 5))
+        expected = round(17300 * ((date(2026, 12, 31) - date(2026, 5, 15)).days + 1) / 365)
+        self.assertEqual(vacation_target(employee, 2026, employee["hired"]), expected)
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "new-hire.xlsm"
+            export_timesheet(target, employee, 2026, [
+                {"day": "2026-04-30", "worked_minutes": 525, "code": "", "note": "vor Eintritt"},
+                {"day": "2026-05-15", "worked_minutes": 495, "code": "", "note": "Eintritt"},
+            ], "AST Elektro AG", employee["hired"])
+            with zipfile.ZipFile(target) as exported:
+                april = exported.read("xl/worksheets/sheet9.xml")
+                may = ET.fromstring(exported.read("xl/worksheets/sheet10.xml"))
+                annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
+                self.assertNotIn(b"vor Eintritt", april)
+                self.assertAlmostEqual(float(cell(annual, "N35").find("x:v", NS).text),
+                                       monthly_target_minutes(2026, 5, employee["hired"]) / 60)
+                self.assertIn("DATE(2026,5,15)", cell(may, "L4").find("x:f", NS).text)
+                self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), expected / 100)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from .widgets import Page, Table, Metric, Disclosure, label, button, combo, line
 from .pages import Receivables, SettingsPage, SalaryPage, save_path, PdfPreview
 from .dialogs import EmployeeDialog, InvoiceDialog, TimeRecordDialog, BulkTimeDialog, ManualReminderDialog
 from .domain import (TIME_CODES, chf, number, display_date, effective_work_minutes,
-                     scheduled_work_minutes, worked_minutes,
+                     target_work_minutes, worked_minutes,
                      vacation_target)
 from .documents import report_pdf
 from .timesheet_excel import export_timesheet, monthly_summary
@@ -490,6 +490,10 @@ class TimeWorkspace(Page):
         current = date.today().year
         self.year = combo([(str(y), y) for y in range(current + 2, current - 7, -1)], current)
         row.addWidget(self.year)
+        self.use_hired = QCheckBox("Eintrittsdatum berücksichtigen")
+        self.use_hired.setChecked(True)
+        self.use_hired.setToolTip("Ignoriert frühere Tage und berechnet Sollstunden und Ferienanspruch ab dem Eintritt.")
+        row.addWidget(self.use_hired)
         row.addStretch()
         self.pdf_btn = button("PDF erstellen", self.export_pdf)
         self.export_btn = button("Excel speichern", self.export_excel, True)
@@ -499,7 +503,8 @@ class TimeWorkspace(Page):
         self.cards = self.metrics([("Arbeitszeit", "Summe der erfassten Zeiten", True),
                                    ("Arbeitstage", "Tage mit eingetragener Arbeitszeit"),
                                    ("Abwesenheiten", "Tage mit einem Code")])
-        self.table = Table(["Datum", "Wochentag", "Eingabe", "IST-Arbeit", "Sollzeit", "Abweichung", "Grund", "Bemerkung"])
+        self.table = Table(["Datum", "Wochentag", "Eingabe", "IST-Arbeit", "Sollzeit", "Abweichung",
+                            "Grund", "Rapportnummer", "Bemerkung"])
         self.layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(self.layout, "Wähle einen Tag aus oder erfasse einen neuen.")
         self.edit_btn = button("Tag bearbeiten", self.edit_entry)
@@ -510,6 +515,7 @@ class TimeWorkspace(Page):
         self.hint.setWordWrap(True)
         self.layout.addWidget(self.hint)
         self.year.currentIndexChanged.connect(self.refresh)
+        self.use_hired.toggled.connect(self.refresh)
         self.table.itemSelectionChanged.connect(self.selection)
         self.table.cellDoubleClicked.connect(self.edit_entry)
         self.selection()
@@ -529,6 +535,10 @@ class TimeWorkspace(Page):
             return
         self.title_label.setText(self.employee["first_name"] + " " + self.employee["last_name"])
         self.subtitle_label.setText("Stundennachweis · Personal-Nr. " + self.employee["code"])
+        hired = str(self.employee.get("hired") or "").strip()
+        self.use_hired.setVisible(bool(hired))
+        if hired:
+            self.use_hired.setText(f"Eintritt ab {display_date(hired)} berücksichtigen")
         years = {int(r["day"][:4]) for r in self.db.time_records(key)} | {date.today().year}
         selected = self.year.currentData()
         self.year.blockSignals(True)
@@ -539,11 +549,20 @@ class TimeWorkspace(Page):
         self.year.blockSignals(False)
         self.refresh()
 
+    def employment_start(self):
+        if not self.employee or not self.use_hired.isChecked():
+            return None
+        return str(self.employee.get("hired") or "").strip() or None
+
     def refresh(self):
         if not self.employee:
             return
         year = self.year.currentData()
         self.current_records = self.db.time_records(self.employee["id"], year)
+        employment_start = self.employment_start()
+        if employment_start:
+            self.current_records = [record for record in self.current_records
+                                    if record["day"] >= employment_start]
         rows = []
         total = 0
         workdays = 0
@@ -553,14 +572,15 @@ class TimeWorkspace(Page):
             day_value = date.fromisoformat(record["day"])
             entered = worked_minutes(record)
             worked = effective_work_minutes(record)
-            scheduled = scheduled_work_minutes(day_value)
+            scheduled = target_work_minutes(record)
             total += worked
             workdays += int(worked > 0)
             absences += int(bool(record["code"]))
             difference = "–" if not scheduled and not worked else self._difference(worked - scheduled)
             rows.append([display_date(record["day"]), weekdays[day_value.weekday()], self._duration(entered),
                          self._duration(worked), self._duration(scheduled), difference,
-                         TIME_CODES.get(record["code"], record["code"]), record["note"]])
+                         TIME_CODES.get(record["code"], record["code"]), record.get("rapport_number", ""),
+                         record["note"]])
         self.table.populate(rows, [record["id"] for record in self.current_records], [2, 3])
         self.cards[0].set(self._duration(total))
         self.cards[1].set(str(workdays))
@@ -576,13 +596,15 @@ class TimeWorkspace(Page):
         self.selection_hint.setText("Ausgewählten Tag bearbeiten oder löschen." if enabled else "Wähle einen Tag aus oder erfasse einen neuen.")
 
     def new_entry(self):
-        if self.employee and TimeRecordDialog(self, self.db, self.employee).exec():
+        if self.employee and TimeRecordDialog(
+                self, self.db, self.employee, minimum_day=self.employment_start()).exec():
             self.refresh()
 
     def bulk_entry(self):
         if not self.employee:
             return
-        dialog = BulkTimeDialog(self, self.db, self.employee, self.year.currentData())
+        dialog = BulkTimeDialog(self, self.db, self.employee, self.year.currentData(),
+                                self.employment_start())
         if dialog.exec():
             self.refresh()
             result = dialog.result_counts
@@ -618,12 +640,12 @@ class TimeWorkspace(Page):
             day_value = date.fromisoformat(record["day"])
             entered = worked_minutes(record)
             worked = effective_work_minutes(record)
-            scheduled = scheduled_work_minutes(day_value)
+            scheduled = target_work_minutes(record)
             rows.append([
                 display_date(record["day"]), weekdays[day_value.weekday()],
                 f"{entered / 60:.2f} h", f"{worked / 60:.2f} h", f"{scheduled / 60:.2f} h",
                 self._difference(worked - scheduled),
-                TIME_CODES.get(record["code"], record["code"]), record["note"],
+                TIME_CODES.get(record["code"], record["code"]), record.get("rapport_number", ""), record["note"],
             ])
         totals = {key: 0 for key in ("overtime", "vacation", "sick", "accident", "other")}
         for month in range(1, 13):
@@ -633,11 +655,11 @@ class TimeWorkspace(Page):
         summary = (f"Überstunden {hours(totals['overtime'])} · Ferien/Freizeit {hours(totals['vacation'])} · "
                    f"Krankheit {hours(totals['sick'])} · Unfall {hours(totals['accident'])} · "
                    f"Übrige Minderzeit {hours(totals['other'])} · "
-                   f"Ferien-Soll {vacation_target(self.employee, year) / 100:.2f} h")
+                   f"Ferien-Soll {vacation_target(self.employee, year, self.employment_start()) / 100:.2f} h")
         name = f"{self.employee['first_name']} {self.employee['last_name']}"
         result = report_pdf(path, "Stundennachweis · " + name, f"Kalenderjahr {year}",
-                            ["Datum", "Wochentag", "Eingabe", "IST", "SOLL", "Abweichung", "Grund", "Bemerkung"],
-                            rows, summary, [60, 58, 46, 46, 46, 54, 108, 306])
+                            ["Datum", "Wochentag", "Eingabe", "IST", "SOLL", "Abweichung", "Grund", "Rapportnr.", "Bemerkung"],
+                            rows, summary, [54, 54, 42, 42, 42, 48, 96, 72, 242])
         PdfPreview(self, result).exec()
 
     @guarded
@@ -649,7 +671,9 @@ class TimeWorkspace(Page):
         path = save_path(self, "Stundennachweis als Excel-Datei", timesheet_filename(self.employee, year),
                          "xlsm", "timesheets_excel", folders)
         if path:
-            result = export_timesheet(path, self.employee, year, self.current_records, self.db.settings().get("company", ""))
+            result = export_timesheet(path, self.employee, year, self.current_records,
+                                      self.db.settings().get("company", ""),
+                                      self.employment_start())
             unblock_excel_file(result)
             trust_error = ensure_excel_trusted_folder(result.parent)
             message = ("Die Excel-Datei wurde vollständig befüllt. Die Schaltflächen «PDF erstellen» und "

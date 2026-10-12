@@ -106,7 +106,7 @@ class UiTests(unittest.TestCase):
         self.assertEqual(window.watermark.geometry(), window.stack.geometry())
         self.assertTrue(window.watermark.testAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents))
-        for index in range(8):
+        for index in range(9):
             QTest.mouseClick(window.buttons[index], Qt.MouseButton.LeftButton)
             for _ in range(4): APP.processEvents()
             self.assertEqual(window.stack.currentIndex(), index)
@@ -121,6 +121,9 @@ class UiTests(unittest.TestCase):
         self.assertGreater(window.pages[7].table.rowCount(), 0)
         self.assertTrue(window.pages[7].sync_timer.isActive())
         self.assertEqual(window.pages[7].sync_timer.interval(), 5 * 60 * 1000)
+        self.assertEqual(window.buttons[8].text(), "Lohnbuch")
+        self.assertEqual(window.pages[8].tabs.tabText(0), "Monatslöhne")
+        self.assertEqual(window.pages[8].tabs.tabText(1), "Lohnverlauf")
         settings = window.pages[4]
         settings.background_logo.setChecked(True)
         APP.processEvents()

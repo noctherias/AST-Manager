@@ -304,22 +304,27 @@ class EntryDialog(FormDialog):
 
 class TimeRecordDialog(FormDialog):
     """Record the day's effective working time without clock-in/out fields."""
-    def __init__(self, parent, db, employee, row=None):
+    def __init__(self, parent, db, employee, row=None, minimum_day=None):
         super().__init__(parent, "Tag bearbeiten" if row else "Arbeitstag erfassen",
                          employee["first_name"] + " " + employee["last_name"], 620)
         self.db, self.employee, self.row = db, employee, row or {}
         r = self.row
         self.add("day", "Datum", day(r.get("day")))
-        self.add("code", "Grund bei Abweichung", combo([(title, code) for code, title in TIME_CODES.items()], r.get("code", "")))
+        if minimum_day:
+            minimum = date.fromisoformat(minimum_day) if isinstance(minimum_day, str) else minimum_day
+            self.fields["day"].setMinimumDate(QDate(minimum.year, minimum.month, minimum.day))
+        self.add("code", "Grund der Abweichung", combo([(title, code) for code, title in TIME_CODES.items()], r.get("code", "")))
         initial = worked_minutes(r) if row else scheduled_work_minutes(date.today())
         self.hours = numeric(initial / 60, " h")
         self.hours.setRange(0, 24)
         self.add("hours", "Stunden", self.hours)
+        self.add("rapport_number", "Rapportnummer", line(r.get("rapport_number", ""), "optional; nur intern im Programm"))
         self.add("note", "Bemerkung", line(r.get("note", ""), "z. B. Baustelle Zürich"))
-        hint = label("Ohne Abwesenheitsgrund werden die tatsächlich gearbeiteten Stunden erfasst. "
-                     "Bei Ferien, Krankheit, Unfall oder anderer Minderzeit werden hier die Abwesenheitsstunden erfasst. "
+        hint = label("Ohne Abweichungsgrund werden die tatsächlich gearbeiteten Stunden erfasst. "
+                     "Bei Ferien, Krankheit, Unfall, Feiertag oder anderer begründeter Minderzeit werden hier die Abwesenheitsstunden erfasst. "
                      "Regelzeit: Montag–Donnerstag 8.75 h, Freitag 8.25 h. "
-                     "Bei «Andere begründete Minderzeit» ist eine kurze Bemerkung erforderlich.", "muted")
+                     "Für eine Stunde weniger vor einem Feiertag wählst du «Feiertag» und trägst 1.00 h ein. "
+                     "Bei «Andere begründete Minderzeit» ist eine kurze Bemerkung wie Vaterschaft oder Militär erforderlich.", "muted")
         hint.setWordWrap(True)
         self.form.addRow("", hint)
         if not row:
@@ -337,7 +342,7 @@ class TimeRecordDialog(FormDialog):
         value = self.fields["day"].date()
         selected_day = date(value.year(), value.month(), value.day())
         code = self.fields["code"].currentData() or ""
-        minutes = scheduled_work_minutes(selected_day) if code in ("", "HO") else 0
+        minutes = scheduled_work_minutes(selected_day)
         self.hours.setValue(minutes / 60)
 
     @guarded
@@ -352,16 +357,29 @@ class TimeRecordDialog(FormDialog):
 
 class BulkTimeDialog(FormDialog):
     """Apply direct working hours or the regular schedule to a date range."""
-    def __init__(self, parent, db, employee, year):
+    def __init__(self, parent, db, employee, year, employment_start=None):
         super().__init__(parent, "Zeitraum erfassen",
                          employee["first_name"] + " " + employee["last_name"], 700)
         self.db, self.employee = db, employee
+        self.employment_start = (date.fromisoformat(employment_start)
+                                 if isinstance(employment_start, str) else employment_start)
+        first = date(year, 1, 1)
+        last = date(year, 12, 31)
+        minimum = max(first, self.employment_start) if self.employment_start else first
         today = date.today()
-        initial = today if today.year == year else date(year, 1, 1)
+        initial = max(minimum, today) if today.year == year else minimum
+        initial = min(initial, last)
         self.add("start_day", "Von", day(initial.isoformat()))
         self.add("end_day", "Bis", day(initial.isoformat()))
         for widget in (self.fields["start_day"], self.fields["end_day"]):
-            widget.setDateRange(QDate(year, 1, 1), QDate(year, 12, 31))
+            widget.setDateRange(QDate(minimum.year, minimum.month, minimum.day), QDate(year, 12, 31))
+        presets = QWidget()
+        preset_row = QHBoxLayout(presets); preset_row.setContentsMargins(0, 0, 0, 0)
+        preset_row.addWidget(button("Arbeitswoche", lambda: self._preset("week")))
+        preset_row.addWidget(button("2 Wochen", lambda: self._preset("two_weeks")))
+        preset_row.addWidget(button("Ganzer Monat", lambda: self._preset("month")))
+        preset_row.addStretch()
+        self.form.addRow("Schnellauswahl", presets)
         week = QWidget()
         week_row = QHBoxLayout(week)
         week_row.setContentsMargins(0, 0, 0, 0)
@@ -373,26 +391,70 @@ class BulkTimeDialog(FormDialog):
             self.weekdays.append(check)
         week_row.addStretch()
         self.form.addRow("Wochentage", week)
-        self.add("code", "Grund bei Abweichung", combo([(title, code) for code, title in TIME_CODES.items()], ""))
-        self.regular = QCheckBox("Regelarbeitszeit automatisch einsetzen")
+        self.add("code", "Grund der Abweichung", combo([(title, code) for code, title in TIME_CODES.items()], ""))
+        self.regular = QCheckBox("Tages-Sollzeit automatisch einsetzen")
         self.regular.setChecked(True)
         self.form.addRow("", self.regular)
         self.hours = numeric(8.75, " h")
         self.hours.setRange(0, 24)
         self.add("hours", "Stunden je Tag", self.hours)
+        self.add("rapport_number", "Rapportnummer", line("", "optional; gilt für alle ausgewählten Tage"))
         self.add("note", "Bemerkung", line("", "gilt für alle ausgewählten Tage"))
         self.overwrite = QCheckBox("Bereits erfasste Tage überschreiben")
         self.form.addRow("", self.overwrite)
-        hint = label("Ohne Abwesenheitsgrund setzt die Automatik die Regelarbeitszeit ein. "
-                     "Bei Ferien, Krankheit, Unfall oder anderer Minderzeit die Automatik ausschalten "
-                     "und die Abwesenheitsstunden eintragen.", "muted")
+        self.preview = label("", "muted")
+        self.form.addRow("Auswahl", self.preview)
+        hint = label("Wähle einen Zeitraum und die gewünschten Wochentage. Ohne Abweichungsgrund erfasst die Automatik normale Arbeit. "
+                     "Mit Ferien, Krankheit, Unfall, Feiertag oder anderer begründeter Minderzeit erfasst sie die vollständige "
+                     "Abwesenheitszeit je ausgewähltem Tag. Für eine Teilabwesenheit die Automatik ausschalten und die Stunden eintragen. "
+                     "Bei «Andere begründete Minderzeit» bitte Vaterschaft, Militär oder den konkreten Grund unter Bemerkung nennen.", "muted")
         hint.setWordWrap(True)
         self.form.addRow("", hint)
         self.regular.toggled.connect(self._state)
+        self.fields["start_day"].dateChanged.connect(self._update_preview)
+        self.fields["end_day"].dateChanged.connect(self._update_preview)
+        for check in self.weekdays:
+            check.toggled.connect(self._update_preview)
+        self.overwrite.toggled.connect(self._update_preview)
         self._state()
+        self._update_preview()
 
     def _state(self):
         self.hours.setEnabled(not self.regular.isChecked())
+
+    def _preset(self, mode):
+        start = date.fromisoformat(day_value(self.fields["start_day"]))
+        if mode == "week":
+            start -= timedelta(days=start.weekday())
+            end = start + timedelta(days=4)
+        elif mode == "two_weeks":
+            end = start + timedelta(days=13)
+        else:
+            start = start.replace(day=1)
+            next_month = date(start.year + (start.month == 12), 1 if start.month == 12 else start.month + 1, 1)
+            end = next_month - timedelta(days=1)
+        minimum = self.fields["start_day"].minimumDate().toPython()
+        maximum = self.fields["end_day"].maximumDate().toPython()
+        start, end = max(start, minimum), min(end, maximum)
+        self.fields["start_day"].setDate(QDate(start.year, start.month, start.day))
+        self.fields["end_day"].setDate(QDate(end.year, end.month, end.day))
+
+    def _update_preview(self):
+        start = date.fromisoformat(day_value(self.fields["start_day"]))
+        end = date.fromisoformat(day_value(self.fields["end_day"]))
+        selected = {index for index, check in enumerate(self.weekdays) if check.isChecked()}
+        dates = []
+        current = start
+        while current <= end:
+            if current.weekday() in selected:
+                dates.append(current.isoformat())
+            current += timedelta(days=1)
+        existing = {record["day"] for record in self.db.time_records(self.employee["id"])}
+        occupied = sum(day in existing for day in dates)
+        action = (f"{len(dates)} Tage werden überschrieben oder neu erfasst."
+                  if self.overwrite.isChecked() else
+                  f"{len(dates) - occupied} Tage werden neu erfasst; {occupied} bestehende werden ausgelassen.")
+        self.preview.setText(action)
 
     @guarded
     def submit(self):
@@ -400,21 +462,26 @@ class BulkTimeDialog(FormDialog):
         end = date.fromisoformat(day_value(self.fields["end_day"]))
         if start > end:
             raise ValueError("Das Enddatum muss nach dem Startdatum liegen.")
+        if self.employment_start and start < self.employment_start:
+            raise ValueError("Der Zeitraum darf nicht vor dem berücksichtigten Eintrittsdatum beginnen.")
         selected = {index for index, check in enumerate(self.weekdays) if check.isChecked()}
         if not selected:
             raise ValueError("Bitte mindestens einen Wochentag auswählen.")
         code = self.fields["code"].currentData() or ""
         common = {"employee_id": self.employee["id"], "code": code,
+                  "rapport_number": self.fields["rapport_number"].text(),
                   "note": self.fields["note"].text(), "break_minutes": 0,
                   "start_1": None, "end_1": None, "start_2": None, "end_2": None}
         records = []
         current = start
         while current <= end:
             if current.weekday() in selected:
-                minutes = (scheduled_work_minutes(current) if code in ("", "HO") else 0) \
+                minutes = scheduled_work_minutes(current) \
                     if self.regular.isChecked() else round(self.hours.value() * 60)
                 records.append({**common, "day": current.isoformat(), "worked_minutes": minutes})
             current += timedelta(days=1)
+        if not records:
+            raise ValueError("Der gewählte Zeitraum enthält keinen ausgewählten Wochentag.")
         self.result_counts = self.db.save_time_records(records, self.overwrite.isChecked())
         self.accept()
 

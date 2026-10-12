@@ -6,16 +6,14 @@ from decimal import Decimal, InvalidOperation
 
 KINDS = {"vacation": "Ferien", "overtime": "Überzeit", "sick": "Krankheit", "accident": "Unfall"}
 TIME_CODES = {
-    "": "Normaler Arbeitstag",
-    "F": "Ferien / Freizeit",
+    "": "Keine Abweichung",
+    "F": "Ferien",
     "K": "Krankheit",
     "U": "Unfall",
     "M": "Andere begründete Minderzeit",
-    "H": "Feiertag / arbeitsfrei",
-    "HO": "Homeoffice",
-    "B": "Bereitschaftsdienst",
+    "H": "Feiertag",
 }
-ABSENCE_TIME_CODES = {"F", "K", "U", "M"}
+ABSENCE_TIME_CODES = {"F", "K", "U", "M", "H"}
 
 # Codes from exports and databases created before the simplified code system.
 LEGACY_TIME_CODES = {
@@ -24,7 +22,7 @@ LEGACY_TIME_CODES = {
     "UG": "U", "UT": "U", "A": "U", "AR": "U",
     "KAG": "M", "KAT": "M", "BM": "M", "KU": "M", "KA": "M",
     "E1": "M", "E2": "M", "E3": "M", "E4": "M", "E5": "M",
-    "FA": "H", "T": "H", "FT": "H", "BD": "B",
+    "FA": "H", "T": "H", "FT": "H", "HO": "", "B": "", "BD": "",
 }
 
 
@@ -97,17 +95,31 @@ def display_date(value: str | None) -> str:
     return date.fromisoformat(value).strftime("%d.%m.%Y") if value else "–"
 
 
-def vacation_target(employee: dict, year: int) -> int:
+def vacation_target(employee: dict, year: int, employment_start: str | date | None = None) -> int:
     """Annual vacation entitlement in hundredths of an hour."""
     if employee.get("kind") == "apprentice":
-        return 21625
+        annual = 21625
+    else:
+        annual = 17300
     birth = str(employee.get("birth_date") or "").strip()
-    if birth:
+    if birth and employee.get("kind") != "apprentice":
         born = date.fromisoformat(birth)
         age = int(year) - born.year
         if age >= 50:
-            return int(employee.get("allowance") or 17300)
-    return 17300
+            annual = int(employee.get("allowance") or 17300)
+    if not employment_start:
+        return annual
+    start = date.fromisoformat(employment_start) if isinstance(employment_start, str) else employment_start
+    first, last = date(int(year), 1, 1), date(int(year), 12, 31)
+    if start <= first:
+        return annual
+    if start > last:
+        return 0
+    # The first employment year is credited exactly by calendar days. This
+    # also handles leap years without a special case.
+    employed_days = (last - start).days + 1
+    year_days = (last - first).days + 1
+    return round(annual * employed_days / year_days)
 
 
 def scheduled_work_minutes(value: str | date) -> int:
@@ -144,9 +156,21 @@ def effective_work_minutes(record: dict) -> int:
     code = normalize_time_code(record.get("code"))
     if code in ABSENCE_TIME_CODES:
         return max(0, scheduled_work_minutes(record["day"]) - entered)
-    if code == "H":
-        return 0
     return entered
+
+
+def target_work_minutes(record: dict) -> int:
+    """Return the comparison target, including full and partial holidays.
+
+    A holiday entry equal to the regular daily schedule represents a full
+    holiday and therefore has a zero target.  A smaller holiday entry records
+    a shortened day (for example one hour before a holiday) and keeps the
+    normal daily target.
+    """
+    scheduled = scheduled_work_minutes(record["day"])
+    if normalize_time_code(record.get("code")) == "H" and worked_minutes(record) >= scheduled:
+        return 0
+    return scheduled
 
 
 def invoice_state(amount: int, paid: int, due: str, today=None) -> str:

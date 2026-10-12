@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS time_records(
  day TEXT NOT NULL, start_1 INTEGER, end_1 INTEGER, start_2 INTEGER, end_2 INTEGER,
  break_minutes INTEGER NOT NULL DEFAULT 0 CHECK(break_minutes>=0 AND break_minutes<=1440),
  worked_minutes INTEGER NOT NULL DEFAULT 0 CHECK(worked_minutes>=0 AND worked_minutes<=1440),
- code TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+ code TEXT NOT NULL DEFAULT '', rapport_number TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
  UNIQUE(employee_id,day));
 CREATE TABLE IF NOT EXISTS invoices(
  id INTEGER PRIMARY KEY, number TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS salaries(
  id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
  year INTEGER NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL, fields TEXT NOT NULL, updated TEXT NOT NULL,
  UNIQUE(employee_id,year));
+CREATE TABLE IF NOT EXISTS payroll_records(
+ id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+ year INTEGER NOT NULL, month INTEGER NOT NULL CHECK(month BETWEEN 1 AND 13),
+ gross INTEGER NOT NULL DEFAULT 0 CHECK(gross>=0), allowance INTEGER NOT NULL DEFAULT 0 CHECK(allowance>=0),
+ ahv_rate INTEGER NOT NULL DEFAULT 5300, alv_rate INTEGER NOT NULL DEFAULT 1100,
+ nbuv_rate INTEGER NOT NULL DEFAULT 1670, ktv_rate INTEGER NOT NULL DEFAULT 1855,
+ bvg_rate INTEGER NOT NULL DEFAULT 0, pk_rate INTEGER NOT NULL DEFAULT 0,
+ note TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL,
+ UNIQUE(employee_id,year,month));
 CREATE TABLE IF NOT EXISTS employment_references(
  id INTEGER PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
  reference_type TEXT NOT NULL CHECK(reference_type IN ('work','interim','apprentice')),
@@ -81,12 +90,13 @@ CREATE INDEX IF NOT EXISTS entries_period ON entries(period_id,day);
 CREATE INDEX IF NOT EXISTS payments_invoice ON payments(invoice_id);
 CREATE INDEX IF NOT EXISTS periods_employee ON periods(employee_id,start);
 CREATE INDEX IF NOT EXISTS time_records_employee ON time_records(employee_id,day);
+CREATE INDEX IF NOT EXISTS payroll_records_employee ON payroll_records(employee_id,year,month);
 CREATE INDEX IF NOT EXISTS references_employee ON employment_references(employee_id,issue_date);
 CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submitted_at);
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 17
 
 
 class Database:
@@ -115,6 +125,8 @@ class Database:
             for record in self.rows("SELECT * FROM time_records"):
                 self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                   (worked_minutes({**record, "worked_minutes": None}), record["id"]))
+        if "rapport_number" not in time_columns:
+            self.conn.execute("ALTER TABLE time_records ADD COLUMN rapport_number TEXT NOT NULL DEFAULT ''")
         if version < SCHEMA_VERSION:
             self._migrate_time_codes(version)
         invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
@@ -170,8 +182,12 @@ class Database:
                 code = extended.get(raw, normalize_time_code(raw))
             elif version < 14:
                 code = "H" if raw == "T" else ("HO" if raw == "H" else normalize_time_code(raw))
-            else:
+            elif version < 15:
                 code = {"FT": "H", "H": "HO"}.get(raw, normalize_time_code(raw))
+            else:
+                code = normalize_time_code(raw)
+            if code in {"HO", "B"}:
+                code = ""
             if code != record["code"]:
                 self.conn.execute("UPDATE time_records SET code=? WHERE id=?", (code, record["id"]))
 
@@ -300,7 +316,7 @@ class Database:
             self.log("reminder", "invoices", invoice_id, {"level": level, "date": value})
 
     def delete(self, table, key):
-        if table not in ("entries", "time_records", "payments", "invoices", "salaries",
+        if table not in ("entries", "time_records", "payments", "invoices", "salaries", "payroll_records",
                          "employment_references", "applicants", "applicant_files"):
             raise ValueError("Dieser Datensatz kann nicht gelöscht werden.")
         try:
@@ -353,10 +369,11 @@ class Database:
 
     def save_time_record(self, data, key=None):
         fields = ("employee_id", "day", "start_1", "end_1", "start_2", "end_2", "break_minutes",
-                  "worked_minutes", "code", "note")
+                  "worked_minutes", "code", "rapport_number", "note")
         d = {name: data.get(name) for name in fields}
         d["day"] = iso(d["day"])
         d["code"] = normalize_time_code(d.get("code"))
+        d["rapport_number"] = str(d.get("rapport_number") or "").strip()
         d["note"] = str(d.get("note") or "").strip()
         d["break_minutes"] = int(d.get("break_minutes") or 0)
         valid_codes = set(TIME_CODES)
@@ -394,7 +411,7 @@ class Database:
         if d["worked_minutes"] == 0 and not d["code"]:
             raise ValueError("Bitte eine Arbeitszeit oder einen Abwesenheitscode erfassen.")
         scheduled = scheduled_work_minutes(d["day"])
-        absence_reasons = {"F", "K", "U", "M"}
+        absence_reasons = {"F", "K", "U", "M", "H"}
         if d["code"] in absence_reasons and d["worked_minutes"] > scheduled:
             raise ValueError("Die Abwesenheitszeit darf die Sollzeit dieses Tages nicht überschreiten.")
         if d["worked_minutes"] < scheduled and d["code"] != "H" and d["code"] not in absence_reasons:
@@ -439,6 +456,47 @@ class Database:
         for r in rows:
             r["fields"] = json.loads(r["fields"])
         return rows
+
+    @staticmethod
+    def payroll_amounts(record):
+        gross = int(record.get("gross") or 0)
+        deductions = {}
+        for name in ("ahv", "alv", "nbuv", "ktv", "bvg", "pk"):
+            rate = int(record.get(name + "_rate") or 0)
+            deductions[name] = round(round(gross * rate / 100000) / 50) * 50
+        total = sum(deductions.values())
+        return {**deductions, "deductions": total,
+                "net": gross - total + int(record.get("allowance") or 0)}
+
+    def payroll_records(self, employee_id=None, year=None):
+        sql = "SELECT p.*,e.first_name||' '||e.last_name AS name FROM payroll_records p JOIN employees e ON e.id=p.employee_id"
+        conditions, args = [], []
+        if employee_id is not None:
+            conditions.append("p.employee_id=?"); args.append(employee_id)
+        if year is not None:
+            conditions.append("p.year=?"); args.append(int(year))
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        rows = self.rows(sql + " ORDER BY p.year,p.month,p.id", args)
+        return [{**row, **self.payroll_amounts(row)} for row in rows]
+
+    def save_payroll_record(self, data, key=None):
+        fields = ("employee_id", "year", "month", "gross", "allowance", "ahv_rate", "alv_rate",
+                  "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate", "note")
+        value = {name: data.get(name) for name in fields}
+        value["employee_id"] = int(value["employee_id"])
+        value["year"], value["month"] = int(value["year"]), int(value["month"])
+        for name in ("gross", "allowance", "ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate"):
+            value[name] = int(value.get(name) or 0)
+        value["note"] = str(value.get("note") or "").strip()
+        value["updated"] = datetime.now().isoformat(timespec="seconds")
+        if not self.employee(value["employee_id"]) or not 1900 <= value["year"] <= 2200 or not 1 <= value["month"] <= 13:
+            raise ValueError("Bitte Person, Jahr und Monat prüfen.")
+        if min(value[name] for name in ("gross", "allowance", "ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate")) < 0:
+            raise ValueError("Lohn, Zulagen und Abzugssätze dürfen nicht negativ sein.")
+        if any(value[name] > 100000 for name in ("ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate")):
+            raise ValueError("Ein Abzug darf höchstens 100 Prozent betragen.")
+        return self._save("payroll_records", value, key)
 
     def save_salary(self, employee_id, year, start, end, fields, key=None):
         iso(start); iso(end)
