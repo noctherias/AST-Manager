@@ -27,7 +27,7 @@ from ast_app.widgets import Table, confirm, numeric, day
 from ast_app.export_paths import setting_key
 from ast_app.references import ReferenceDialog
 from ast_app.applications import ApplicationsPage, ApplicantStatusDialog
-from ast_app.payroll import PayrollDialog
+from ast_app.payroll import PayrollDialog, PayrollPage
 
 APP = QApplication.instance() or QApplication([])
 if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
@@ -432,6 +432,29 @@ class UiTests(unittest.TestCase):
         saved = self.db.payroll_records(employee["id"], 2026)[0]
         self.assertEqual(saved["bvg_mode"], "fixed")
         self.assertEqual(saved["bvg_amount"], 24535)
+
+    def test_payroll_page_imports_multiple_year_workbooks_at_once(self):
+        page = PayrollPage(self.db)
+        employee = self.db.employee(page.person.currentData())
+
+        def workbook(year, month):
+            return {"year": year, "employee_name": f"{employee['last_name']} {employee['first_name']}",
+                    "records": [{"month": month, "gross": 600000, "allowance": 0,
+                                 "ahv_rate": 5300, "alv_rate": 1100, "nbuv_rate": 1670,
+                                 "ktv_rate": 1855, "bvg_mode": "fixed", "bvg_rate": 0,
+                                 "bvg_amount": 24535, "pk_rate": 0, "note": "Excel-Import"}]}
+
+        with (patch("ast_app.payroll.QFileDialog.getOpenFileNames",
+                    return_value=(["lohn-2025.xlsx", "lohn-2026.xlsx"], "")),
+              patch("ast_app.payroll.import_payroll_book",
+                    side_effect=[workbook(2025, 12), workbook(2026, 1)]) as importer,
+              patch("ast_app.payroll.QMessageBox.information") as information):
+            page.import_excel()
+        self.assertEqual(importer.call_count, 2)
+        self.assertEqual(len(self.db.payroll_records(employee["id"], 2025)), 1)
+        self.assertEqual(len(self.db.payroll_records(employee["id"], 2026)), 1)
+        self.assertEqual(page.year.currentData(), 2026)
+        self.assertIn("2 Dateien", information.call_args.args[2])
 
     def test_manual_reminder_dialog_builds_standalone_claim(self):
         dialog = ManualReminderDialog(None, self.db)

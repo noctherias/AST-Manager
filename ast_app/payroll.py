@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
+import re
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QMessageBox, QFileDialog
@@ -158,7 +160,7 @@ class PayrollPage(Page):
         self.year = combo([(str(year), year) for year in range(current + 1, current - 10, -1)], current)
         controls.addWidget(self.year)
         controls.addStretch()
-        controls.addWidget(button("Excel importieren", self.import_excel))
+        controls.addWidget(button("Excel-Dateien importieren", self.import_excel))
         controls.addWidget(button("Excel speichern", self.export_excel, True))
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs, 1)
@@ -276,27 +278,60 @@ class PayrollPage(Page):
         if not employee:
             QMessageBox.information(self, "Mitarbeiter fehlt", "Bitte zuerst einen Mitarbeiter auswählen.")
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Lohnbuch aus Excel importieren", "",
-                                              "Excel-Dateien (*.xlsx *.xlsm)")
-        if not path:
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Lohnbücher für ausgewählten Mitarbeiter importieren", "",
+            "Excel-Dateien (*.xlsx *.xlsm)")
+        if not paths:
             return
-        parsed = import_payroll_book(path)
-        year = int(parsed["year"])
-        known_year = self.year.findData(year)
-        if known_year < 0:
-            self.year.addItem(str(year), year)
-            known_year = self.year.findData(year)
-        existing = {record["month"]: record for record in self.db.payroll_records(employee["id"], year)}
-        for record in parsed["records"]:
-            values = {**record, "employee_id": employee["id"], "year": year}
-            self.db.save_payroll_record(values, existing.get(record["month"], {}).get("id"))
-        self.year.setCurrentIndex(known_year)
+
+        def normal_name(value):
+            return re.sub(r"[^\w]+", "", str(value or "").casefold())
+
+        expected_names = {
+            normal_name(f"{employee['first_name']} {employee['last_name']}"),
+            normal_name(f"{employee['last_name']} {employee['first_name']}"),
+        }
+        parsed_files = []
+        imported_keys = set()
+        for path in paths:
+            parsed = import_payroll_book(path)
+            source_name = parsed.get("employee_name") or ""
+            if source_name and normal_name(source_name) not in expected_names:
+                raise ValueError(
+                    f"{Path(path).name} gehört gemäss Excel zu «{source_name}» und nicht zum "
+                    f"ausgewählten Mitarbeiter {employee['first_name']} {employee['last_name']}.")
+            year = int(parsed["year"])
+            for record in parsed["records"]:
+                key = (year, int(record["month"]))
+                if key in imported_keys:
+                    raise ValueError(
+                        f"Der Monat {MONTHS[key[1] - 1]} {year} ist in mehreren ausgewählten Dateien enthalten.")
+                imported_keys.add(key)
+            parsed_files.append((path, parsed))
+
+        created = updated = 0
+        imported_years = sorted({int(parsed["year"]) for _, parsed in parsed_files})
+        for year in imported_years:
+            if self.year.findData(year) < 0:
+                self.year.addItem(str(year), year)
+        for _, parsed in parsed_files:
+            year = int(parsed["year"])
+            existing = {record["month"]: record for record in self.db.payroll_records(employee["id"], year)}
+            for record in parsed["records"]:
+                previous = existing.get(record["month"])
+                values = {**record, "employee_id": employee["id"], "year": year}
+                self.db.save_payroll_record(values, previous.get("id") if previous else None)
+                updated += int(previous is not None)
+                created += int(previous is None)
+        latest_year = max(imported_years)
+        self.year.setCurrentIndex(self.year.findData(latest_year))
         self.refresh()
-        source_name = parsed.get("employee_name") or "ohne Namensangabe"
         QMessageBox.information(
             self, "Excel-Import abgeschlossen",
-            f"{len(parsed['records'])} Monatslöhne aus {year} wurden für "
-            f"{employee['first_name']} {employee['last_name']} importiert.\n\nName in der Datei: {source_name}")
+            f"{len(parsed_files)} Dateien mit {len(imported_keys)} Monatslöhnen wurden für "
+            f"{employee['first_name']} {employee['last_name']} importiert.\n"
+            f"Jahre: {', '.join(map(str, imported_years))}\n"
+            f"{created} Monate neu angelegt, {updated} bestehende Monate aktualisiert.")
 
     @guarded
     def export_excel(self):
