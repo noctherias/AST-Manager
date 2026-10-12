@@ -27,6 +27,7 @@ from ast_app.widgets import Table, confirm, numeric, day
 from ast_app.export_paths import setting_key
 from ast_app.references import ReferenceDialog
 from ast_app.applications import ApplicationsPage, ApplicantStatusDialog
+from ast_app.payroll import PayrollDialog
 
 APP = QApplication.instance() or QApplication([])
 if os.name == "nt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
@@ -396,10 +397,41 @@ class UiTests(unittest.TestCase):
         dialog = BulkTimeDialog(None, self.db, employee, 2026)
         dialog.fields["start_day"].setDate(QDate(2026, 1, 5))
         dialog.fields["end_day"].setDate(QDate(2026, 1, 9))
+        self.assertIn("4 Tage × 8.75 h", dialog.automatic_hours.text())
+        self.assertIn("1 Tag × 8.25 h", dialog.automatic_hours.text())
+        self.assertIn("43.25 h gesamt", dialog.automatic_hours.text())
+        self.assertTrue(dialog.automatic_hours.isVisibleTo(dialog))
+        self.assertFalse(dialog.hours.isVisibleTo(dialog))
         dialog.submit()
         records = {row["day"]: row["worked_minutes"] for row in self.db.time_records(employee["id"], 2026)}
         self.assertEqual([records[f"2026-01-0{day}"] for day in range(5, 9)], [525, 525, 525, 525])
         self.assertEqual(records["2026-01-09"], 495)
+
+    def test_bulk_time_dialog_shows_manual_hours_only_when_automatic_is_disabled(self):
+        employee = self.db.employees()[0]
+        dialog = BulkTimeDialog(None, self.db, employee, 2026)
+        dialog.show(); APP.processEvents()
+        self.assertTrue(dialog.automatic_hours.isVisible())
+        self.assertFalse(dialog.hours.isVisible())
+        dialog.regular.setChecked(False)
+        APP.processEvents()
+        self.assertFalse(dialog.automatic_hours.isVisible())
+        self.assertTrue(dialog.hours.isVisible())
+
+    def test_payroll_dialog_switches_bvg_between_percentage_and_fixed_amount(self):
+        employee = self.db.employees()[0]
+        dialog = PayrollDialog(None, self.db, employee, 2026)
+        dialog.show(); APP.processEvents()
+        self.assertEqual(dialog.bvg_value.suffix(), " %")
+        dialog.fields["bvg_mode"].setCurrentIndex(dialog.fields["bvg_mode"].findData("fixed"))
+        APP.processEvents()
+        self.assertEqual(dialog.bvg_value.suffix(), " CHF")
+        dialog.fields["gross"].setValue(6000)
+        dialog.bvg_value.setValue(245.35)
+        dialog.submit()
+        saved = self.db.payroll_records(employee["id"], 2026)[0]
+        self.assertEqual(saved["bvg_mode"], "fixed")
+        self.assertEqual(saved["bvg_amount"], 24535)
 
     def test_manual_reminder_dialog_builds_standalone_claim(self):
         dialog = ManualReminderDialog(None, self.db)

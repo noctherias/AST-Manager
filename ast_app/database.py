@@ -61,7 +61,9 @@ CREATE TABLE IF NOT EXISTS payroll_records(
  gross INTEGER NOT NULL DEFAULT 0 CHECK(gross>=0), allowance INTEGER NOT NULL DEFAULT 0 CHECK(allowance>=0),
  ahv_rate INTEGER NOT NULL DEFAULT 5300, alv_rate INTEGER NOT NULL DEFAULT 1100,
  nbuv_rate INTEGER NOT NULL DEFAULT 1670, ktv_rate INTEGER NOT NULL DEFAULT 1855,
- bvg_rate INTEGER NOT NULL DEFAULT 0, pk_rate INTEGER NOT NULL DEFAULT 0,
+ bvg_rate INTEGER NOT NULL DEFAULT 0, bvg_mode TEXT NOT NULL DEFAULT 'percent'
+ CHECK(bvg_mode IN ('percent','fixed')), bvg_amount INTEGER NOT NULL DEFAULT 0 CHECK(bvg_amount>=0),
+ pk_rate INTEGER NOT NULL DEFAULT 0,
  note TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL,
  UNIQUE(employee_id,year,month));
 CREATE TABLE IF NOT EXISTS employment_references(
@@ -96,7 +98,7 @@ CREATE INDEX IF NOT EXISTS applicants_status ON applicants(status,category,submi
 CREATE INDEX IF NOT EXISTS applicant_files_applicant ON applicant_files(applicant_id);
 """
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 
 class Database:
@@ -127,6 +129,11 @@ class Database:
                                   (worked_minutes({**record, "worked_minutes": None}), record["id"]))
         if "rapport_number" not in time_columns:
             self.conn.execute("ALTER TABLE time_records ADD COLUMN rapport_number TEXT NOT NULL DEFAULT ''")
+        payroll_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(payroll_records)")}
+        if "bvg_mode" not in payroll_columns:
+            self.conn.execute("ALTER TABLE payroll_records ADD COLUMN bvg_mode TEXT NOT NULL DEFAULT 'percent'")
+        if "bvg_amount" not in payroll_columns:
+            self.conn.execute("ALTER TABLE payroll_records ADD COLUMN bvg_amount INTEGER NOT NULL DEFAULT 0")
         if version < SCHEMA_VERSION:
             self._migrate_time_codes(version)
         invoice_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(invoices)")}
@@ -462,8 +469,11 @@ class Database:
         gross = int(record.get("gross") or 0)
         deductions = {}
         for name in ("ahv", "alv", "nbuv", "ktv", "bvg", "pk"):
-            rate = int(record.get(name + "_rate") or 0)
-            deductions[name] = round(round(gross * rate / 100000) / 50) * 50
+            if name == "bvg" and record.get("bvg_mode") == "fixed":
+                deductions[name] = int(record.get("bvg_amount") or 0)
+            else:
+                rate = int(record.get(name + "_rate") or 0)
+                deductions[name] = round(round(gross * rate / 100000) / 50) * 50
         total = sum(deductions.values())
         return {**deductions, "deductions": total,
                 "net": gross - total + int(record.get("allowance") or 0)}
@@ -482,17 +492,20 @@ class Database:
 
     def save_payroll_record(self, data, key=None):
         fields = ("employee_id", "year", "month", "gross", "allowance", "ahv_rate", "alv_rate",
-                  "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate", "note")
+                  "nbuv_rate", "ktv_rate", "bvg_rate", "bvg_mode", "bvg_amount", "pk_rate", "note")
         value = {name: data.get(name) for name in fields}
         value["employee_id"] = int(value["employee_id"])
         value["year"], value["month"] = int(value["year"]), int(value["month"])
-        for name in ("gross", "allowance", "ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate"):
+        for name in ("gross", "allowance", "ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "bvg_amount", "pk_rate"):
             value[name] = int(value.get(name) or 0)
+        value["bvg_mode"] = str(value.get("bvg_mode") or "percent")
         value["note"] = str(value.get("note") or "").strip()
         value["updated"] = datetime.now().isoformat(timespec="seconds")
         if not self.employee(value["employee_id"]) or not 1900 <= value["year"] <= 2200 or not 1 <= value["month"] <= 13:
             raise ValueError("Bitte Person, Jahr und Monat prüfen.")
-        if min(value[name] for name in ("gross", "allowance", "ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate")) < 0:
+        if value["bvg_mode"] not in ("percent", "fixed"):
+            raise ValueError("Bitte für den BVG-Abzug Prozent oder festen Betrag auswählen.")
+        if min(value[name] for name in ("gross", "allowance", "ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "bvg_amount", "pk_rate")) < 0:
             raise ValueError("Lohn, Zulagen und Abzugssätze dürfen nicht negativ sein.")
         if any(value[name] > 100000 for name in ("ahv_rate", "alv_rate", "nbuv_rate", "ktv_rate", "bvg_rate", "pk_rate")):
             raise ValueError("Ein Abzug darf höchstens 100 Prozent betragen.")
@@ -649,6 +662,11 @@ class Database:
                 for record in self.rows("SELECT * FROM time_records"):
                     self.conn.execute("UPDATE time_records SET worked_minutes=? WHERE id=?",
                                       (worked_minutes({**record, "worked_minutes": None}), record["id"]))
+            payroll_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(payroll_records)")}
+            if "bvg_mode" not in payroll_columns:
+                self.conn.execute("ALTER TABLE payroll_records ADD COLUMN bvg_mode TEXT NOT NULL DEFAULT 'percent'")
+            if "bvg_amount" not in payroll_columns:
+                self.conn.execute("ALTER TABLE payroll_records ADD COLUMN bvg_amount INTEGER NOT NULL DEFAULT 0")
             if saved_version < SCHEMA_VERSION:
                 self._migrate_time_codes(saved_version)
             self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")

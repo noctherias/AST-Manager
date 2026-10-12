@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from ast_app.payroll_excel import export_payroll_book
+from ast_app.payroll_excel import export_payroll_book, import_payroll_book
 
 
 NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -47,6 +47,30 @@ class PayrollExcelTests(unittest.TestCase):
                     self.assertNotIn(private_value, package)
                 for marker in (b"#REF!", b"#DIV/0!", b"#VALUE!", b"#NAME?", b"#N/A"):
                     self.assertNotIn(marker, package)
+
+    def test_fixed_bvg_is_exported_and_workbook_can_be_imported(self):
+        employee = {"first_name": "Lena", "last_name": "Muster", "code": "AST-007",
+                    "ahv": "", "birth_date": "", "address": "", "postcode": "", "city": ""}
+        fixed = {
+            "year": 2026, "month": 1, "gross": 600000, "allowance": 10000,
+            "ahv_rate": 5300, "alv_rate": 1100, "nbuv_rate": 1670, "ktv_rate": 1855,
+            "bvg_mode": "fixed", "bvg_rate": 0, "bvg_amount": 24535, "pk_rate": 1000,
+            "ahv": 31800, "alv": 6600, "nbuv": 10000, "ktv": 11150,
+            "bvg": 24535, "pk": 6000, "deductions": 90085, "net": 519915,
+        }
+        percent = {**fixed, "month": 2, "bvg_mode": "percent", "bvg_rate": 2000,
+                   "bvg_amount": 0, "bvg": 12000, "deductions": 77550, "net": 532450}
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "lohn.xlsx"
+            export_payroll_book(target, employee, 2026, [fixed, percent])
+            parsed = import_payroll_book(target)
+        self.assertEqual(parsed["year"], 2026)
+        self.assertEqual(parsed["employee_name"], "Muster Lena")
+        self.assertEqual(len(parsed["records"]), 2)
+        self.assertEqual(parsed["records"][0]["bvg_mode"], "fixed")
+        self.assertEqual(parsed["records"][0]["bvg_amount"], 24535)
+        self.assertEqual(parsed["records"][1]["bvg_mode"], "percent")
+        self.assertEqual(parsed["records"][1]["bvg_rate"], 2000)
 
 
 if __name__ == "__main__":

@@ -4,13 +4,13 @@ from __future__ import annotations
 from datetime import date
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QMessageBox, QFileDialog
 
 from .widgets import Page, FormDialog, Table, label, button, combo, numeric, line, selection_bar, guarded, confirm
 from .domain import chf
 from .pages import save_path
 from .export_paths import employee_year_folders
-from .payroll_excel import export_payroll_book
+from .payroll_excel import export_payroll_book, import_payroll_book
 
 
 MONTHS = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
@@ -29,10 +29,22 @@ class PayrollDialog(FormDialog):
                                            source.get("month", min(date.today().month, 12))))
         self.add("gross", "Bruttolohn", numeric(int(source.get("gross") or 0) / 100, " CHF"))
         self.add("allowance", "Zulagen / Gutschriften", numeric(int(source.get("allowance") or 0) / 100, " CHF"))
-        self.form.addRow(label("Abzüge in Prozent des Bruttolohns", "sectionTitle"))
+        self.form.addRow(label("Lohnabzüge", "sectionTitle"))
         defaults_rates = {"ahv_rate": 5300, "alv_rate": 1100, "nbuv_rate": 1670,
                           "ktv_rate": 1855, "bvg_rate": 0, "pk_rate": 0}
         for key, title in RATE_FIELDS:
+            if key == "bvg_rate":
+                mode = source.get("bvg_mode") or "percent"
+                self.add("bvg_mode", "BVG Berechnung", combo([
+                    ("Prozent des Bruttolohns", "percent"), ("Fester Betrag in CHF", "fixed")], mode))
+                amount = (int(source.get("bvg_amount") or 0) / 100 if mode == "fixed"
+                          else int(source.get("bvg_rate") or 0) / 1000)
+                self.bvg_value = numeric(amount, " CHF" if mode == "fixed" else " %")
+                self.bvg_value.setRange(0, 999999999 if mode == "fixed" else 100)
+                self.bvg_value.setDecimals(2 if mode == "fixed" else 3)
+                self.add("bvg_value", "BVG Wert", self.bvg_value)
+                self.fields["bvg_mode"].currentIndexChanged.connect(self._bvg_mode_changed)
+                continue
             rate = int(source.get(key) if source.get(key) is not None else defaults_rates[key]) / 1000
             field = numeric(rate, " %")
             field.setRange(0, 100)
@@ -40,9 +52,19 @@ class PayrollDialog(FormDialog):
             field.setSingleStep(0.1)
             self.add(key, title, field)
         self.add("note", "Bemerkung", line(source.get("note", ""), "optional"))
-        note = label("Die Abzüge werden auf CHF 0.50 gerundet. Nettolohn = Bruttolohn − Abzüge + Zulagen.", "muted")
+        self._bvg_mode_changed()
+        note = label("Prozentuale Abzüge werden auf CHF 0.50 gerundet; ein fixer BVG-Betrag wird exakt übernommen. "
+                     "Nettolohn = Bruttolohn - Abzüge + Zulagen.", "muted")
         note.setWordWrap(True)
         self.form.addRow("", note)
+
+    def _bvg_mode_changed(self):
+        fixed = self.fields["bvg_mode"].currentData() == "fixed"
+        self.bvg_value.setSuffix(" CHF" if fixed else " %")
+        self.bvg_value.setDecimals(2 if fixed else 3)
+        self.bvg_value.setRange(0, 999999999 if fixed else 100)
+        self.bvg_value.setToolTip("Festen monatlichen BVG-Abzug in CHF eingeben." if fixed else
+                                  "BVG-Abzug in Prozent des Bruttolohns eingeben.")
 
     @guarded
     def submit(self):
@@ -51,7 +73,14 @@ class PayrollDialog(FormDialog):
         values["gross"] = round(values["gross"] * 100)
         values["allowance"] = round(values["allowance"] * 100)
         for key, _ in RATE_FIELDS:
+            if key == "bvg_rate":
+                continue
             values[key] = round(values[key] * 1000)
+        bvg_value = values.pop("bvg_value")
+        if values["bvg_mode"] == "fixed":
+            values["bvg_amount"], values["bvg_rate"] = round(bvg_value * 100), 0
+        else:
+            values["bvg_rate"], values["bvg_amount"] = round(bvg_value * 1000), 0
         if values["gross"] <= 0:
             raise ValueError("Bitte einen positiven Bruttolohn eingeben.")
         self.saved_id = self.db.save_payroll_record(values, self.row.get("id"))
@@ -117,7 +146,7 @@ class SalaryTrend(QWidget):
 
 class PayrollPage(Page):
     def __init__(self, db):
-        super().__init__("Lohnbuch", "Monatslöhne, prozentuale Abzüge, Nettolohn und Lohnverlauf.")
+        super().__init__("Lohnbuch", "Monatslöhne, prozentuale oder feste Abzüge, Nettolohn und Lohnverlauf.")
         self.db, self.records = db, []
         self.header.addWidget(button("+ Monatslohn erfassen", self.new, True))
         controls = self.toolbar()
@@ -129,11 +158,13 @@ class PayrollPage(Page):
         self.year = combo([(str(year), year) for year in range(current + 1, current - 10, -1)], current)
         controls.addWidget(self.year)
         controls.addStretch()
+        controls.addWidget(button("Excel importieren", self.import_excel))
         controls.addWidget(button("Excel speichern", self.export_excel, True))
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs, 1)
         monthly = QWidget(); monthly_layout = QVBoxLayout(monthly); monthly_layout.setContentsMargins(0, 16, 0, 0)
-        self.table = Table(["Monat", "Bruttolohn", "Abzüge", "Zulagen", "Nettolohn", "Bemerkung"])
+        self.table = Table(["Monat", "Bruttolohn", "BVG-Art", "BVG-Abzug", "Abzüge total",
+                            "Zulagen", "Nettolohn", "Bemerkung"])
         monthly_layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(monthly_layout, "Wähle einen Monatslohn aus oder erfasse einen neuen.")
         self.edit_btn = button("Bearbeiten", self.edit); self.delete_btn = button("Löschen", self.remove)
@@ -180,9 +211,11 @@ class PayrollPage(Page):
             self.person.blockSignals(False)
         employee_id, year = self.person.currentData(), self.year.currentData()
         self.records = self.db.payroll_records(employee_id, year) if employee_id else []
-        self.table.populate([[MONTHS[r["month"] - 1], chf(r["gross"]), chf(r["deductions"]),
-                              chf(r["allowance"]), chf(r["net"]), r["note"]] for r in self.records],
-                            [r["id"] for r in self.records], [1, 2, 3, 4])
+        self.table.populate([[
+            MONTHS[r["month"] - 1], chf(r["gross"]),
+            "Fixbetrag" if r.get("bvg_mode") == "fixed" else f"{int(r.get('bvg_rate') or 0) / 1000:.3f} %",
+            chf(r["bvg"]), chf(r["deductions"]), chf(r["allowance"]), chf(r["net"]), r["note"]
+        ] for r in self.records], [r["id"] for r in self.records], [1, 3, 4, 5, 6])
         self.selection(); self.refresh_trend()
 
     def selected(self):
@@ -236,6 +269,34 @@ class PayrollPage(Page):
         self.chart.set_data([p[0] for p in points], [p[1] for p in points], [p[2] for p in points])
         self.trend_table.populate([[title, chf(gross), chf(net), chf(gross - net)]
                                    for title, gross, net in reversed(points)], list(range(len(points))), [1, 2, 3])
+
+    @guarded
+    def import_excel(self):
+        employee = self.db.employee(self.person.currentData()) if self.person.currentData() else None
+        if not employee:
+            QMessageBox.information(self, "Mitarbeiter fehlt", "Bitte zuerst einen Mitarbeiter auswählen.")
+            return
+        path, _ = QFileDialog.getOpenFileName(self, "Lohnbuch aus Excel importieren", "",
+                                              "Excel-Dateien (*.xlsx *.xlsm)")
+        if not path:
+            return
+        parsed = import_payroll_book(path)
+        year = int(parsed["year"])
+        known_year = self.year.findData(year)
+        if known_year < 0:
+            self.year.addItem(str(year), year)
+            known_year = self.year.findData(year)
+        existing = {record["month"]: record for record in self.db.payroll_records(employee["id"], year)}
+        for record in parsed["records"]:
+            values = {**record, "employee_id": employee["id"], "year": year}
+            self.db.save_payroll_record(values, existing.get(record["month"], {}).get("id"))
+        self.year.setCurrentIndex(known_year)
+        self.refresh()
+        source_name = parsed.get("employee_name") or "ohne Namensangabe"
+        QMessageBox.information(
+            self, "Excel-Import abgeschlossen",
+            f"{len(parsed['records'])} Monatslöhne aus {year} wurden für "
+            f"{employee['first_name']} {employee['last_name']} importiert.\n\nName in der Datei: {source_name}")
 
     @guarded
     def export_excel(self):

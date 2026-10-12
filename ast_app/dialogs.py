@@ -395,9 +395,14 @@ class BulkTimeDialog(FormDialog):
         self.regular = QCheckBox("Tages-Sollzeit automatisch einsetzen")
         self.regular.setChecked(True)
         self.form.addRow("", self.regular)
+        self.automatic_hours = line()
+        self.automatic_hours.setReadOnly(True)
+        self.automatic_hours.setToolTip(
+            "Die Stunden werden für jedes Datum einzeln berechnet: Montag bis Donnerstag 8.75 h, Freitag 8.25 h.")
+        self.form.addRow("Automatische Stunden", self.automatic_hours)
         self.hours = numeric(8.75, " h")
         self.hours.setRange(0, 24)
-        self.add("hours", "Stunden je Tag", self.hours)
+        self.add("hours", "Manuelle Stunden je Tag", self.hours)
         self.add("rapport_number", "Rapportnummer", line("", "optional; gilt für alle ausgewählten Tage"))
         self.add("note", "Bemerkung", line("", "gilt für alle ausgewählten Tage"))
         self.overwrite = QCheckBox("Bereits erfasste Tage überschreiben")
@@ -413,6 +418,7 @@ class BulkTimeDialog(FormDialog):
         self.regular.toggled.connect(self._state)
         self.fields["start_day"].dateChanged.connect(self._update_preview)
         self.fields["end_day"].dateChanged.connect(self._update_preview)
+        self.fields["code"].currentIndexChanged.connect(self._update_preview)
         for check in self.weekdays:
             check.toggled.connect(self._update_preview)
         self.overwrite.toggled.connect(self._update_preview)
@@ -420,7 +426,22 @@ class BulkTimeDialog(FormDialog):
         self._update_preview()
 
     def _state(self):
-        self.hours.setEnabled(not self.regular.isChecked())
+        automatic = self.regular.isChecked()
+        self.form.setRowVisible(self.automatic_hours, automatic)
+        self.form.setRowVisible(self.hours, not automatic)
+        self._update_preview()
+
+    def _selected_dates(self):
+        start = date.fromisoformat(day_value(self.fields["start_day"]))
+        end = date.fromisoformat(day_value(self.fields["end_day"]))
+        selected = {index for index, check in enumerate(self.weekdays) if check.isChecked()}
+        dates = []
+        current = start
+        while current <= end:
+            if current.weekday() in selected:
+                dates.append(current)
+            current += timedelta(days=1)
+        return dates
 
     def _preset(self, mode):
         start = date.fromisoformat(day_value(self.fields["start_day"]))
@@ -440,20 +461,25 @@ class BulkTimeDialog(FormDialog):
         self.fields["end_day"].setDate(QDate(end.year, end.month, end.day))
 
     def _update_preview(self):
-        start = date.fromisoformat(day_value(self.fields["start_day"]))
-        end = date.fromisoformat(day_value(self.fields["end_day"]))
-        selected = {index for index, check in enumerate(self.weekdays) if check.isChecked()}
-        dates = []
-        current = start
-        while current <= end:
-            if current.weekday() in selected:
-                dates.append(current.isoformat())
-            current += timedelta(days=1)
+        dates = self._selected_dates()
+        iso_dates = [value.isoformat() for value in dates]
+        if self.regular.isChecked():
+            counts = {}
+            for value in dates:
+                minutes = scheduled_work_minutes(value)
+                counts[minutes] = counts.get(minutes, 0) + 1
+            parts = []
+            for minutes in sorted(counts, reverse=True):
+                title = "Tag" if counts[minutes] == 1 else "Tage"
+                parts.append(f"{counts[minutes]} {title} × {minutes / 60:.2f} h")
+            total = sum(scheduled_work_minutes(value) for value in dates)
+            detail = " + ".join(parts) if parts else "Keine Tage ausgewählt"
+            self.automatic_hours.setText(f"{detail} = {total / 60:.2f} h gesamt" if parts else detail)
         existing = {record["day"] for record in self.db.time_records(self.employee["id"])}
-        occupied = sum(day in existing for day in dates)
-        action = (f"{len(dates)} Tage werden überschrieben oder neu erfasst."
+        occupied = sum(day in existing for day in iso_dates)
+        action = (f"{len(iso_dates)} Tage werden überschrieben oder neu erfasst."
                   if self.overwrite.isChecked() else
-                  f"{len(dates) - occupied} Tage werden neu erfasst; {occupied} bestehende werden ausgelassen.")
+                  f"{len(iso_dates) - occupied} Tage werden neu erfasst; {occupied} bestehende werden ausgelassen.")
         self.preview.setText(action)
 
     @guarded
@@ -464,8 +490,7 @@ class BulkTimeDialog(FormDialog):
             raise ValueError("Das Enddatum muss nach dem Startdatum liegen.")
         if self.employment_start and start < self.employment_start:
             raise ValueError("Der Zeitraum darf nicht vor dem berücksichtigten Eintrittsdatum beginnen.")
-        selected = {index for index, check in enumerate(self.weekdays) if check.isChecked()}
-        if not selected:
+        if not any(check.isChecked() for check in self.weekdays):
             raise ValueError("Bitte mindestens einen Wochentag auswählen.")
         code = self.fields["code"].currentData() or ""
         common = {"employee_id": self.employee["id"], "code": code,
@@ -473,13 +498,10 @@ class BulkTimeDialog(FormDialog):
                   "note": self.fields["note"].text(), "break_minutes": 0,
                   "start_1": None, "end_1": None, "start_2": None, "end_2": None}
         records = []
-        current = start
-        while current <= end:
-            if current.weekday() in selected:
-                minutes = scheduled_work_minutes(current) \
-                    if self.regular.isChecked() else round(self.hours.value() * 60)
-                records.append({**common, "day": current.isoformat(), "worked_minutes": minutes})
-            current += timedelta(days=1)
+        for current in self._selected_dates():
+            minutes = scheduled_work_minutes(current) \
+                if self.regular.isChecked() else round(self.hours.value() * 60)
+            records.append({**common, "day": current.isoformat(), "worked_minutes": minutes})
         if not records:
             raise ValueError("Der gewählte Zeitraum enthält keinen ausgewählten Wochentag.")
         self.result_counts = self.db.save_time_records(records, self.overwrite.isChecked())

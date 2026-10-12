@@ -234,5 +234,18 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(row["ahv"], 31800)
         self.assertEqual(row["net"], row["gross"] - row["deductions"] + row["allowance"])
 
+    def test_payroll_accepts_fixed_bvg_amount_per_month(self):
+        self.db.save_payroll_record({
+            "employee_id": self.person, "year": 2026, "month": 6,
+            "gross": 600000, "allowance": 0,
+            "ahv_rate": 5300, "alv_rate": 1100, "nbuv_rate": 1670,
+            "ktv_rate": 1855, "bvg_mode": "fixed", "bvg_amount": 24535,
+            "bvg_rate": 0, "pk_rate": 0, "note": "Fixes BVG",
+        })
+        row = self.db.payroll_records(self.person, 2026)[0]
+        self.assertEqual(row["bvg_mode"], "fixed")
+        self.assertEqual(row["bvg"], 24535)
+        self.assertEqual(row["net"], row["gross"] - row["deductions"])
+
 
 if __name__ == "__main__": unittest.main()
