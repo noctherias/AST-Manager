@@ -153,7 +153,7 @@ class TimesheetExcelTests(unittest.TestCase):
                 self.assertEqual(annual.find(".//x:row[@r='43']", NS).get("hidden"), "1")
                 self.assertIsNone(annual.find(".//x:row[@r='44']", NS).get("hidden"))
                 self.assertEqual(cell(annual, "A44").find("x:is/x:t", NS).text,
-                                 "Ferienanspruch 01.01.–31.12.2026 (h)")
+                                 "Ferienkontingent 01.01.-31.12.2026 (h)")
                 self.assertIsNone(cell(annual, "B44").find("x:v", NS))
                 self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), 173.0)
                 settings = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
@@ -246,12 +246,23 @@ class TimesheetExcelTests(unittest.TestCase):
             ], "AST Elektro AG", employee["hired"])
             with zipfile.ZipFile(target) as exported:
                 april = exported.read("xl/worksheets/sheet9.xml")
+                february = ET.fromstring(exported.read("xl/worksheets/sheet7.xml"))
                 may = ET.fromstring(exported.read("xl/worksheets/sheet10.xml"))
                 annual = ET.fromstring(exported.read("xl/worksheets/sheet18.xml"))
+                styles = ET.fromstring(exported.read("xl/styles.xml"))
                 self.assertNotIn(b"vor Eintritt", april)
+                self.assertEqual(cell(february, "L32").find("x:f", NS).text, "0")
+                self.assertEqual(cell(february, "L34").find("x:f", NS).text, "0")
+                self.assertAlmostEqual(float(cell(annual, "E35").find("x:v", NS).text), 0)
                 self.assertAlmostEqual(float(cell(annual, "N35").find("x:v", NS).text),
                                        monthly_target_minutes(2026, 5, employee["hired"]) / 60)
                 self.assertIn("DATE(2026,5,15)", cell(may, "L4").find("x:f", NS).text)
+                self.assertTrue(cell(may, "L4").find("x:f", NS).text.startswith("IF(A4<DATE(2026,5,15)"))
+                self.assertEqual(fill_rgb(styles, annual, "B4"), "FFD9DEE2")
+                self.assertEqual(fill_rgb(styles, annual, "N17"), "FFD9DEE2")
+                self.assertNotEqual(fill_rgb(styles, annual, "N18"), "FFD9DEE2")
+                self.assertEqual(cell(annual, "A44").find("x:is/x:t", NS).text,
+                                 "Ferienkontingent ab Eintritt 15.05.2026 (h)")
                 self.assertAlmostEqual(float(cell(annual, "AL44").find("x:v", NS).text), expected / 100)
 
 

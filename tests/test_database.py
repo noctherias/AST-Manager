@@ -43,6 +43,14 @@ class DatabaseTests(unittest.TestCase):
         self.db = Database(self.path)
         self.assertEqual(self.db.balances(self.person)[2]["balance"], 60700)
 
+    def test_multiple_rows_are_deleted_in_one_operation(self):
+        period = self.period(2024)
+        first = self.entry(period, 2024, "vacation", 100)
+        second = self.db.save_entry({"period_id": period, "day": "2024-08-02", "kind": "sick",
+                                     "hours": 200, "note": "Test"})
+        self.db.delete_many("entries", [first, second, first])
+        self.assertEqual(self.db.entries(period), [])
+
     def test_period_validation_and_entry_boundaries(self):
         p = self.period(2024)
         with self.assertRaises(ValueError): self.period(2024)

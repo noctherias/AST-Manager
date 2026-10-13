@@ -831,7 +831,12 @@ class ApplicationsPage(Page):
 
     @guarded
     def remove(self):
+        keys = self.table.selected_ids()
         row = self.selected()
-        if row and confirm(self, "Bewerbung löschen", "Soll dieses Bewerbungsdossier wirklich gelöscht werden?\nDie lokale Dokumentkopie bleibt als Datei erhalten."):
-            self.db.delete("applicants", row["id"])
+        text = ("Soll dieses Bewerbungsdossier wirklich gelöscht werden?\nDie lokale Dokumentkopie bleibt als Datei erhalten."
+                if len(keys) == 1 else
+                f"Sollen die {len(keys)} ausgewählten Bewerbungsdossiers wirklich gelöscht werden?\n"
+                "Die lokalen Dokumentkopien bleiben als Dateien erhalten.")
+        if keys and confirm(self, "Bewerbung löschen" if len(keys) == 1 else "Bewerbungen löschen", text):
+            self.db.delete_many("applicants", keys)
             self.refresh()

@@ -10,7 +10,7 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 from .documents import resource_path
-from .timesheet_excel import _replace_cell, _replace_formula_cell
+from .timesheet_excel import _remove_calc_chain, _replace_cell, _replace_formula_cell
 
 
 XML_NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -195,6 +195,10 @@ def export_payroll_book(destination, employee, year, records, company_settings=N
     xml = _replace_formula_cell(xml, "M48", "SUM(F48:K48)",
                                 sum(int(r.get("deductions") or 0) for r in by_month.values()) / 100)
     members[sheet_name] = xml.encode("utf-8")
+    # The template's calculation chain points to its original formulas.  Once
+    # the monthly formulas are replaced, Excel treats that stale chain as a
+    # damaged workbook and offers to repair the file.
+    _remove_calc_chain(members)
     workbook = members.get("xl/workbook.xml", b"").decode("utf-8")
     workbook = re.sub(r'<calcPr\b([^>]*)/?>', '<calcPr calcId="191029" fullCalcOnLoad="1" forceFullCalc="1"/>', workbook, count=1)
     members["xl/workbook.xml"] = workbook.encode("utf-8")
@@ -203,7 +207,8 @@ def export_payroll_book(destination, employee, year, records, company_settings=N
     try:
         with zipfile.ZipFile(temporary, "w") as target:
             for info in infos:
-                target.writestr(info, members[info.filename])
+                if info.filename in members:
+                    target.writestr(info, members[info.filename])
         with zipfile.ZipFile(temporary, "r") as check:
             if check.testzip() is not None:
                 raise ValueError("Die Excel-Datei konnte nicht vollständig erstellt werden.")

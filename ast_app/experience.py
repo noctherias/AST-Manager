@@ -590,10 +590,14 @@ class TimeWorkspace(Page):
         self.selection()
 
     def selection(self):
-        enabled = self.table.selected_id() is not None
-        self.edit_btn.setEnabled(enabled)
-        self.delete_btn.setEnabled(enabled)
-        self.selection_hint.setText("Ausgewählten Tag bearbeiten oder löschen." if enabled else "Wähle einen Tag aus oder erfasse einen neuen.")
+        count = len(self.table.selected_ids())
+        self.edit_btn.setEnabled(count == 1)
+        self.delete_btn.setEnabled(count > 0)
+        if count > 1:
+            self.selection_hint.setText(f"{count} Tage ausgewählt. Sie können gemeinsam gelöscht werden.")
+        else:
+            self.selection_hint.setText("Ausgewählten Tag bearbeiten oder löschen." if count else
+                                        "Wähle einen Tag aus oder erfasse einen neuen.")
 
     def new_entry(self):
         if self.employee and TimeRecordDialog(
@@ -619,9 +623,11 @@ class TimeWorkspace(Page):
 
     @guarded
     def remove_entry(self):
-        key = self.table.selected_id()
-        if key and confirm(self, "Diesen erfassten Tag löschen?"):
-            self.db.delete("time_records", key)
+        keys = self.table.selected_ids()
+        question = ("Diesen erfassten Tag löschen?" if len(keys) == 1 else
+                    f"Die {len(keys)} ausgewählten Tage löschen?")
+        if keys and confirm(self, question):
+            self.db.delete_many("time_records", keys)
             self.refresh()
 
     @guarded

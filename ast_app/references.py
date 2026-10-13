@@ -510,7 +510,10 @@ class ReferencesPage(Page):
 
     @guarded
     def remove(self):
+        keys = self.table.selected_ids()
         row = self.selected()
-        if row and confirm(self, "Zeugnis löschen", "Soll dieses Zeugnis wirklich gelöscht werden?"):
-            self.db.delete("employment_references", row["id"])
+        text = ("Soll dieses Zeugnis wirklich gelöscht werden?" if len(keys) == 1 else
+                f"Sollen die {len(keys)} ausgewählten Zeugnisse wirklich gelöscht werden?")
+        if keys and confirm(self, "Zeugnis löschen" if len(keys) == 1 else "Zeugnisse löschen", text):
+            self.db.delete_many("employment_references", keys)
             self.refresh()

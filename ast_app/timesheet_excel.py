@@ -226,13 +226,21 @@ def _widen_annual_hour_columns(xml: str) -> str:
 def _use_direct_hours_formula(xml: str, year=None, month=None, employment_start=None) -> str:
     """Use one hours input with an unambiguous meaning for every reason."""
     for row in range(4, 35):
+        day_number = row - 3
+        if year and month and not _valid_day(int(year), int(month), day_number):
+            # The template still contains rows 29-31 in short months.  Any
+            # date calculation in those rows can produce #VALUE! and poison
+            # the monthly and annual target totals.
+            xml = _replace_formula_cell(xml, f"L{row}", "0", 0)
+            xml = _replace_formula_cell(xml, f"K{row}", "0", 0)
+            continue
         target = (f'IF(A{row}="",0,IF(AND(J{row}="H",IF(D{row}="",0,D{row})>=N{row}),0,'
                   f'IF(AND(C{row}<>"",J{row}=""),'
                   f'IFERROR(VLOOKUP(B{row},Feiertage,3,FALSE)*N{row},N{row}),N{row})))')
         if employment_start and year and month:
             start = (date.fromisoformat(employment_start) if isinstance(employment_start, str)
                      else employment_start)
-            target = (f'IF(DATE({int(year)},{int(month)},B{row})<DATE({start.year},{start.month},{start.day}),0,'
+            target = (f'IF(A{row}<DATE({start.year},{start.month},{start.day}),0,'
                       f'{target})')
         actual = (f'IF(A{row}="",0,IF(OR(J{row}="F",J{row}="K",J{row}="U",J{row}="M",J{row}="H"),'
                   f'MAX(0,L{row}-IF(D{row}="",0,D{row})),IF(D{row}="",0,D{row})))')
@@ -320,7 +328,7 @@ def _remove_annual_calendar_formatting(xml: str) -> str:
 
 
 def _annual_calendar_cells(year: int, records_by_day: dict[date, dict],
-                           holidays: set[date], fills: dict[str, int]
+                           holidays: set[date], fills: dict[str, int], employment_start=None
                            ) -> list[tuple[str, str | None, int]]:
     """Return direct calendar styles for weekends, holidays and absences."""
     result = []
@@ -328,6 +336,8 @@ def _annual_calendar_cells(year: int, records_by_day: dict[date, dict],
         "F": fills["vacation"], "K": fills["sick"],
         "U": fills["accident"], "M": fills["other"],
     }
+    start = (date.fromisoformat(employment_start) if isinstance(employment_start, str)
+             else employment_start)
     for month, columns in enumerate(ANNUAL_MONTH_COLUMNS, 1):
         for day_number in range(1, 32):
             if not _valid_day(year, month, day_number):
@@ -335,7 +345,9 @@ def _annual_calendar_cells(year: int, records_by_day: dict[date, dict],
             current_day = date(year, month, day_number)
             record = records_by_day.get(current_day)
             code = normalize_time_code(record.get("code")) if record else ""
-            if current_day in holidays or code == "H":
+            if start and current_day < start:
+                fill_id = fills["inactive"]
+            elif current_day in holidays or code == "H":
                 fill_id = fills["holiday"]
             elif code in reason_fills:
                 fill_id = reason_fills[code]
@@ -634,9 +646,9 @@ def _simplify_annual_summary(xml: str, year: int, vacation_hours: float,
         40: "Unfall · U (h)",
         41: "Andere begründete Minderzeit · M (h)",
         42: "Abwesenheit (h)",
-        44: (f"Ferienanspruch ab {date.fromisoformat(employment_start).strftime('%d.%m.%Y')} (h)"
+        44: (f"Ferienkontingent ab Eintritt {date.fromisoformat(employment_start).strftime('%d.%m.%Y')} (h)"
              if isinstance(employment_start, str) and employment_start else
-             f"Ferienanspruch 01.01.–31.12.{year} (h)"),
+             f"Ferienkontingent 01.01.-31.12.{year} (h)"),
     }
     for row, title in labels.items():
         xml = _replace_cell(xml, f"A{row}", title, "string")
@@ -804,6 +816,7 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
     fill_weekend = styles.fill_id("FFFFD59A")
     fill_total = styles.fill_id("FFE9EEF2")
     fill_header = styles.fill_id("FFDCE6EB")
+    fill_inactive = styles.fill_id("FFD9DEE2")
     positive_balance_dxf = styles.differential_font_color("FF008A67")
     category_fills = (
         (36, fill_overtime),
@@ -917,7 +930,8 @@ def export_timesheet(destination, employee: dict, year: int, records: list[dict]
             "vacation": fill_vacation, "sick": fill_sick,
             "accident": fill_accident, "other": fill_other,
             "holiday": fill_holiday, "weekend": fill_weekend,
-        }),
+            "inactive": fill_inactive,
+        }, employment_start),
     )
     annual_summary_columns = ("B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI", "AL")
     annual_category_fills = tuple((row + 1, fill_id) for row, fill_id in category_fills)

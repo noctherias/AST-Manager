@@ -140,7 +140,7 @@ class Table(QTableWidget):
         self.verticalHeader().setSectionsMovable(True)
         self.verticalHeader().setToolTip("Zeilen ziehen zum Sortieren · Rechtsklick zum Ausblenden")
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setShowGrid(False)
         self.setAlternatingRowColors(False)
@@ -192,6 +192,18 @@ class Table(QTableWidget):
     def selected_id(self):
         row = self.currentRow()
         return self.item(row, 0).data(Qt.ItemDataRole.UserRole) if row >= 0 and self.item(row, 0) else None
+
+    def selected_ids(self):
+        """Return every selected record id once, in visible row order."""
+        rows = sorted({index.row() for index in self.selectionModel().selectedRows()})
+        result = []
+        for row in rows:
+            item = self.item(row, 0)
+            if item is not None:
+                key = item.data(Qt.ItemDataRole.UserRole)
+                if key is not None and key not in result:
+                    result.append(key)
+        return result
 
     def _stored_layout(self):
         if not self._layout_db:

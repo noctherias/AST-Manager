@@ -297,9 +297,13 @@ class Receivables(Page):
 
     @guarded
     def remove(self):
+        keys = self.table.selected_ids()
         r = self.selected()
-        if r and confirm(self, f"Rechnung {r['number']} löschen? Rechnungen mit Zahlungen müssen zuerst bereinigt werden."):
-            self.db.delete("invoices", r["id"])
+        question = (f"Rechnung {r['number']} löschen? Rechnungen mit Zahlungen müssen zuerst bereinigt werden."
+                    if len(keys) == 1 and r else
+                    f"Die {len(keys)} ausgewählten Rechnungen löschen? Rechnungen mit Zahlungen müssen zuerst bereinigt werden.")
+        if keys and confirm(self, question):
+            self.db.delete_many("invoices", keys)
             self.refresh()
 
     def export_rows(self):
@@ -464,9 +468,12 @@ class TimePage(Page):
 
     @guarded
     def remove_entry(self):
-        key = self.table.selected_id()
-        if key and confirm(self, "Diese Buchung löschen? Guthaben und Überträge werden neu berechnet."):
-            self.db.delete("entries", key)
+        keys = self.table.selected_ids()
+        question = ("Diese Buchung löschen? Guthaben und Überträge werden neu berechnet."
+                    if len(keys) == 1 else
+                    f"Die {len(keys)} ausgewählten Buchungen löschen? Guthaben und Überträge werden neu berechnet.")
+        if keys and confirm(self, question):
+            self.db.delete_many("entries", keys)
             self.refresh_entries()
 
     @guarded
@@ -575,9 +582,13 @@ class SalaryPage(Page):
 
     @guarded
     def remove(self):
+        keys = self.table.selected_ids()
         r = self.selected()
-        if r and confirm(self, f"Gespeicherten Ausweis für {r['name']} ({r['year']}) löschen?"):
-            self.db.delete("salaries", r["id"])
+        question = (f"Gespeicherten Ausweis für {r['name']} ({r['year']}) löschen?"
+                    if len(keys) == 1 and r else
+                    f"Die {len(keys)} ausgewählten Lohnausweise löschen?")
+        if keys and confirm(self, question):
+            self.db.delete_many("salaries", keys)
             self.refresh()
 
 

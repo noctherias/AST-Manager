@@ -323,14 +323,23 @@ class Database:
             self.log("reminder", "invoices", invoice_id, {"level": level, "date": value})
 
     def delete(self, table, key):
+        self.delete_many(table, [key])
+
+    def delete_many(self, table, keys):
         if table not in ("entries", "time_records", "payments", "invoices", "salaries", "payroll_records",
                          "employment_references", "applicants", "applicant_files"):
             raise ValueError("Dieser Datensatz kann nicht gelöscht werden.")
+        keys = list(dict.fromkeys(key for key in keys if key is not None))
+        if not keys:
+            return
         try:
             with self.conn:
-                row = self.one(f"SELECT * FROM {table} WHERE id=?", (key,))
-                self.conn.execute(f"DELETE FROM {table} WHERE id=?", (key,))
-                self.log("delete", table, key, row)
+                rows = [(key, self.one(f"SELECT * FROM {table} WHERE id=?", (key,))) for key in keys]
+                for key, row in rows:
+                    if row is None:
+                        raise ValueError("Mindestens ein ausgewählter Datensatz existiert nicht mehr.")
+                    self.conn.execute(f"DELETE FROM {table} WHERE id=?", (key,))
+                    self.log("delete", table, key, row)
         except sqlite3.IntegrityError:
             raise ValueError("Zuerst die zugehörigen Zahlungen entfernen.") from None
 

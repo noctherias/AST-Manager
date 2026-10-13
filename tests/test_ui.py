@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QLocale, QCoreApplication, QEvent, QDate
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (QApplication, QMessageBox, QDialog, QLineEdit, QPlainTextEdit,
-                               QAbstractSpinBox)
+                               QAbstractSpinBox, QTableWidgetSelectionRange)
 
 from ast_app.database import Database
 from ast_app.demo import seed_demo
@@ -41,6 +41,12 @@ QLocale.setDefault(QLocale(QLocale.Language.German, QLocale.Country.Switzerland)
 
 
 class UiTests(unittest.TestCase):
+    def test_tables_allow_multiple_selected_rows(self):
+        table = Table(["Wert"])
+        table.populate([["A"], ["B"], ["C"]], [10, 11, 12])
+        table.setRangeSelected(QTableWidgetSelectionRange(0, 0, 1, 0), True)
+        self.assertEqual(table.selected_ids(), [10, 11])
+
     def test_numbers_use_direct_entry_and_dates_offer_a_clear_calendar(self):
         amount = numeric(8.75, " h")
         self.assertEqual(amount.buttonSymbols(), QAbstractSpinBox.ButtonSymbols.NoButtons)

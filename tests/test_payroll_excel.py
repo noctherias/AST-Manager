@@ -33,6 +33,9 @@ class PayrollExcelTests(unittest.TestCase):
             export_payroll_book(target, employee, 2026, [record], {"city": "Aarburg"})
             with zipfile.ZipFile(target) as exported:
                 self.assertIsNone(exported.testzip())
+                self.assertNotIn("xl/calcChain.xml", exported.namelist())
+                self.assertNotIn(b"calcChain.xml", exported.read("[Content_Types].xml"))
+                self.assertNotIn(b"calcChain.xml", exported.read("xl/_rels/workbook.xml.rels"))
                 sheet = ET.fromstring(exported.read("xl/worksheets/sheet1.xml"))
                 self.assertEqual(cell(sheet, "L3").find("x:v", NS).text, "2026")
                 self.assertEqual(cell(sheet, "J13").find("x:is/x:t", NS).text, "Muster Lena")

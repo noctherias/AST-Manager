@@ -136,9 +136,12 @@ class PaymentDialog(FormDialog):
 
     @guarded
     def remove(self):
-        key = self.table.selected_id()
-        if key and confirm(self, "Diese Zahlung entfernen? Der offene Rechnungsbetrag wird neu berechnet."):
-            self.db.delete("payments", key)
+        keys = self.table.selected_ids()
+        question = ("Diese Zahlung entfernen? Der offene Rechnungsbetrag wird neu berechnet."
+                    if len(keys) == 1 else
+                    f"Die {len(keys)} ausgewählten Zahlungen entfernen? Der offene Rechnungsbetrag wird neu berechnet.")
+        if keys and confirm(self, question):
+            self.db.delete_many("payments", keys)
             self.refresh()
 
     @guarded

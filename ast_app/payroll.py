@@ -224,8 +224,8 @@ class PayrollPage(Page):
         return next((record for record in self.records if record["id"] == self.table.selected_id()), None)
 
     def selection(self):
-        enabled = self.selected() is not None
-        self.edit_btn.setEnabled(enabled); self.delete_btn.setEnabled(enabled)
+        count = len(self.table.selected_ids())
+        self.edit_btn.setEnabled(count == 1); self.delete_btn.setEnabled(count > 0)
 
     def defaults(self):
         all_records = self.db.payroll_records(self.person.currentData()) if self.person.currentData() else []
@@ -246,9 +246,13 @@ class PayrollPage(Page):
 
     @guarded
     def remove(self):
+        keys = self.table.selected_ids()
         record = self.selected()
-        if record and confirm(self, f"Den Monatslohn {MONTHS[record['month'] - 1]} {record['year']} löschen?"):
-            self.db.delete("payroll_records", record["id"]); self.refresh()
+        question = (f"Den Monatslohn {MONTHS[record['month'] - 1]} {record['year']} löschen?"
+                    if len(keys) == 1 and record else
+                    f"Die {len(keys)} ausgewählten Monatslöhne löschen?")
+        if keys and confirm(self, question):
+            self.db.delete_many("payroll_records", keys); self.refresh()
 
     def refresh_trend(self):
         employee_id = self.person.currentData() if hasattr(self, "person") else None
