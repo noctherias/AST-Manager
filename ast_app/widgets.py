@@ -7,7 +7,7 @@ import json
 import logging
 
 from PySide6.QtCore import Qt, QDate
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLineEdit, QComboBox,
     QDoubleSpinBox, QSpinBox, QDateEdit, QMessageBox, QDialog, QDialogButtonBox,
@@ -37,12 +37,17 @@ def label(text, name=None):
     return w
 
 
-def button(text, callback=None, primary=False):
+def button(text, callback=None, primary=False, icon: QIcon | None = None):
     b = QPushButton(text)
+    b.setAccessibleName(text.replace("&", ""))
     b.setCursor(Qt.CursorShape.PointingHandCursor)
     b.setMinimumHeight(36)
     if primary:
         b.setObjectName("primary")
+    elif any(word in text.lower() for word in ("löschen", "entfernen")):
+        b.setObjectName("danger")
+    if icon is not None:
+        b.setIcon(icon)
     if callback:
         b.clicked.connect(lambda checked=False: callback())
     return b
@@ -326,13 +331,18 @@ class Table(QTableWidget):
 
 
 class Page(QWidget):
-    def __init__(self, title, subtitle):
+    def __init__(self, title, subtitle, help_topic=""):
         super().__init__()
         self.setObjectName("pageRoot")
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(32, 26, 32, 24)
         self.layout.setSpacing(18)
-        self.header = QHBoxLayout()
+        self.help_topic = help_topic or self._topic_from_title(title)
+        self.header_frame = QFrame()
+        self.header_frame.setObjectName("pageHeader")
+        self.header = QHBoxLayout(self.header_frame)
+        self.header.setContentsMargins(20, 17, 16, 17)
+        self.header.setSpacing(12)
         titles = QVBoxLayout()
         titles.setSpacing(5)
         self.title_label = label(title, "pageTitle")
@@ -341,7 +351,26 @@ class Page(QWidget):
         titles.addWidget(self.title_label)
         titles.addWidget(self.subtitle_label)
         self.header.addLayout(titles, 1)
-        self.layout.addLayout(self.header)
+        if help_topic is not None:
+            self.help_button = button("Hilfe")
+            self.help_button.setObjectName("helpButton")
+            self.help_button.setToolTip("Anleitung zu diesem Bereich öffnen (F1)")
+            self.help_button.setAccessibleName("Hilfe zu " + title)
+            self.header.addWidget(self.help_button, 0, Qt.AlignmentFlag.AlignTop)
+        else:
+            self.help_button = None
+        self.layout.addWidget(self.header_frame)
+
+    @staticmethod
+    def _topic_from_title(title):
+        value = title.lower()
+        for marker, topic in (("mahn", "reminders"), ("debitor", "debtors"),
+                              ("stunden", "timesheet"), ("lohnbuch", "payroll"),
+                              ("zeugnis", "references"), ("bewerbung", "applications"),
+                              ("lohnausweis", "salary"), ("einstellung", "settings")):
+            if marker in value:
+                return topic
+        return "overview"
 
     def toolbar(self):
         row = QHBoxLayout()
@@ -389,8 +418,8 @@ class FormDialog(QDialog):
         scroll.setWidget(content)
         self.layout.addWidget(scroll, 1)
         self.buttons = QDialogButtonBox()
-        self.cancel_button = self.buttons.addButton("Abbrechen", QDialogButtonBox.ButtonRole.RejectRole)
-        self.save_button = self.buttons.addButton("Speichern", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.cancel_button = self.buttons.addButton("Vorgang abbrechen", QDialogButtonBox.ButtonRole.RejectRole)
+        self.save_button = self.buttons.addButton("Angaben speichern", QDialogButtonBox.ButtonRole.AcceptRole)
         self.save_button.setObjectName("primary")
         self.buttons.rejected.connect(self.reject)
         self.buttons.accepted.connect(self.submit)

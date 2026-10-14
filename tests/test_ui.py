@@ -113,7 +113,7 @@ class UiTests(unittest.TestCase):
         self.assertEqual(window.watermark.geometry(), window.stack.geometry())
         self.assertTrue(window.watermark.testAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents))
-        for index in range(9):
+        for index in range(10):
             QTest.mouseClick(window.buttons[index], Qt.MouseButton.LeftButton)
             for _ in range(4): APP.processEvents()
             self.assertEqual(window.stack.currentIndex(), index)
@@ -131,6 +131,18 @@ class UiTests(unittest.TestCase):
         self.assertEqual(window.buttons[8].text(), "Lohnbuch")
         self.assertEqual(window.pages[8].tabs.tabText(0), "Monatslöhne")
         self.assertEqual(window.pages[8].tabs.tabText(1), "Lohnverlauf")
+        self.assertEqual(window.buttons[9].text(), "Hilfe und Anleitungen")
+        help_page = window.pages[9]
+        self.assertGreaterEqual(help_page.topics.count(), 9)
+        help_page.search.setText("Ferien Eintritt")
+        APP.processEvents()
+        self.assertEqual(help_page.topics.count(), 1)
+        self.assertEqual(help_page.topics.currentItem().data(Qt.ItemDataRole.UserRole), "timesheet")
+        window.navigate(1)
+        QTest.mouseClick(window.pages[1].help_button, Qt.MouseButton.LeftButton)
+        APP.processEvents()
+        self.assertEqual(window.stack.currentIndex(), 9)
+        self.assertEqual(help_page.topics.currentItem().data(Qt.ItemDataRole.UserRole), "debtors")
         settings = window.pages[4]
         settings.background_logo.setChecked(True)
         APP.processEvents()

@@ -2,13 +2,15 @@ from datetime import date
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget,
-                               QButtonGroup, QFrame, QScrollArea, QApplication, QStyle)
+                               QButtonGroup, QFrame, QScrollArea, QApplication)
 
-from .widgets import label, button, Table
+from .widgets import label, button, Table, Page
 from .experience import Start, Invoices, Reminders, Team, Salaries, Settings
 from .references import ReferencesPage
 from .applications import ApplicationsPage
 from .payroll import PayrollPage
+from .help import HelpPage
+from .icons import icon as app_icon
 from .update_ui import UpdateController
 from . import __version__
 from .documents import resource_path
@@ -62,7 +64,7 @@ class MainWindow(QMainWindow):
         self.sidebar.setObjectName("sidebar")
         self.nav = QVBoxLayout(self.sidebar)
         self.nav.setContentsMargins(20, 20, 20, 22)
-        self.nav.setSpacing(8)
+        self.nav.setSpacing(3)
         brand_row = QHBoxLayout()
         self.brand_label = label("AST", "brand")
         brand_row.addWidget(self.brand_label, 1)
@@ -73,30 +75,41 @@ class MainWindow(QMainWindow):
         self.nav.addLayout(brand_row)
         self.brand_caption = label("VERWALTUNG", "brandCaption")
         self.nav.addWidget(self.brand_caption)
-        self.nav.addSpacing(22)
-        self.nav_section = label("ARBEITSBEREICHE", "navSection")
-        self.nav.addWidget(self.nav_section)
-        self.nav.addSpacing(4)
+        self.nav.addSpacing(10)
+        self.nav_sections = []
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
-        self.buttons = [None] * 9
+        self.buttons = [None] * 10
         self.nav_items = {}
-        for page_index, name, child, icon in [
-            (0, "Übersicht", False, QStyle.StandardPixmap.SP_DesktopIcon),
-            (1, "Debitoren", False, QStyle.StandardPixmap.SP_FileDialogDetailedView),
-            (5, "Mahnungen", True, QStyle.StandardPixmap.SP_MessageBoxWarning),
-            (2, "Stundennachweis", False, QStyle.StandardPixmap.SP_FileDialogListView),
-            (8, "Lohnbuch", False, QStyle.StandardPixmap.SP_DriveHDIcon),
-            (6, "Zeugnisse", False, QStyle.StandardPixmap.SP_FileDialogContentsView),
-            (7, "Bewerbungen", False, QStyle.StandardPixmap.SP_DirHomeIcon),
-            (3, "Lohnausweise", False, QStyle.StandardPixmap.SP_FileIcon),
-            (4, "Einstellungen", False, QStyle.StandardPixmap.SP_ComputerIcon),
-        ]:
+        nav_spec = [
+            ("section", "START"),
+            (0, "Übersicht", False, "overview"),
+            ("section", "FINANZEN"),
+            (1, "Debitoren", False, "invoices"),
+            (5, "Mahnungen", True, "reminders"),
+            (8, "Lohnbuch", False, "payroll"),
+            (3, "Lohnausweise", False, "salary"),
+            ("section", "PERSONAL"),
+            (2, "Stundennachweis", False, "timesheet"),
+            (6, "Zeugnisse", False, "references"),
+            (7, "Bewerbungen", False, "applications"),
+            ("section", "SYSTEM"),
+            (4, "Einstellungen", False, "settings"),
+            (9, "Hilfe und Anleitungen", False, "help"),
+        ]
+        for item in nav_spec:
+            if item[0] == "section":
+                section = label(item[1], "navSection")
+                self.nav_sections.append(section)
+                self.nav.addSpacing(2)
+                self.nav.addWidget(section)
+                continue
+            page_index, name, child, icon_name = item
             b = button(name, lambda index=page_index: self.navigate(index))
             b.setObjectName("navSubButton" if child else "navButton")
             b.setCheckable(True)
-            b.setMinimumHeight(38 if child else 46)
-            b.setIcon(self.style().standardIcon(icon))
+            b.setMinimumHeight(34 if child else 40)
+            b.setIcon(app_icon(icon_name))
             b.setIconSize(QSize(20, 20))
             b.setToolTip(name)
             self.nav_group.addButton(b, page_index)
@@ -119,12 +132,22 @@ class MainWindow(QMainWindow):
         self.updates = UpdateController(self, db, demo)
         self.pages = [Start(db, self), Invoices(db), Team(db, self), Salaries(db),
                       Settings(db, self.updates, self.set_watermark_enabled), Reminders(db, self), ReferencesPage(db),
-                      ApplicationsPage(db), PayrollPage(db)]
+                      ApplicationsPage(db), PayrollPage(db), HelpPage()]
         for page in self.pages:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setWidget(page)
             self.stack.addWidget(scroll)
+            help_pages = ([page] if isinstance(page, Page) else []) + page.findChildren(Page)
+            for help_page in help_pages:
+                if help_page.help_button is None:
+                    continue
+                help_page.header.removeWidget(help_page.help_button)
+                help_page.help_button.setIcon(app_icon("help"))
+                help_page.help_button.clicked.connect(
+                    lambda checked=False, topic=help_page.help_topic: self.open_help(topic)
+                )
+                help_page.header.addWidget(help_page.help_button, 0, Qt.AlignmentFlag.AlignTop)
         for page_index, page in enumerate(self.pages):
             for table_index, table in enumerate(page.findChildren(Table)):
                 table.bind_layout(db, f"page_{page_index}_{table_index}")
@@ -140,6 +163,8 @@ class MainWindow(QMainWindow):
         QApplication.instance().aboutToQuit.connect(self.prepare_shutdown)
         self.refresh_shortcut = QShortcut(QKeySequence("F5"), self)
         self.refresh_shortcut.activated.connect(lambda: self.pages[self.stack.currentIndex()].refresh())
+        self.help_shortcut = QShortcut(QKeySequence("F1"), self)
+        self.help_shortcut.activated.connect(self.open_current_help)
         self.set_sidebar_collapsed(self.db.settings().get("sidebar_collapsed", "0") == "1", save=False)
 
     def _position_watermark(self, *_):
@@ -168,7 +193,7 @@ class MainWindow(QMainWindow):
         self.brand_label.setAlignment(Qt.AlignmentFlag.AlignCenter if collapsed else Qt.AlignmentFlag.AlignLeft)
         self.sidebar_toggle.setText("›" if collapsed else "‹")
         self.sidebar_toggle.setToolTip("Menü ausklappen" if collapsed else "Menü einklappen")
-        for widget in (self.brand_caption, self.nav_section, self.storage_label, self.bottom_label, self.version_label):
+        for widget in (self.brand_caption, *self.nav_sections, self.storage_label, self.bottom_label, self.version_label):
             widget.setVisible(not collapsed)
         for page_index, (name, child) in self.nav_items.items():
             nav_button = self.buttons[page_index]
@@ -189,6 +214,22 @@ class MainWindow(QMainWindow):
         self.pages[index].refresh()
         self.stack.setCurrentIndex(index)
         self.buttons[index].setChecked(True)
+        name = self.nav_items[index][0]
+        self.statusBar().showMessage(f"{name} · Bereit")
+
+    def open_help(self, topic="overview"):
+        self.navigate(9)
+        self.pages[9].open_topic(topic)
+
+    def open_current_help(self):
+        index = self.stack.currentIndex()
+        if index == 9:
+            topic = "overview"
+        elif isinstance(self.pages[index], Page):
+            topic = self.pages[index].help_topic
+        else:
+            topic = "timesheet"
+        self.open_help(topic)
 
     def navigate_settings_team(self, create=False, employee_id=None):
         self.navigate(4)

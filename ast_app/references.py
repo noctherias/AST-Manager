@@ -361,8 +361,8 @@ class ReferenceDialog(QDialog):
 
         buttons = QDialogButtonBox()
         buttons.addButton("Abbrechen", QDialogButtonBox.ButtonRole.RejectRole)
-        self.back = buttons.addButton("Zurück", QDialogButtonBox.ButtonRole.ActionRole)
-        self.next = buttons.addButton("Weiter", QDialogButtonBox.ButtonRole.ActionRole)
+        self.back = buttons.addButton("Vorheriger Schritt", QDialogButtonBox.ButtonRole.ActionRole)
+        self.next = buttons.addButton("Nächster Schritt", QDialogButtonBox.ButtonRole.ActionRole)
         self.save = buttons.addButton("Zeugnis speichern", QDialogButtonBox.ButtonRole.AcceptRole)
         self.next.setObjectName("primary"); self.save.setObjectName("primary")
         self.back.clicked.connect(lambda: self.set_step(self.tabs.currentIndex() - 1))
@@ -436,10 +436,10 @@ class ReferencesPage(Page):
         row = QHBoxLayout()
         self.hint = label("Bitte ein Zeugnis auswählen.", "muted")
         row.addWidget(self.hint, 1)
-        self.edit_button = button("Bearbeiten", self.edit)
+        self.edit_button = button("Zeugnis bearbeiten", self.edit)
         self.preview_button = button("PDF ansehen", self.preview)
         self.export_button = button("PDF speichern", self.export, True)
-        self.delete_button = button("Löschen", self.remove)
+        self.delete_button = button("Ausgewählte Zeugnisse löschen", self.remove)
         for control in (self.edit_button, self.preview_button, self.export_button, self.delete_button):
             row.addWidget(control)
         self.layout.addLayout(row)

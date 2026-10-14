@@ -169,7 +169,7 @@ class PayrollPage(Page):
                             "Zulagen", "Nettolohn", "Bemerkung"])
         monthly_layout.addWidget(self.table, 1)
         row, self.selection_hint = selection_bar(monthly_layout, "Wähle einen Monatslohn aus oder erfasse einen neuen.")
-        self.edit_btn = button("Bearbeiten", self.edit); self.delete_btn = button("Löschen", self.remove)
+        self.edit_btn = button("Monatslohn bearbeiten", self.edit); self.delete_btn = button("Ausgewählte Monatslöhne löschen", self.remove)
         row.addWidget(self.edit_btn); row.addWidget(self.delete_btn)
         self.tabs.addTab(monthly, "Monatslöhne")
         trend = QWidget(); trend_layout = QVBoxLayout(trend); trend_layout.setContentsMargins(0, 16, 0, 0)
